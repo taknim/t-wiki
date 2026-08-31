@@ -18,6 +18,11 @@ const ATTACHMENT_EXTENSIONS = new Set([...IMAGE_EXTENSIONS, ...DOCUMENT_EXTENSIO
 /** 이보다 큰 첨부는 동기화하지 않습니다. 로컬에는 그대로 두고 목록에만 표시합니다. */
 export const MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024
 
+/** 파일 고르기 창에서 미리 걸러 주는 목록. */
+export const ACCEPT_ATTRIBUTE = [...IMAGE_EXTENSIONS, ...DOCUMENT_EXTENSIONS]
+  .map((extension) => `.${extension}`)
+  .join(',')
+
 export type AttachmentKind = 'image' | 'pdf' | 'text' | 'binary'
 
 export function extensionOf(path: string): string {

@@ -10,7 +10,7 @@ import { SyncReportSheet } from './components/SyncReportSheet'
 import { TreeView } from './components/TreeView'
 import { useGitHubSync } from './hooks/useGitHubSync'
 import { useVault } from './hooks/useVault'
-import { isMarkdown } from './lib/attachments'
+import { ACCEPT_ATTRIBUTE, formatBytes, isMarkdown, MAX_ATTACHMENT_BYTES } from './lib/attachments'
 import { extractHeadings, parseFrontmatter } from './lib/markdown'
 import { loadSession, saveSession } from './lib/session'
 import { titleOf } from './lib/wikilinks'
@@ -237,7 +237,39 @@ export default function App() {
     })
   }, [])
 
-  const currentDir = selectedPath ? selectedPath.split('/').slice(0, -1).join('/') : ''
+  const currentDir = selectedDir ?? (selectedPath ? selectedPath.split('/').slice(0, -1).join('/') : '')
+
+  const filePicker = useRef<HTMLInputElement>(null)
+
+  const handleAddFiles = useCallback(
+    async (files: File[]) => {
+      if (files.length === 0) return
+      try {
+        const result = await vault.addFiles(currentDir, files)
+
+        const parts: string[] = []
+        if (result.added.length > 0) parts.push(`${result.added.length}개 추가`)
+        if (result.rejected.length > 0) parts.push(`${result.rejected.length}개는 지원하지 않는 형식`)
+        if (result.tooBig.length > 0) {
+          parts.push(`${result.tooBig.length}개는 ${formatBytes(MAX_ATTACHMENT_BYTES)} 초과로 동기화 제외`)
+        }
+        flash(parts.join(' · ') || '추가한 파일이 없습니다')
+
+        // 방금 넣은 파일을 바로 보여 줍니다.
+        const first = result.added[0]
+        if (first) {
+          setSelectedDir(null)
+          setSelectedPath(first)
+          setDraft('')
+          setDirty(false)
+        }
+      } catch (cause) {
+        report(cause)
+      }
+    },
+    [currentDir, flash, report, vault],
+  )
+
 
   // 문서 맨 앞 `---` 블록은 메타데이터로 떼어내고 본문만 렌더합니다.
   const selection = useMemo<SelectionInfo | null>(() => {
@@ -564,7 +596,29 @@ export default function App() {
               >
                 ＋ 폴더
               </button>
+              <button
+                type="button"
+                className="btn btn-small"
+                data-tip={`이미지·문서 파일을 골라 넣습니다 (${currentDir || '최상위'})`}
+                onClick={() => filePicker.current?.click()}
+              >
+                ＋ 파일
+              </button>
             </div>
+
+            {/* 파일 고르기 창은 브라우저가 띄웁니다. 목록에 있는 형식만 걸러 보여 줍니다. */}
+            <input
+              ref={filePicker}
+              type="file"
+              multiple
+              accept={ACCEPT_ATTRIBUTE}
+              className="visually-hidden"
+              onChange={(event) => {
+                const files = [...(event.target.files ?? [])]
+                event.target.value = ''
+                void handleAddFiles(files)
+              }}
+            />
           </div>
 
           <div className="sidebar-scroll">

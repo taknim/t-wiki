@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { AssetIndex, DocIndex, VaultNode } from '../types'
+import { isAttachment, MAX_ATTACHMENT_BYTES } from '../lib/attachments'
 import { clearAssetCache } from '../lib/assets'
 import * as fs from '../lib/fsAccess'
 import { clearVaultHandle, loadVaultHandle, saveVaultHandle } from '../lib/store'
@@ -24,6 +25,16 @@ export interface Vault {
   rename: (path: string, nextName: string) => Promise<string>
   move: (path: string, targetDir: string) => Promise<string>
   remove: (path: string) => Promise<void>
+  addFiles: (dirPath: string, files: File[]) => Promise<AddResult>
+}
+
+export interface AddResult {
+  /** 실제로 들어간 경로. */
+  added: string[]
+  /** 형식이 맞지 않아 넣지 않은 파일 이름. */
+  rejected: string[]
+  /** 넣긴 했지만 크기 때문에 동기화되지 않을 파일 경로. */
+  tooBig: string[]
 }
 
 function joinPath(dir: string, name: string): string {
@@ -233,6 +244,33 @@ export function useVault(): Vault {
     [refresh, requireRoot],
   )
 
+  /**
+   * 고른 파일을 폴더에 넣습니다.
+   * 같은 이름이 있으면 덮지 않고 뒤에 번호를 붙입니다. 실수로 원본을 잃지 않도록.
+   */
+  const addFiles = useCallback(
+    async (dirPath: string, files: File[]): Promise<AddResult> => {
+      const root = requireRoot()
+      const result: AddResult = { added: [], rejected: [], tooBig: [] }
+
+      for (const file of files) {
+        if (!isAttachment(file.name)) {
+          result.rejected.push(file.name)
+          continue
+        }
+
+        const path = await uniquePath(root, joinPath(dirPath, file.name))
+        await fs.writeBinaryFile(root, path, file)
+        result.added.push(path)
+        if (file.size > MAX_ATTACHMENT_BYTES) result.tooBig.push(path)
+      }
+
+      if (result.added.length > 0) await refresh()
+      return result
+    },
+    [refresh, requireRoot],
+  )
+
   return {
     status,
     error,
@@ -251,5 +289,21 @@ export function useVault(): Vault {
     rename,
     move,
     remove,
+    addFiles,
   }
+}
+
+/** 이미 있는 이름이면 "그림 (2).png" 처럼 번호를 붙여 비어 있는 자리를 찾습니다. */
+async function uniquePath(root: FileSystemDirectoryHandle, path: string): Promise<string> {
+  if (!(await fs.exists(root, path))) return path
+
+  const at = path.lastIndexOf('.')
+  const stem = at === -1 ? path : path.slice(0, at)
+  const extension = at === -1 ? '' : path.slice(at)
+
+  for (let number = 2; number < 1000; number += 1) {
+    const candidate = `${stem} (${number})${extension}`
+    if (!(await fs.exists(root, candidate))) return candidate
+  }
+  throw new Error('같은 이름의 파일이 너무 많습니다.')
 }
