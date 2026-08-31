@@ -12,6 +12,8 @@ export interface TreeActions {
   onRename: (path: string) => void
   onDelete: (path: string) => void
   onMove: (from: string, targetDir: string) => void
+  /** 컴퓨터에서 끌어다 놓은 파일을 그 폴더에 넣습니다. */
+  onDropFiles: (targetDir: string, files: File[]) => void
 }
 
 interface TreeViewProps extends TreeActions {
@@ -30,6 +32,12 @@ export function TreeView({ root, ...props }: TreeViewProps) {
       // 루트로 끌어다 놓으면 볼트 최상위로 옮깁니다.
       onDragOver={(event) => event.preventDefault()}
       onDrop={(event) => {
+        event.preventDefault()
+        const files = [...event.dataTransfer.files]
+        if (files.length > 0) {
+          props.onDropFiles('', files)
+          return
+        }
         const from = event.dataTransfer.getData('text/mdwiki-path')
         if (from) props.onMove(from, '')
       }}
@@ -83,6 +91,14 @@ function TreeRow({ node, depth, selectedPath, expanded, onToggle, ...actions }: 
           event.preventDefault()
           event.stopPropagation()
           setDropTarget(false)
+
+          // 컴퓨터에서 끌어온 파일이면 그 폴더에 넣고, 아니면 트리 안 이동으로 봅니다.
+          const files = [...event.dataTransfer.files]
+          if (files.length > 0) {
+            actions.onDropFiles(dropDir, files)
+            return
+          }
+
           const from = event.dataTransfer.getData('text/mdwiki-path')
           if (from && from !== node.path) actions.onMove(from, dropDir)
         }}

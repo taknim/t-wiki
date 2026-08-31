@@ -48,6 +48,18 @@ export default function App() {
     selectedRef.current = selectedPath
   }, [selectedPath])
 
+  // 트리 밖에 파일을 떨어뜨리면 브라우저가 그 파일로 이동해 버립니다.
+  // 작업하던 화면이 통째로 날아가므로 문서 전체에서 기본 동작을 막습니다.
+  useEffect(() => {
+    const swallow = (event: DragEvent) => event.preventDefault()
+    document.addEventListener('dragover', swallow)
+    document.addEventListener('drop', swallow)
+    return () => {
+      document.removeEventListener('dragover', swallow)
+      document.removeEventListener('drop', swallow)
+    }
+  }, [])
+
   const flash = useCallback((message: string) => {
     setNotice(message)
     window.setTimeout(() => setNotice((current) => (current === message ? null : current)), 2600)
@@ -242,10 +254,11 @@ export default function App() {
   const filePicker = useRef<HTMLInputElement>(null)
 
   const handleAddFiles = useCallback(
-    async (files: File[]) => {
+    async (files: File[], targetDir?: string) => {
       if (files.length === 0) return
+      const dir = targetDir ?? currentDir
       try {
-        const result = await vault.addFiles(currentDir, files)
+        const result = await vault.addFiles(dir, files)
 
         const parts: string[] = []
         if (result.added.length > 0) parts.push(`${result.added.length}개 추가`)
@@ -641,6 +654,7 @@ export default function App() {
                   onRename={(path) => void handleRename(path)}
                   onDelete={(path) => void handleDelete(path)}
                   onMove={(from, dir) => void handleMove(from, dir)}
+                  onDropFiles={(dir, files) => void handleAddFiles(files, dir)}
                 />
               )
             )}
