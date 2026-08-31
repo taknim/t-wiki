@@ -42,6 +42,13 @@ async function rawRequest(
 ): Promise<Response> {
   const response = await fetch(`${API}${path}`, {
     ...init,
+    /*
+     * GitHub 은 인증된 응답에도 `cache-control: private, max-age=60` 을 붙입니다.
+     * 그대로 두면 브랜치 위치를 최대 1분간 캐시에서 읽어, 방금 우리가 옮겨 놓은
+     * 커밋을 못 보고 낡은 부모 위에 쌓다가 non-fast-forward 로 거절당합니다.
+     * 재시도해도 캐시가 그대로라 계속 실패합니다.
+     */
+    cache: 'no-store',
     headers: {
       Authorization: `Bearer ${token}`,
       Accept: accept,

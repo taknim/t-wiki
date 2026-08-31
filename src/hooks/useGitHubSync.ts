@@ -277,6 +277,8 @@ export function useGitHubSync({ root, docs, assets, onBeforeSync, onLocalChanged
             message: '저장소가 그 사이에 바뀌었습니다. 다시 맞추는 중…',
             progress: null,
           })
+          // 정말로 다른 쪽이 쓰는 중이라면 조금 쉬었다 가는 편이 낫습니다.
+          await new Promise((done) => setTimeout(done, 400 * attempt))
         }
       })
 
