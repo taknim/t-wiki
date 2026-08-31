@@ -33,8 +33,14 @@ export function SyncReportSheet({ report, onClose, onConfirm }: SyncReportSheetP
       <div className="sheet" role="dialog" aria-modal="true" aria-label="동기화 결과">
         <header className="sheet-head">
           <h2>{report.needsConfirm ? '동기화 대상이 바뀌었습니다' : '동기화 결과'}</h2>
-          <button type="button" className="btn" data-tip="결과 창을 닫습니다" onClick={onClose}>
-            닫기
+          <button
+            type="button"
+            className="btn sheet-close"
+            aria-label="닫기"
+            data-tip="결과 창을 닫습니다"
+            onClick={onClose}
+          >
+            ×
           </button>
         </header>
 

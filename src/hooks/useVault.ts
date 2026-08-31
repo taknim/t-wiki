@@ -155,7 +155,7 @@ export function useVault(): Vault {
   }, [scan])
 
   const requireRoot = useCallback((): FileSystemDirectoryHandle => {
-    if (!rootRef.current) throw new Error('먼저 볼트 폴더를 열어 주세요.')
+    if (!rootRef.current) throw new Error('먼저 폴더를 열어 주세요.')
     return rootRef.current
   }, [])
 

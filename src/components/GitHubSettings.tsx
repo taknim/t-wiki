@@ -165,8 +165,8 @@ export function GitHubSettings({ sync, onShowReport }: GitHubSettingsProps) {
           onChange={(event) => update({ basePath: event.target.value.replace(/^\/+|\/+$/g, '') })}
         />
         <p className="hint">
-          하위 폴더를 적으면 <strong>볼트 최상위가 저장소의 그 폴더에 대응</strong>합니다.
-          예를 들어 <code>docs</code> 로 두면 볼트의 <code>회고/8월.md</code> 는
+          하위 폴더를 적으면 <strong>연 폴더의 최상위가 저장소의 그 폴더에 대응</strong>합니다.
+          예를 들어 <code>docs</code> 로 두면 <code>회고/8월.md</code> 는
           저장소의 <code>docs/회고/8월.md</code> 가 됩니다. 비우면 저장소 루트입니다.
         </p>
         <p className="hint">
@@ -213,7 +213,7 @@ export function GitHubSettings({ sync, onShowReport }: GitHubSettingsProps) {
           />
           정해진 간격마다 알아서 동기화하기
           <span className="hint">
-            볼트를 연 직후 한 번 돌고, 그 뒤로는 아래 간격마다 반복합니다.
+            폴더를 연 직후 한 번 돌고, 그 뒤로는 아래 간격마다 반복합니다.
             이미 동기화 중이면 건너뜁니다.
           </span>
         </label>

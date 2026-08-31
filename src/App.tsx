@@ -172,7 +172,7 @@ export default function App() {
     async (dirPath: string) => {
       const name = await dialogs.prompt({
         title: '새 문서',
-        label: dirPath ? `"${dirPath}" 안에 만듭니다.` : '볼트 최상위에 만듭니다.',
+        label: dirPath ? `"${dirPath}" 안에 만듭니다.` : '최상위 폴더에 만듭니다.',
         defaultValue: '제목 없는 문서',
         confirmText: '만들기',
       })
@@ -191,7 +191,7 @@ export default function App() {
     async (dirPath: string) => {
       const name = await dialogs.prompt({
         title: '새 폴더',
-        label: dirPath ? `"${dirPath}" 안에 만듭니다.` : '볼트 최상위에 만듭니다.',
+        label: dirPath ? `"${dirPath}" 안에 만듭니다.` : '최상위 폴더에 만듭니다.',
         defaultValue: '새 폴더',
         confirmText: '만들기',
       })
@@ -321,7 +321,7 @@ export default function App() {
               <button
                 type="button"
                 className="btn"
-                data-tip="다른 폴더를 볼트로 지정합니다"
+                data-tip="다른 폴더를 지정합니다"
                 onClick={() => void vault.open()}
               >
                 다른 폴더 고르기
@@ -418,7 +418,7 @@ export default function App() {
             data-tip="이 폴더와의 연결을 끊습니다. 파일은 그대로 남습니다"
             onClick={() => void vault.close()}
           >
-            볼트 닫기
+            폴더 닫기
           </button>
         </div>
       </header>

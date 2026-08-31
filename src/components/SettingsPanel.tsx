@@ -43,7 +43,19 @@ export function SettingsPanel({ onClose, sync, onShowReport, initialTab = 'appea
       <div className="sheet" role="dialog" aria-modal="true" aria-label="설정">
         <header className="sheet-head">
           <h2>설정</h2>
-          <div className="segmented" role="tablist" aria-label="설정 묶음">
+          <button
+            type="button"
+            className="btn sheet-close"
+            aria-label="닫기"
+            data-tip="설정 창을 닫습니다"
+            onClick={onClose}
+          >
+            ×
+          </button>
+        </header>
+
+        <div className="sheet-body settings-layout">
+          <nav className="settings-nav" role="tablist" aria-label="설정 묶음">
             {TABS.map((item) => (
               <button
                 key={item.id}
@@ -57,13 +69,9 @@ export function SettingsPanel({ onClose, sync, onShowReport, initialTab = 'appea
                 {item.name}
               </button>
             ))}
-          </div>
-          <button type="button" className="btn" data-tip="설정 창을 닫습니다" onClick={onClose}>
-            닫기
-          </button>
-        </header>
+          </nav>
 
-        <div className="sheet-body">
+          <div className="settings-content">
           {tab === 'sync' && <GitHubSettings sync={sync} onShowReport={onShowReport} />}
 
           {tab === 'appearance' && (
@@ -184,6 +192,7 @@ export function SettingsPanel({ onClose, sync, onShowReport, initialTab = 'appea
           </section>
           </>
           )}
+          </div>
         </div>
       </div>
     </div>

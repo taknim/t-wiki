@@ -740,6 +740,79 @@ mark { background: var(--mark); color: inherit; border-radius: 2px; }
 }
 .interval-input:disabled { opacity: 0.5; }
 
-/* 설정 창 머리에 묶음 전환이 들어가 자리가 좁아졌습니다. */
 .sheet-head { gap: 12px; flex-wrap: wrap; }
-.sheet-head .segmented { margin-inline-start: auto; }
+
+/* ---------- 시트 닫기 버튼 ---------- */
+
+.sheet-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  font-size: 19px;
+  line-height: 1;
+  color: var(--text-muted);
+}
+.sheet-close:hover { color: var(--text); }
+
+/* ---------- 설정 창 왼쪽 메뉴 ---------- */
+
+/* 왼쪽 메뉴가 차지하는 만큼 본문 폭이 줄어들어 조금 넓혀 줍니다. */
+.sheet:has(.settings-layout) { width: min(840px, 100%); }
+
+.settings-layout {
+  display: flex;
+  padding: 0;
+  /* 안쪽에서 스크롤이 생기도록 바깥은 넘치지 않게 둡니다. */
+  overflow: hidden;
+  min-height: 0;
+}
+
+.settings-nav {
+  flex: 0 0 150px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 8px;
+  border-inline-end: 1px solid var(--border);
+  background: var(--bg-sunken);
+  overflow-y: auto;
+}
+.settings-nav button {
+  text-align: start;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text);
+  white-space: nowrap;
+}
+.settings-nav button:hover { background: var(--bg-raised); }
+.settings-nav .is-active {
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.settings-content {
+  flex: 1;
+  min-width: 0;
+  padding: 18px;
+  overflow-y: auto;
+}
+
+@media (max-width: 640px) {
+  /* 좁은 화면에서는 메뉴를 위로 눕힙니다. */
+  .settings-layout { flex-direction: column; }
+  .settings-nav {
+    flex: 0 0 auto;
+    flex-direction: row;
+    border-inline-end: 0;
+    border-block-end: 1px solid var(--border);
+    overflow-x: auto;
+  }
+}
