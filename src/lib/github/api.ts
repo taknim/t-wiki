@@ -33,12 +33,13 @@ interface GitHubError {
   errors?: { message?: string }[]
 }
 
-async function request<T>(
+/** 오류 처리를 공유하면서 응답 객체 자체가 필요할 때 씁니다(첨부 내려받기). */
+async function rawRequest(
   token: string,
   path: string,
   init: RequestInit = {},
   accept = 'application/vnd.github+json',
-): Promise<T> {
+): Promise<Response> {
   const response = await fetch(`${API}${path}`, {
     ...init,
     headers: {
@@ -64,6 +65,17 @@ async function request<T>(
     }
     throw new Error(`GitHub: ${detail}`)
   }
+
+  return response
+}
+
+async function request<T>(
+  token: string,
+  path: string,
+  init: RequestInit = {},
+  accept = 'application/vnd.github+json',
+): Promise<T> {
+  const response = await rawRequest(token, path, init, accept)
 
   if (accept.includes('raw')) return (await response.text()) as T
   if (response.status === 204) return undefined as T
@@ -159,6 +171,37 @@ export async function createBlob(config: GitHubConfig, content: string): Promise
     body: JSON.stringify({ content, encoding: 'utf-8' }),
   })
   return raw.sha
+}
+
+/** 첨부처럼 텍스트가 아닌 내용. base64 로 실어 보냅니다(용량이 4/3 배로 늘어납니다). */
+export async function createBinaryBlob(config: GitHubConfig, bytes: Uint8Array): Promise<string> {
+  const raw = await request<{ sha: string }>(config.token, `${repoPath(config)}/git/blobs`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ content: toBase64(bytes), encoding: 'base64' }),
+  })
+  return raw.sha
+}
+
+/** 한 번에 문자열로 만들면 큰 파일에서 호출 스택이 넘칩니다. 조각내어 이어 붙입니다. */
+function toBase64(bytes: Uint8Array): string {
+  const CHUNK = 0x8000
+  let binary = ''
+  for (let at = 0; at < bytes.length; at += CHUNK) {
+    binary += String.fromCharCode(...bytes.subarray(at, at + CHUNK))
+  }
+  return btoa(binary)
+}
+
+/** 첨부를 원본 바이트 그대로 받습니다. 파일에 바로 쓸 수 있도록 ArrayBuffer 로 돌려줍니다. */
+export async function getBlobBytes(config: GitHubConfig, sha: string): Promise<ArrayBuffer> {
+  const response = await rawRequest(
+    config.token,
+    `${repoPath(config)}/git/blobs/${sha}`,
+    {},
+    'application/vnd.github.raw',
+  )
+  return response.arrayBuffer()
 }
 
 export async function createTree(

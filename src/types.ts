@@ -19,11 +19,17 @@ export interface DocEntry {
 
 export type DocIndex = Map<string, DocEntry>
 
-/**
- * 마크다운이 아닌 파일(이미지 등)의 위치. 파일명(소문자) → 경로 목록.
- * `![[그림.png]]` 처럼 경로 없이 파일명만 쓴 임베드를 찾아내는 데 씁니다.
- */
-export type AssetIndex = Map<string, string[]>
+/** 마크다운이 아닌 파일 하나. 본문은 필요할 때만 읽습니다. */
+export interface AssetEntry {
+  path: string
+  size: number
+  lastModified: number
+  /** 동기화 대상인지. 형식이 맞고 크기 제한을 넘지 않아야 합니다. */
+  syncable: boolean
+}
+
+/** 경로 → 첨부 정보. */
+export type AssetIndex = Map<string, AssetEntry>
 
 export interface SearchHit {
   path: string

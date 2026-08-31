@@ -88,5 +88,19 @@ export async function saveSyncState(signature: string, state: SyncState): Promis
 
 export const clearSyncState = () => del(SYNC_STATE)
 
+const ASSET_HASHES = 'mdwiki:asset-hashes'
+
+/** 첨부 해시 캐시. 크기와 수정 시각이 그대로면 다시 읽지 않습니다. */
+export interface AssetHash {
+  sha: string
+  size: number
+  lastModified: number
+}
+
+export const loadAssetHashes = async (): Promise<Record<string, AssetHash>> =>
+  (await get<Record<string, AssetHash>>(ASSET_HASHES)) ?? {}
+
+export const saveAssetHashes = (hashes: Record<string, AssetHash>) => set(ASSET_HASHES, hashes)
+
 export const saveLastSyncAt = (at: number) => set(LAST_SYNC, at)
 export const loadLastSyncAt = () => get<number>(LAST_SYNC)

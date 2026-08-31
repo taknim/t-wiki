@@ -1,9 +1,12 @@
 import { useState } from 'react'
 import type { VaultNode } from '../types'
+import { isMarkdown } from '../lib/attachments'
 import { titleOf } from '../lib/wikilinks'
 
 export interface TreeActions {
   onSelect: (path: string) => void
+  /** 폴더를 고르면 정보 표시줄이 폴더 요약을 보여 줍니다. */
+  onSelectDir: (path: string) => void
   onNewDoc: (dirPath: string) => void
   onNewFolder: (dirPath: string) => void
   onRename: (path: string) => void
@@ -83,11 +86,21 @@ function TreeRow({ node, depth, selectedPath, expanded, onToggle, ...actions }: 
           const from = event.dataTransfer.getData('text/mdwiki-path')
           if (from && from !== node.path) actions.onMove(from, dropDir)
         }}
-        onClick={() => (isDir ? onToggle(node.path) : actions.onSelect(node.path))}
+        onClick={() => {
+          // 폴더는 펼치기와 고르기를 함께 합니다.
+          if (isDir) {
+            onToggle(node.path)
+            actions.onSelectDir(node.path)
+          } else {
+            actions.onSelect(node.path)
+          }
+        }}
       >
         <span className="tree-caret">{isDir ? (isOpen ? '▾' : '▸') : ''}</span>
-        <span className="tree-icon">{isDir ? '📁' : '📄'}</span>
-        <span className="tree-name">{isDir ? node.name : titleOf(node.name)}</span>
+        <span className="tree-icon">{isDir ? '📁' : isMarkdown(node.name) ? '📄' : '🖿'}</span>
+        <span className="tree-name">
+          {isDir || !isMarkdown(node.name) ? node.name : titleOf(node.name)}
+        </span>
 
         <span className="tree-tools" onClick={(event) => event.stopPropagation()}>
           {isDir && (

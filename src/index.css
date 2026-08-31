@@ -830,3 +830,96 @@ mark { background: var(--mark); color: inherit; border-radius: 2px; }
     overflow-x: auto;
   }
 }
+
+/* ---------- 첨부 미리보기 ---------- */
+
+.asset-view {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 16px 20px;
+  background: var(--bg);
+  overflow: auto;
+}
+.asset-image {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  align-self: center;
+  border-radius: 6px;
+}
+.asset-frame {
+  flex: 1;
+  min-height: 480px;
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-raised);
+}
+.asset-text {
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-sunken);
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.asset-note { color: var(--text-muted); font-size: 13px; }
+
+/* ---------- 아래쪽 정보 표시줄 ---------- */
+
+.info-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  padding: 6px 14px;
+  border-top: 1px solid var(--border);
+  background: var(--bg-sunken);
+  font-size: 12px;
+  color: var(--text-muted);
+  overflow-x: auto;
+  white-space: nowrap;
+}
+.info-kind {
+  padding: 1px 7px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+.info-name { color: var(--text); font-weight: 600; flex-shrink: 0; }
+.info-path {
+  font-family: var(--mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.info-sep { flex: 1; min-width: 8px; }
+.info-meta { flex-shrink: 0; }
+
+.info-toggle {
+  flex-shrink: 0;
+  padding: 2px 9px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--bg-raised);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 12px;
+}
+.info-toggle:hover { color: var(--text); }
+.info-toggle.is-open { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+.info-panel {
+  flex-shrink: 0;
+  max-height: 40vh;
+  overflow: auto;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+  background: var(--bg-sunken);
+}

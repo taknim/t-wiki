@@ -1,4 +1,5 @@
 import type { AssetIndex } from '../types'
+import { withMime } from './attachments'
 import { readBinaryFile } from './fsAccess'
 
 /**
@@ -23,44 +24,25 @@ function resolveAssetPath(target: string, docPath: string, assets: AssetIndex): 
   const docDir = docPath.split('/').slice(0, -1).join('/')
   const candidates = docDir ? [`${docDir}/${clean}`, clean] : [clean]
 
-  const known = new Set<string>()
-  for (const paths of assets.values()) for (const path of paths) known.add(path)
-
   for (const candidate of candidates) {
-    if (known.has(candidate)) return candidate
+    if (assets.has(candidate)) return candidate
   }
 
   // 옵시디안처럼 파일명만 적은 경우. 같은 이름이 여럿이면 경로가 짧은 쪽을 씁니다.
-  const byName = assets.get((clean.split('/').pop() ?? clean).toLowerCase())
-  if (byName && byName.length > 0) return [...byName].sort((a, b) => a.length - b.length)[0]
+  const wanted = (clean.split('/').pop() ?? clean).toLowerCase()
+  const matches = [...assets.keys()].filter(
+    (path) => (path.split('/').pop() ?? path).toLowerCase() === wanted,
+  )
+  if (matches.length > 0) return matches.sort((a, b) => a.length - b.length)[0]
 
   return null
-}
-
-const MIME_BY_EXTENSION: Record<string, string> = {
-  png: 'image/png',
-  jpg: 'image/jpeg',
-  jpeg: 'image/jpeg',
-  gif: 'image/gif',
-  webp: 'image/webp',
-  svg: 'image/svg+xml',
-  avif: 'image/avif',
-  bmp: 'image/bmp',
 }
 
 async function toObjectUrl(root: FileSystemDirectoryHandle, path: string): Promise<string> {
   const cached = cache.get(path)
   if (cached) return cached
 
-  const blob = await readBinaryFile(root, path)
-
-  // 형식이 비어 있으면 <img> 가 내용을 해석하지 못합니다. 확장자로 채워 줍니다.
-  const extension = (path.split('.').pop() ?? '').toLowerCase()
-  const typed = blob.type
-    ? blob
-    : new Blob([blob], { type: MIME_BY_EXTENSION[extension] ?? 'application/octet-stream' })
-
-  const url = URL.createObjectURL(typed)
+  const url = URL.createObjectURL(withMime(await readBinaryFile(root, path), path))
   cache.set(path, url)
   return url
 }

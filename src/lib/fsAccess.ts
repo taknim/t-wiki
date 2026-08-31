@@ -1,4 +1,5 @@
 import type { AssetIndex, DocIndex, VaultNode } from '../types'
+import { isAttachment, isMarkdown, isSyncable } from './attachments'
 
 /** 볼트 안에서 무시할 이름들. 점으로 시작하는 항목은 전부 별도로 걸러냅니다. */
 const IGNORED = new Set(['node_modules', 'Icon\r'])
@@ -74,16 +75,29 @@ async function walk(
       const child: VaultNode = { kind: 'dir', name, path, children: [] }
       await walk(handle as FileSystemDirectoryHandle, path, child, index, assets)
       children.push(child)
-    } else if (name.toLowerCase().endsWith('.md')) {
-      const file = await (handle as FileSystemFileHandle).getFile()
+      continue
+    }
+
+    const file = await (handle as FileSystemFileHandle).getFile()
+
+    if (isMarkdown(name)) {
       const content = await file.text()
       index.set(path, { path, content, lastModified: file.lastModified })
       children.push({ kind: 'file', name, path, lastModified: file.lastModified, size: file.size })
-    } else {
-      const key = name.toLowerCase()
-      const paths = assets.get(key) ?? []
-      paths.push(path)
-      assets.set(key, paths)
+      continue
+    }
+
+    // 첨부는 본문을 읽지 않습니다. 이미지 수십 장을 매번 읽으면 폴더 열기가 느려집니다.
+    assets.set(path, {
+      path,
+      size: file.size,
+      lastModified: file.lastModified,
+      syncable: isSyncable(path, file.size),
+    })
+
+    // 아는 형식만 트리에 보여 줍니다. 그래야 목록이 잡동사니로 넘치지 않습니다.
+    if (isAttachment(name)) {
+      children.push({ kind: 'file', name, path, lastModified: file.lastModified, size: file.size })
     }
   }
   node.children = sortNodes(children)
@@ -204,6 +218,21 @@ export async function readBinaryFile(
   const dir = await resolveDir(root, segments)
   const handle = await dir.getFileHandle(name)
   return handle.getFile()
+}
+
+/** 텍스트가 아닌 내용을 그대로 씁니다. 첨부를 내려받을 때 씁니다. */
+export async function writeBinaryFile(
+  root: FileSystemDirectoryHandle,
+  path: string,
+  data: BlobPart,
+): Promise<number> {
+  const { segments, name } = splitPath(path)
+  const dir = await resolveDir(root, segments, true)
+  const handle = await dir.getFileHandle(name, { create: true })
+  const writable = await handle.createWritable()
+  await writable.write(data)
+  await writable.close()
+  return (await handle.getFile()).lastModified
 }
 
 /** 파일 한 개의 수정 시각. 동기화 기준점을 갱신할 때 씁니다. */

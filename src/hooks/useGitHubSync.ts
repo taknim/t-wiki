@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { DocIndex, GitHubConfig, SyncLogLine, SyncPlanItem } from '../types'
+import type { AssetIndex, DocIndex, GitHubConfig, SyncLogLine, SyncPlanItem } from '../types'
 import { applyPlan, buildPlan, localShas, scanRemote } from '../lib/github/sync'
 import {
   loadGitHubConfig,
@@ -63,6 +63,7 @@ export interface GitHubSync {
 interface Options {
   root: FileSystemDirectoryHandle | null
   docs: DocIndex
+  assets: AssetIndex
   /** 동기화 전에 편집 중인 내용을 파일에 반영합니다. */
   onBeforeSync: () => Promise<void>
   /** 로컬 파일이 바뀌었을 때 볼트를 다시 읽습니다. */
@@ -102,7 +103,7 @@ async function runExclusively<T>(task: () => Promise<T>): Promise<T | typeof BUS
   })
 }
 
-export function useGitHubSync({ root, docs, onBeforeSync, onLocalChanged }: Options): GitHubSync {
+export function useGitHubSync({ root, docs, assets, onBeforeSync, onLocalChanged }: Options): GitHubSync {
   const [config, setConfig] = useState<GitHubConfig>(DEFAULT_GITHUB_CONFIG)
   const [loaded, setLoaded] = useState(false)
   const [status, setStatus] = useState<SyncStatus>(IDLE)
@@ -113,6 +114,7 @@ export function useGitHubSync({ root, docs, onBeforeSync, onLocalChanged }: Opti
   // 설정만은 실행 직전에 저장소에서 다시 읽으므로 여기 두지 않습니다.
   const rootRef = useRef(root)
   const docsRef = useRef(docs)
+  const assetsRef = useRef(assets)
   const busyRef = useRef(false)
   const pendingSaveRef = useRef<Promise<void>>(Promise.resolve())
   // 사용자가 "이 대상으로 진행" 을 누른 서명. 한 번 확인하면 다시 묻지 않습니다.
@@ -124,6 +126,7 @@ export function useGitHubSync({ root, docs, onBeforeSync, onLocalChanged }: Opti
   useEffect(() => {
     rootRef.current = root
     docsRef.current = docs
+    assetsRef.current = assets
     callbacksRef.current = { onBeforeSync, onLocalChanged }
   })
 
@@ -170,7 +173,8 @@ export function useGitHubSync({ root, docs, onBeforeSync, onLocalChanged }: Opti
         // 기준점은 이 저장소·브랜치·하위 폴더 조합의 것만 씁니다.
         const signature = syncSignature(current)
         const synced = await loadSyncState(signature)
-        const plan = buildPlan(await localShas(docsRef.current), remote.files, synced, current)
+        const local = await localShas(vault, docsRef.current, assetsRef.current)
+        const plan = buildPlan(local, remote.files, synced, current)
         const pending = plan.filter((item) => item.action !== 'skip')
         const at = Date.now()
 

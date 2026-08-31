@@ -1,5 +1,7 @@
-import type { DocIndex, GitHubConfig, SyncLogLine, SyncPlanItem, SyncState } from '../../types'
+import type { AssetIndex, DocIndex, GitHubConfig, SyncLogLine, SyncPlanItem, SyncState } from '../../types'
+import { isAttachment, isMarkdown } from '../attachments'
 import * as fs from '../fsAccess'
+import { loadAssetHashes, saveAssetHashes } from '../store'
 import * as api from './api'
 
 /**
@@ -12,6 +14,17 @@ export async function gitBlobSha(content: string): Promise<string> {
   const payload = new Uint8Array(header.length + body.length)
   payload.set(header)
   payload.set(body, header.length)
+
+  const digest = await crypto.subtle.digest('SHA-1', payload)
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('')
+}
+
+/** 바이트 그대로의 git blob 해시. 첨부는 텍스트가 아니므로 이쪽을 씁니다. */
+export async function gitBlobShaBytes(bytes: Uint8Array): Promise<string> {
+  const header = new TextEncoder().encode(`blob ${bytes.length}\0`)
+  const payload = new Uint8Array(header.length + bytes.length)
+  payload.set(header)
+  payload.set(bytes, header.length)
 
   const digest = await crypto.subtle.digest('SHA-1', payload)
   return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('')
@@ -44,11 +57,12 @@ export async function scanRemote(config: GitHubConfig): Promise<RemoteSnapshot> 
 
   for (const entry of entries) {
     if (entry.type !== 'blob') continue
-    if (!entry.path.toLowerCase().endsWith('.md')) continue
 
     const vaultPath = toVaultPath(config, entry.path)
     if (vaultPath === null) continue
     if (vaultPath.split('/').some((segment) => segment.startsWith('.'))) continue
+    // 마크다운과 정해진 첨부 형식만 다룹니다. 저장소에 다른 파일이 있어도 건드리지 않습니다.
+    if (!isMarkdown(vaultPath) && !isAttachment(vaultPath)) continue
 
     files.set(vaultPath, entry.sha)
   }
@@ -56,11 +70,44 @@ export async function scanRemote(config: GitHubConfig): Promise<RemoteSnapshot> 
   return { head, files, truncated }
 }
 
-export async function localShas(index: DocIndex): Promise<Map<string, string>> {
+/**
+ * 로컬에 있는 동기화 대상 전체의 해시.
+ *
+ * 첨부는 본문을 메모리에 들고 있지 않아 매번 파일을 읽어야 합니다.
+ * 이미지 수십 장을 회차마다 읽으면 느려지므로, 크기와 수정 시각이 그대로면
+ * 지난번 해시를 그대로 씁니다.
+ */
+export async function localShas(
+  root: FileSystemDirectoryHandle,
+  index: DocIndex,
+  assets: AssetIndex,
+): Promise<Map<string, string>> {
   const shas = new Map<string, string>()
+
   for (const entry of index.values()) {
     shas.set(entry.path, await gitBlobSha(entry.content))
   }
+
+  const cache = await loadAssetHashes()
+  const next: Record<string, { sha: string; size: number; lastModified: number }> = {}
+
+  for (const asset of assets.values()) {
+    if (!asset.syncable) continue
+
+    const cached = cache[asset.path]
+    if (cached && cached.size === asset.size && cached.lastModified === asset.lastModified) {
+      shas.set(asset.path, cached.sha)
+      next[asset.path] = cached
+      continue
+    }
+
+    const bytes = new Uint8Array(await (await fs.readBinaryFile(root, asset.path)).arrayBuffer())
+    const sha = await gitBlobShaBytes(bytes)
+    shas.set(asset.path, sha)
+    next[asset.path] = { sha, size: asset.size, lastModified: asset.lastModified }
+  }
+
+  await saveAssetHashes(next)
   return shas
 }
 
@@ -173,6 +220,7 @@ export async function applyPlan(options: ApplyOptions): Promise<ApplyResult> {
   // 원격 변경은 모아서 커밋 한 번으로 처리합니다.
   // 경로별로 올리면 커밋이 지저분해지고, 도중에 끊겼을 때 절반만 반영된 상태가 남습니다.
   const uploads = new Map<string, string>()
+  const binaryUploads = new Map<string, Uint8Array>()
   const deletions = new Set<string>()
 
   const todo = plan.filter((item) => item.action !== 'skip')
@@ -188,14 +236,25 @@ export async function applyPlan(options: ApplyOptions): Promise<ApplyResult> {
   const download = async (path: string) => {
     const sha = remote.files.get(path)
     if (!sha) throw new Error('저장소에서 파일 정보를 찾을 수 없습니다.')
-    const content = await api.getBlobText(config, sha)
-    await fs.writeFile(root, path, content)
+
+    if (isMarkdown(path)) {
+      await fs.writeFile(root, path, await api.getBlobText(config, sha))
+    } else {
+      // 첨부는 텍스트로 옮기면 내용이 깨집니다. 바이트 그대로 씁니다.
+      await fs.writeBinaryFile(root, path, await api.getBlobBytes(config, sha))
+    }
+
     synced[path] = sha
     localChanged = true
   }
 
   const stageUpload = async (path: string) => {
-    uploads.set(path, await fs.readFile(root, path))
+    if (isMarkdown(path)) {
+      uploads.set(path, await fs.readFile(root, path))
+      return
+    }
+    const blob = await fs.readBinaryFile(root, path)
+    binaryUploads.set(path, new Uint8Array(await blob.arrayBuffer()))
   }
 
   const resolveConflict = async (path: string) => {
@@ -252,21 +311,21 @@ export async function applyPlan(options: ApplyOptions): Promise<ApplyResult> {
   let commitSha: string | null = null
   let staleRemote = false
 
-  if (uploads.size > 0 || deletions.size > 0) {
+  if (uploads.size > 0 || binaryUploads.size > 0 || deletions.size > 0) {
     onProgress?.(done, totalSteps, '커밋하는 중')
     try {
-      commitSha = await commitChanges(config, remote.head, uploads, deletions)
+      commitSha = await commitChanges(config, remote.head, uploads, binaryUploads, deletions)
 
       // 커밋된 실제 blob SHA 를 다시 읽어 기준점으로 삼습니다.
       // 직접 계산한 값을 믿는 대신 서버가 저장한 값을 그대로 씁니다.
       const fresh = await scanRemote(config)
-      for (const path of uploads.keys()) {
+      for (const path of [...uploads.keys(), ...binaryUploads.keys()]) {
         const sha = fresh.files.get(path)
         if (sha) synced[path] = sha
       }
       for (const path of deletions) delete synced[path]
 
-      const changed = [...uploads.keys(), ...deletions]
+      const changed = [...uploads.keys(), ...binaryUploads.keys(), ...deletions]
       for (const path of changed) {
         const line = log.find((entry) => entry.path === path && entry.status === 'ok')
         if (line) line.detail = `${line.detail} · ${commitSha.slice(0, 7)}`
@@ -277,7 +336,7 @@ export async function applyPlan(options: ApplyOptions): Promise<ApplyResult> {
       for (const line of log) {
         const isRemoteWrite =
           line.status === 'ok' &&
-          (uploads.has(line.path) || deletions.has(line.path))
+          (uploads.has(line.path) || binaryUploads.has(line.path) || deletions.has(line.path))
         if (isRemoteWrite) {
           line.status = 'error'
           line.detail = `커밋 실패: ${detail}`
@@ -294,6 +353,7 @@ async function commitChanges(
   config: GitHubConfig,
   head: api.HeadInfo | null,
   uploads: Map<string, string>,
+  binaryUploads: Map<string, Uint8Array>,
   deletions: Set<string>,
 ): Promise<string> {
   const changes: api.TreeChange[] = []
@@ -302,6 +362,9 @@ async function commitChanges(
   // 트리에 본문을 직접 넣을 수도 있지만, blob 을 거치면 서버가 매긴 SHA 를 바로 받을 수 있습니다.
   for (const [path, content] of uploads) {
     changes.push({ path: toRepoPath(config, path), sha: await api.createBlob(config, content) })
+  }
+  for (const [path, bytes] of binaryUploads) {
+    changes.push({ path: toRepoPath(config, path), sha: await api.createBinaryBlob(config, bytes) })
   }
   for (const path of deletions) {
     changes.push({ path: toRepoPath(config, path), sha: null })

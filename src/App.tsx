@@ -1,17 +1,19 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Backlinks } from './components/Backlinks'
 import { useDialogs } from './components/dialogContext'
 import { Editor } from './components/Editor'
 import { Preview } from './components/Preview'
+import { AssetView } from './components/AssetView'
+import { InfoBar, type SelectionInfo } from './components/InfoBar'
 import { SearchPanel } from './components/SearchPanel'
 import { SettingsPanel } from './components/SettingsPanel'
 import { SyncReportSheet } from './components/SyncReportSheet'
-import { Toc } from './components/Toc'
 import { TreeView } from './components/TreeView'
 import { useGitHubSync } from './hooks/useGitHubSync'
 import { useVault } from './hooks/useVault'
+import { isMarkdown } from './lib/attachments'
 import { extractHeadings, parseFrontmatter } from './lib/markdown'
 import { titleOf } from './lib/wikilinks'
+import type { VaultNode } from './types'
 
 type ViewMode = 'edit' | 'split' | 'preview'
 
@@ -22,6 +24,8 @@ export default function App() {
   const dialogs = useDialogs()
 
   const [selectedPath, setSelectedPath] = useState<string | null>(null)
+  // 폴더를 고르면 편집기 대신 폴더 정보를 보여 줍니다.
+  const [selectedDir, setSelectedDir] = useState<string | null>(null)
   const [draft, setDraft] = useState('')
   const [dirty, setDirty] = useState(false)
   const [viewMode, setViewMode] = useState<ViewMode>('split')
@@ -70,6 +74,7 @@ export default function App() {
   const sync = useGitHubSync({
     root: vault.root,
     docs: vault.index,
+    assets: vault.assets,
     onBeforeSync: commit,
     onLocalChanged: vault.refresh,
   })
@@ -122,6 +127,7 @@ export default function App() {
       if (path === selectedRef.current) return
       await commit()
       const entry = vault.index.get(path)
+      setSelectedDir(null)
       setSelectedPath(path)
       setDraft(entry?.content ?? '')
       setDirty(false)
@@ -143,15 +149,26 @@ export default function App() {
     if (!selectedPath) return
     const entry = vault.index.get(selectedPath)
     if (!entry) {
-      setSelectedPath(null)
-      setDraft('')
-      setDirty(false)
+      // 첨부는 문서 인덱스에 없습니다. 파일 자체가 사라졌을 때만 선택을 놓습니다.
+      if (!vault.assets.has(selectedPath)) {
+        setSelectedPath(null)
+        setDraft('')
+        setDirty(false)
+      }
       return
     }
     if (!dirty && entry.content !== draftRef.current) setDraft(entry.content)
     // dirty 를 의존성에 넣으면 편집 중에 되돌려버리므로 제외합니다.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [vault.index, selectedPath])
+  }, [vault.index, vault.assets, selectedPath])
+
+  const openAsset = useCallback((path: string) => {
+    void commit()
+    setSelectedDir(null)
+    setSelectedPath(path)
+    setDraft('')
+    setDirty(false)
+  }, [commit])
 
   const toggleFolder = useCallback((path: string) => {
     setExpanded((previous) => {
@@ -165,6 +182,46 @@ export default function App() {
   const currentDir = selectedPath ? selectedPath.split('/').slice(0, -1).join('/') : ''
 
   // 문서 맨 앞 `---` 블록은 메타데이터로 떼어내고 본문만 렌더합니다.
+  const selection = useMemo<SelectionInfo | null>(() => {
+    if (selectedDir !== null && vault.tree) {
+      const node = findNode(vault.tree, selectedDir)
+      const rolled = node ? rollUp(node) : { size: 0, files: 0 }
+      return {
+        kind: 'dir',
+        path: selectedDir,
+        name: selectedDir.split('/').pop() || vault.vaultName,
+        size: rolled.size,
+        fileCount: rolled.files,
+        lastModified: null,
+      }
+    }
+
+    if (!selectedPath) return null
+
+    const doc = vault.index.get(selectedPath)
+    if (doc) {
+      return {
+        kind: 'doc',
+        path: selectedPath,
+        name: selectedPath.split('/').pop() ?? selectedPath,
+        size: new TextEncoder().encode(doc.content).length,
+        lastModified: doc.lastModified,
+      }
+    }
+
+    const asset = vault.assets.get(selectedPath)
+    if (asset) {
+      return {
+        kind: 'asset',
+        path: selectedPath,
+        name: selectedPath.split('/').pop() ?? selectedPath,
+        size: asset.size,
+        lastModified: asset.lastModified,
+      }
+    }
+    return null
+  }, [selectedDir, selectedPath, vault.index, vault.assets, vault.tree, vault.vaultName])
+
   const { fields, body } = useMemo(() => parseFrontmatter(draft), [draft])
   const headings = useMemo(() => extractHeadings(body), [body])
 
@@ -459,10 +516,14 @@ export default function App() {
               vault.tree && (
                 <TreeView
                   root={vault.tree}
-                  selectedPath={selectedPath}
+                  selectedPath={selectedDir ?? selectedPath}
                   expanded={expanded}
                   onToggle={toggleFolder}
-                  onSelect={(path) => void openDoc(path)}
+                  onSelect={(path) => (isMarkdown(path) ? void openDoc(path) : openAsset(path))}
+                  onSelectDir={(path: string) => {
+                    setSelectedDir(path)
+                    setSelectedPath(null)
+                  }}
                   onNewDoc={(dir) => void handleNewDoc(dir)}
                   onNewFolder={(dir) => void handleNewFolder(dir)}
                   onRename={(path) => void handleRename(path)}
@@ -475,7 +536,23 @@ export default function App() {
         </aside>
 
         <main className="main">
-          {selectedPath ? (
+          {selection && selection.kind !== 'doc' ? (
+            <>
+              <div className="doc-head">
+                <h1>{selection.name}</h1>
+                <span className="doc-path">{selection.path || '최상위'}</span>
+                {selection.kind === 'asset' && <span className="pill">읽기 전용</span>}
+              </div>
+              {selection.kind === 'asset' && vault.root ? (
+                <AssetView root={vault.root} path={selection.path} size={selection.size} />
+              ) : (
+                <div className="placeholder">
+                  <p>폴더입니다. 아래에서 내용 요약을 볼 수 있습니다.</p>
+                  <p className="hint">문서를 고르면 여기에 열립니다.</p>
+                </div>
+              )}
+            </>
+          ) : selectedPath ? (
             <>
               <div className="doc-head">
                 <h1>{titleOf(selectedPath)}</h1>
@@ -524,17 +601,6 @@ export default function App() {
                 )}
               </div>
 
-              <section className="panel">
-                {viewMode !== 'edit' && headings.length >= 2 && (
-                  <div className="panel-col">
-                    <Toc headings={headings} />
-                  </div>
-                )}
-                <div className="panel-col">
-                  <h2>이 문서를 가리키는 문서</h2>
-                  <Backlinks path={selectedPath} index={vault.index} onOpen={(path) => void openDoc(path)} />
-                </div>
-              </section>
             </>
           ) : (
             <div className="placeholder">
@@ -543,6 +609,16 @@ export default function App() {
                 본문에 <code>[[다른 문서]]</code> 라고 쓰면 위키 링크가 되고, 없는 문서는 클릭해서 바로 만들 수 있습니다.
               </p>
             </div>
+          )}
+
+          {selection && (
+            <InfoBar
+              info={selection}
+              headings={headings}
+              index={vault.index}
+              showToc={viewMode !== 'edit'}
+              onOpen={(path) => void openDoc(path)}
+            />
           )}
         </main>
       </div>
@@ -570,4 +646,28 @@ export default function App() {
       )}
     </div>
   )
+}
+
+/** 트리에서 경로에 해당하는 마디를 찾습니다. */
+function findNode(root: VaultNode, path: string): VaultNode | null {
+  if (root.path === path) return root
+  for (const child of root.children ?? []) {
+    const found = findNode(child, path)
+    if (found) return found
+  }
+  return null
+}
+
+/** 폴더 아래에 든 파일 수와 크기 합계. */
+function rollUp(node: VaultNode): { size: number; files: number } {
+  if (node.kind === 'file') return { size: node.size ?? 0, files: 1 }
+
+  let size = 0
+  let files = 0
+  for (const child of node.children ?? []) {
+    const inner = rollUp(child)
+    size += inner.size
+    files += inner.files
+  }
+  return { size, files }
 }
