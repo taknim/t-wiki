@@ -164,7 +164,16 @@ export function GitHubSettings({ sync, onShowReport }: GitHubSettingsProps) {
           placeholder="저장소 안 하위 폴더 (비우면 저장소 루트)"
           onChange={(event) => update({ basePath: event.target.value.replace(/^\/+|\/+$/g, '') })}
         />
-        <p className="hint">브랜치가 아직 없으면 첫 동기화 때 새로 만듭니다. 빈 저장소도 그대로 쓸 수 있습니다.</p>
+        <p className="hint">
+          하위 폴더를 적으면 <strong>볼트 최상위가 저장소의 그 폴더에 대응</strong>합니다.
+          예를 들어 <code>docs</code> 로 두면 볼트의 <code>회고/8월.md</code> 는
+          저장소의 <code>docs/회고/8월.md</code> 가 됩니다. 비우면 저장소 루트입니다.
+        </p>
+        <p className="hint">
+          저장소·브랜치·하위 폴더를 바꾸면 문서가 올라갈 경로가 달라지므로,
+          그 대상에 대한 비교 기준을 새로 잡습니다. 이전 대상의 기준점은 그대로 남아 있어
+          되돌리면 다시 쓰입니다. 브랜치가 아직 없으면 첫 동기화 때 새로 만듭니다.
+        </p>
       </section>
 
       <section className="field">

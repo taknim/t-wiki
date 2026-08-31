@@ -81,7 +81,7 @@ export default function App() {
     if (!report || report.at === lastReported.current) return
     lastReported.current = report.at
 
-    if (report.error || report.log.some((line) => line.status === 'error')) {
+    if (report.needsConfirm || report.error || report.log.some((line) => line.status === 'error')) {
       setReportOpen(true)
       return
     }
@@ -559,7 +559,14 @@ export default function App() {
       )}
 
       {reportOpen && sync.report && (
-        <SyncReportSheet report={sync.report} onClose={() => setReportOpen(false)} />
+        <SyncReportSheet
+          report={sync.report}
+          onClose={() => setReportOpen(false)}
+          onConfirm={() => {
+            setReportOpen(false)
+            void sync.confirmTarget()
+          }}
+        />
       )}
     </div>
   )

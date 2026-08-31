@@ -157,6 +157,11 @@ export interface ApplyResult {
   synced: SyncState
   localChanged: boolean
   commitSha: string | null
+  /**
+   * 우리가 저장소를 읽은 뒤 다른 쪽이 먼저 올려서 커밋이 거부됐는지.
+   * 잘못된 게 아니라 다시 읽고 다시 하면 되는 상황이라 따로 표시합니다.
+   */
+  staleRemote: boolean
 }
 
 export async function applyPlan(options: ApplyOptions): Promise<ApplyResult> {
@@ -245,6 +250,7 @@ export async function applyPlan(options: ApplyOptions): Promise<ApplyResult> {
   }
 
   let commitSha: string | null = null
+  let staleRemote = false
 
   if (uploads.size > 0 || deletions.size > 0) {
     onProgress?.(done, totalSteps, '커밋하는 중')
@@ -267,6 +273,7 @@ export async function applyPlan(options: ApplyOptions): Promise<ApplyResult> {
       }
     } catch (cause) {
       const detail = cause instanceof Error ? cause.message : String(cause)
+      staleRemote = /fast forward/i.test(detail)
       for (const line of log) {
         const isRemoteWrite =
           line.status === 'ok' &&
@@ -280,7 +287,7 @@ export async function applyPlan(options: ApplyOptions): Promise<ApplyResult> {
   }
 
   onProgress?.(totalSteps, totalSteps, '')
-  return { log, synced, localChanged, commitSha }
+  return { log, synced, localChanged, commitSha, staleRemote }
 }
 
 async function commitChanges(

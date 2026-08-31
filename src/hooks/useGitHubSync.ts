@@ -8,6 +8,8 @@ import {
   saveGitHubConfig,
   saveLastSyncAt,
   saveSyncState,
+  syncSignature,
+  hasAnyBaseline,
 } from '../lib/store'
 
 export const DEFAULT_GITHUB_CONFIG: GitHubConfig = {
@@ -22,7 +24,7 @@ export const DEFAULT_GITHUB_CONFIG: GitHubConfig = {
   autoSyncMinutes: 10,
 }
 
-export type SyncPhase = 'idle' | 'running' | 'done' | 'error' | 'blocked'
+export type SyncPhase = 'idle' | 'running' | 'done' | 'error' | 'blocked' | 'needs-confirm'
 
 export interface SyncStatus {
   phase: SyncPhase
@@ -37,6 +39,11 @@ export interface SyncReport {
   log: SyncLogLine[]
   commitSha: string | null
   error: string | null
+  /**
+   * 동기화 대상이 바뀌어 아직 적용하지 않은 계획.
+   * 사용자가 보고 진행 여부를 정해야 합니다.
+   */
+  needsConfirm?: boolean
 }
 
 export interface GitHubSync {
@@ -48,6 +55,8 @@ export interface GitHubSync {
   lastSyncAt: number | null
   update: (patch: Partial<GitHubConfig>) => void
   run: (trigger?: 'manual' | 'auto') => Promise<void>
+  /** 대상이 바뀌어 멈춘 계획을 그대로 진행합니다. */
+  confirmTarget: () => Promise<void>
   dismissReport: () => void
 }
 
@@ -64,6 +73,9 @@ const IDLE: SyncStatus = { phase: 'idle', message: '', progress: null }
 
 /** 자동 동기화가 켜져 있을 때, 볼트를 연 직후 한 번 돌기까지 두는 여유. */
 const FIRST_RUN_DELAY = 5000
+
+/** 저장소가 그 사이에 바뀌었을 때 다시 맞춰 볼 횟수. */
+const MAX_ATTEMPTS = 3
 
 /**
  * 브라우저 전체에서 하나만 잡을 수 있는 이름.
@@ -103,6 +115,8 @@ export function useGitHubSync({ root, docs, onBeforeSync, onLocalChanged }: Opti
   const docsRef = useRef(docs)
   const busyRef = useRef(false)
   const pendingSaveRef = useRef<Promise<void>>(Promise.resolve())
+  // 사용자가 "이 대상으로 진행" 을 누른 서명. 한 번 확인하면 다시 묻지 않습니다.
+  const confirmedRef = useRef<string | null>(null)
   const callbacksRef = useRef({ onBeforeSync, onLocalChanged })
 
   // ref 쓰기는 렌더가 아니라 커밋 뒤에 해야 합니다.
@@ -133,6 +147,97 @@ export function useGitHubSync({ root, docs, onBeforeSync, onLocalChanged }: Opti
     pendingSaveRef.current = saveGitHubConfig(config)
   }, [config, loaded])
 
+  /**
+   * 한 번의 비교와 적용. 저장소가 그 사이에 바뀌어 커밋이 거부되면 true 를 돌려주고,
+   * 그러면 바깥에서 다시 읽어 처음부터 세웁니다.
+   */
+  const attemptSync = useCallback(
+    async (
+      current: GitHubConfig,
+      vault: FileSystemDirectoryHandle,
+      trigger: 'manual' | 'auto',
+      attempt: number,
+    ): Promise<boolean> => {
+      try {
+        // 편집 중이던 내용이 아직 파일에 없으면 그대로 덮어써질 수 있습니다.
+        await callbacksRef.current.onBeforeSync()
+
+        const remote = await scanRemote(current)
+        if (remote.truncated) {
+          throw new Error('저장소가 너무 커서 파일 목록을 다 받지 못했습니다. 하위 폴더를 지정해 범위를 좁혀 주세요.')
+        }
+
+        // 기준점은 이 저장소·브랜치·하위 폴더 조합의 것만 씁니다.
+        const signature = syncSignature(current)
+        const synced = await loadSyncState(signature)
+        const plan = buildPlan(await localShas(docsRef.current), remote.files, synced, current)
+        const pending = plan.filter((item) => item.action !== 'skip')
+        const at = Date.now()
+
+        // 저장소·브랜치·하위 폴더를 바꾸면 문서가 올라갈 경로가 통째로 달라집니다.
+        // 그대로 밀면 옛 경로와 새 경로에 같은 문서가 복제되므로,
+        // 처음 보는 대상이면 무엇이 오갈지 보여 주고 확인을 받습니다.
+        if (
+          pending.length > 0 &&
+          confirmedRef.current !== signature &&
+          Object.keys(synced).length === 0 &&
+          (await hasAnyBaseline())
+        ) {
+          setReport({ at, trigger, plan, log: [], commitSha: null, error: null, needsConfirm: true })
+          setStatus({
+            phase: 'needs-confirm',
+            message: '동기화 대상이 바뀌었습니다. 무엇이 오갈지 확인해 주세요.',
+            progress: null,
+          })
+          return false
+        }
+
+        if (pending.length === 0) {
+          await saveSyncState(signature, synced)
+          await saveLastSyncAt(at)
+          setLastSyncAt(at)
+          setReport({ at, trigger, plan, log: [], commitSha: null, error: null })
+          setStatus({ phase: 'done', message: '이미 저장소와 같습니다', progress: null })
+          return false
+        }
+
+        setStatus({ phase: 'running', message: '동기화하는 중…', progress: { done: 0, total: pending.length } })
+
+        const result = await applyPlan({
+          root: vault,
+          config: current,
+          plan,
+          remote,
+          synced,
+          onProgress: (done, total) => setStatus((previous) => ({ ...previous, progress: { done, total } })),
+        })
+
+        await saveSyncState(signature, result.synced)
+        if (result.localChanged) await callbacksRef.current.onLocalChanged()
+
+        // 커밋이 거부됐을 뿐이라면 결과를 남기지 않고 다시 시도합니다.
+        if (result.staleRemote && attempt < MAX_ATTEMPTS) return true
+
+        await saveLastSyncAt(at)
+        setLastSyncAt(at)
+
+        const failures = result.log.filter((line) => line.status === 'error')
+        setReport({ at, trigger, plan, log: result.log, commitSha: result.commitSha, error: null })
+        setStatus({
+          phase: failures.length > 0 ? 'error' : 'done',
+          message: failures.length > 0 ? `${failures.length}건 실패` : summarize(result.log),
+          progress: null,
+        })
+      } catch (cause) {
+        const message = cause instanceof Error ? cause.message : String(cause)
+        setReport({ at: Date.now(), trigger, plan: [], log: [], commitSha: null, error: message })
+        setStatus({ phase: 'error', message, progress: null })
+      }
+      return false
+    },
+    [],
+  )
+
   const run = useCallback(async (trigger: 'manual' | 'auto' = 'manual') => {
     const vault = rootRef.current
     if (busyRef.current || !vault) return
@@ -158,56 +263,16 @@ export function useGitHubSync({ root, docs, onBeforeSync, onLocalChanged }: Opti
       setStatus({ phase: 'running', message: '변경 사항을 비교하는 중…', progress: null })
 
       const outcome = await runExclusively(async () => {
-        try {
-          // 편집 중이던 내용이 아직 파일에 없으면 그대로 덮어써질 수 있습니다.
-          await callbacksRef.current.onBeforeSync()
-
-          const remote = await scanRemote(current)
-          if (remote.truncated) {
-            throw new Error('저장소가 너무 커서 파일 목록을 다 받지 못했습니다. 하위 폴더를 지정해 범위를 좁혀 주세요.')
-          }
-
-          const synced = await loadSyncState()
-          const plan = buildPlan(await localShas(docsRef.current), remote.files, synced, current)
-          const pending = plan.filter((item) => item.action !== 'skip')
-          const at = Date.now()
-
-          if (pending.length === 0) {
-            await saveSyncState(synced)
-            await saveLastSyncAt(at)
-            setLastSyncAt(at)
-            setReport({ at, trigger, plan, log: [], commitSha: null, error: null })
-            setStatus({ phase: 'done', message: '이미 저장소와 같습니다', progress: null })
-            return
-          }
-
-          setStatus({ phase: 'running', message: '동기화하는 중…', progress: { done: 0, total: pending.length } })
-
-          const result = await applyPlan({
-            root: vault,
-            config: current,
-            plan,
-            remote,
-            synced,
-            onProgress: (done, total) => setStatus((previous) => ({ ...previous, progress: { done, total } })),
-          })
-
-          await saveSyncState(result.synced)
-          await saveLastSyncAt(at)
-          setLastSyncAt(at)
-          if (result.localChanged) await callbacksRef.current.onLocalChanged()
-
-          const failures = result.log.filter((line) => line.status === 'error')
-          setReport({ at, trigger, plan, log: result.log, commitSha: result.commitSha, error: null })
+        // 우리가 저장소를 읽은 뒤 다른 쪽이 먼저 올리면 커밋이 거부됩니다.
+        // 잘못된 게 아니라 기준이 낡은 것뿐이라, 다시 읽고 다시 세워 시도합니다.
+        for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
+          const again = await attemptSync(current, vault, trigger, attempt)
+          if (!again) return
           setStatus({
-            phase: failures.length > 0 ? 'error' : 'done',
-            message: failures.length > 0 ? `${failures.length}건 실패` : summarize(result.log),
+            phase: 'running',
+            message: '저장소가 그 사이에 바뀌었습니다. 다시 맞추는 중…',
             progress: null,
           })
-        } catch (cause) {
-          const message = cause instanceof Error ? cause.message : String(cause)
-          setReport({ at: Date.now(), trigger, plan: [], log: [], commitSha: null, error: message })
-          setStatus({ phase: 'error', message, progress: null })
         }
       })
 
@@ -223,7 +288,14 @@ export function useGitHubSync({ root, docs, onBeforeSync, onLocalChanged }: Opti
     } finally {
       busyRef.current = false
     }
-  }, [])
+  }, [attemptSync])
+
+  const confirmTarget = useCallback(async () => {
+    const current = { ...DEFAULT_GITHUB_CONFIG, ...(await loadGitHubConfig()) }
+    confirmedRef.current = syncSignature(current)
+    setReport(null)
+    await run('manual')
+  }, [run])
 
   const runRef = useRef(run)
   useEffect(() => {
@@ -249,7 +321,10 @@ export function useGitHubSync({ root, docs, onBeforeSync, onLocalChanged }: Opti
 
   const dismissReport = useCallback(() => setReport(null), [])
 
-  return { config, loaded, isConfigured, status, report, lastSyncAt, update, run, dismissReport }
+  return {
+    config, loaded, isConfigured, status, report, lastSyncAt,
+    update, run, confirmTarget, dismissReport,
+  }
 }
 
 function isReady(config: GitHubConfig): boolean {
