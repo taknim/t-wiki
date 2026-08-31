@@ -6,6 +6,7 @@ import { AssetView } from './components/AssetView'
 import { FolderView } from './components/FolderView'
 import { InfoBar, type SelectionInfo } from './components/InfoBar'
 import { SearchPanel } from './components/SearchPanel'
+import { TextPreview } from './components/TextPreview'
 import { SettingsPanel } from './components/SettingsPanel'
 import { SyncReportSheet } from './components/SyncReportSheet'
 import { TreeView } from './components/TreeView'
@@ -17,6 +18,7 @@ import {
 import { extractHeadings, parseFrontmatter } from './lib/markdown'
 import { readFile } from './lib/fsAccess'
 import { loadSession, saveSession } from './lib/session'
+import { textPreviewKind } from './lib/textPreview'
 import { titleOf } from './lib/wikilinks'
 import type { VaultNode } from './types'
 
@@ -353,6 +355,8 @@ export default function App() {
   // 마크다운은 아니지만 글자로 되어 있어 고쳐 쓸 수 있는 첨부인지.
   const editableText =
     selection !== null && selection.kind !== 'dir' && isEditableText(selection.path)
+  // 표나 코드처럼 그려서 보여 줄 것이 있는 형식인지.
+  const textPreview = editableText && selection ? textPreviewKind(selection.path) : null
 
   const { fields, body } = useMemo(() => parseFrontmatter(draft), [draft])
   const headings = useMemo(() => extractHeadings(body), [body])
@@ -540,7 +544,7 @@ export default function App() {
           <span className="vault-name">{vault.vaultName}</span>
         </div>
         <div className="topbar-right">
-          {(selection === null || selection.kind === 'markdown') && (
+          {(selection === null || selection.kind === 'markdown' || textPreview !== null) && (
           <div className="mode-switch" role="group" aria-label="보기 모드">
             {(['edit', 'split', 'preview'] as ViewMode[]).map((mode) => (
               <button
@@ -705,17 +709,22 @@ export default function App() {
               </div>
 
               {editableText ? (
-                // 마크다운이 아니므로 렌더할 것이 없습니다. 편집기만 넓게 씁니다.
-                <div className="doc-body mode-edit">
-                  <Editor
-                    path={selection.path}
-                    value={draft}
-                    onChange={(next) => {
-                      setDraft(next)
-                      setDirty(true)
-                    }}
-                    onSave={() => void commit()}
-                  />
+                // 보여 줄 것이 있으면 마크다운처럼 나란히 놓고, 없으면 편집기만 넓게 씁니다.
+                <div className={`doc-body mode-${textPreview ? viewMode : 'edit'}`}>
+                  {(!textPreview || viewMode !== 'preview') && (
+                    <Editor
+                      path={selection.path}
+                      value={draft}
+                      onChange={(next) => {
+                        setDraft(next)
+                        setDirty(true)
+                      }}
+                      onSave={() => void commit()}
+                    />
+                  )}
+                  {textPreview && viewMode !== 'edit' && (
+                    <TextPreview kind={textPreview} path={selection.path} text={draft} />
+                  )}
                 </div>
               ) : selection.kind !== 'dir' && vault.root ? (
                 <AssetView root={vault.root} path={selection.path} size={selection.size} />

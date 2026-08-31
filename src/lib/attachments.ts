@@ -9,9 +9,12 @@
 export const IMAGE_EXTENSIONS = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'avif', 'bmp', 'ico']
 
 export const DOCUMENT_EXTENSIONS = [
-  'pdf', 'txt', 'csv', 'tsv', 'json', 'yaml', 'yml',
+  'pdf', 'txt', 'csv', 'tsv', 'json', 'yaml', 'yml', 'xml', 'html', 'htm',
   'docx', 'xlsx', 'pptx', 'hwp', 'hwpx',
 ]
+
+/** 글자로 되어 있어 편집기에서 고쳐 쓸 수 있는 형식. */
+const TEXT_EXTENSIONS = ['txt', 'csv', 'tsv', 'json', 'yaml', 'yml', 'xml', 'html', 'htm']
 
 const ATTACHMENT_EXTENSIONS = new Set([...IMAGE_EXTENSIONS, ...DOCUMENT_EXTENSIONS])
 
@@ -55,7 +58,7 @@ export function attachmentKind(path: string): AttachmentKind {
   const extension = extensionOf(path)
   if (IMAGE_EXTENSIONS.includes(extension)) return 'image'
   if (extension === 'pdf') return 'pdf'
-  if (['txt', 'csv', 'tsv', 'json', 'yaml', 'yml'].includes(extension)) return 'text'
+  if (TEXT_EXTENSIONS.includes(extension)) return 'text'
   return 'binary'
 }
 

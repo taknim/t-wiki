@@ -333,6 +333,13 @@ async function ensureFeatures(markdown: string): Promise<void> {
   await Promise.all(jobs)
 }
 
+/** 문서 바깥에서도 같은 하이라이팅을 쓰기 위해 내보냅니다(첨부 미리보기). */
+export async function highlightCode(code: string, language: string): Promise<string> {
+  await loadHighlighter()
+  if (!highlighter || !highlighter.getLanguage(language)) return escapeHtml(code)
+  return highlighter.highlight(code, { language, ignoreIllegals: true }).value
+}
+
 /* ------------------------------------------------------------------ */
 /* marked 인스턴스                                                      */
 /* ------------------------------------------------------------------ */

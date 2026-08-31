@@ -1028,3 +1028,64 @@ mark { background: var(--mark); color: inherit; border-radius: 2px; }
   text-decoration: underline;
 }
 
+
+/* ---------- 글자 파일 미리보기 ---------- */
+
+.text-preview { padding: 16px 20px; }
+.text-preview > * { max-width: none; margin-inline: 0; }
+
+.table-wrap {
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.data-table {
+  border-collapse: collapse;
+  font-size: 13px;
+  width: 100%;
+}
+.data-table th,
+.data-table td {
+  border-inline-end: 1px solid var(--border);
+  border-block-end: 1px solid var(--border);
+  padding: 5px 10px;
+  text-align: start;
+  white-space: pre-wrap;
+  vertical-align: top;
+}
+.data-table thead th {
+  position: sticky;
+  inset-block-start: 0;
+  background: var(--bg-sunken);
+  font-weight: 600;
+  z-index: 1;
+}
+.data-table .row-number {
+  width: 1%;
+  color: var(--text-muted);
+  font-family: var(--mono);
+  font-size: 11px;
+  text-align: end;
+  background: var(--bg-sunken);
+}
+
+.code-preview {
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-sunken);
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.7;
+  overflow: auto;
+}
+
+.html-frame {
+  width: 100%;
+  height: 100%;
+  min-height: 420px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+}
