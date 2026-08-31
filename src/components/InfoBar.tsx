@@ -38,8 +38,11 @@ export function InfoBar({ info, headings, index, showToc, onOpen }: InfoBarProps
   const tocAvailable = showToc && info.kind === 'doc' && headings.length >= 2
   const toggle = (next: Panel) => setPanel((current) => (current === next ? null : next))
 
+  // 최상위 폴더는 경로가 비어 있으므로 폴더 이름을 씁니다.
+  const fullPath = info.path || info.name
+
   return (
-    <>
+    <div className="info-dock">
       {panel === 'toc' && (
         <div className="info-panel">
           <Toc headings={headings} />
@@ -54,9 +57,8 @@ export function InfoBar({ info, headings, index, showToc, onOpen }: InfoBarProps
 
       <div className="info-bar">
         <span className="info-kind">{KIND_LABEL[info.kind]}</span>
-        <span className="info-name">{info.name}</span>
-        <span className="info-path" title={info.path || '최상위'}>
-          {info.path || '최상위'}
+        <span className="info-path" title={fullPath}>
+          {fullPath}
         </span>
 
         <span className="info-sep" />
@@ -100,7 +102,7 @@ export function InfoBar({ info, headings, index, showToc, onOpen }: InfoBarProps
           </button>
         )}
       </div>
-    </>
+    </div>
   )
 }
 
