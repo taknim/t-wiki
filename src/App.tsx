@@ -3,6 +3,7 @@ import { useDialogs } from './components/dialogContext'
 import { Editor } from './components/Editor'
 import { Preview } from './components/Preview'
 import { AssetView } from './components/AssetView'
+import { FolderView } from './components/FolderView'
 import { InfoBar, type SelectionInfo } from './components/InfoBar'
 import { SearchPanel } from './components/SearchPanel'
 import { SettingsPanel } from './components/SettingsPanel'
@@ -269,8 +270,9 @@ export default function App() {
         flash(parts.join(' · ') || '추가한 파일이 없습니다')
 
         // 방금 넣은 파일을 바로 보여 줍니다.
+        // 다만 폴더를 보고 있었다면 그대로 둡니다. 이어서 더 넣을 수 있게.
         const first = result.added[0]
-        if (first) {
+        if (first && selectedDir === null) {
           setSelectedDir(null)
           setSelectedPath(first)
           setDraft('')
@@ -280,7 +282,7 @@ export default function App() {
         report(cause)
       }
     },
-    [currentDir, flash, report, vault],
+    [currentDir, flash, report, selectedDir, vault],
   )
 
 
@@ -672,10 +674,14 @@ export default function App() {
               {selection.kind === 'asset' && vault.root ? (
                 <AssetView root={vault.root} path={selection.path} size={selection.size} />
               ) : (
-                <div className="placeholder">
-                  <p>폴더입니다. 아래에서 내용 요약을 볼 수 있습니다.</p>
-                  <p className="hint">문서를 고르면 여기에 열립니다.</p>
-                </div>
+                <FolderView
+                  path={selection.path}
+                  name={selection.name}
+                  fileCount={selection.fileCount ?? 0}
+                  size={selection.size}
+                  onDropFiles={(files) => void handleAddFiles(files, selection.path)}
+                  onPickFiles={() => filePicker.current?.click()}
+                />
               )}
             </>
           ) : selectedPath ? (
