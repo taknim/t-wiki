@@ -184,7 +184,9 @@ export async function movePath(
   if (kind === null) throw new Error(`"${from}" 를 찾을 수 없습니다.`)
 
   if (kind === 'file') {
-    await writeFile(root, to, await readFile(root, from))
+    // 텍스트로 읽어 다시 쓰면 이미지처럼 UTF-8 이 아닌 파일의 바이트가 망가집니다.
+    // 해석할 수 없는 바이트가 전부 U+FFFD 로 바뀌고, 원본은 되돌릴 수 없습니다.
+    await writeBinaryFile(root, to, await readBinaryFile(root, from))
   } else {
     await copyDir(root, from, to)
   }
@@ -203,8 +205,9 @@ async function copyDir(
     if (handle.kind === 'directory') {
       await copyDir(root, `${from}/${name}`, `${to}/${name}`)
     } else {
+      // 폴더를 통째로 옮길 때도 바이트 그대로 옮겨야 합니다.
       const file = await (handle as FileSystemFileHandle).getFile()
-      await writeFile(root, `${to}/${name}`, await file.text())
+      await writeBinaryFile(root, `${to}/${name}`, file)
     }
   }
 }
