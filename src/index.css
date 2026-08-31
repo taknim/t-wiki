@@ -370,7 +370,12 @@ mark { background: var(--mark); color: inherit; border-radius: 2px; }
   border-bottom: 1px solid var(--border);
 }
 .sheet-head h2 { margin: 0; font-size: 16px; }
-.sheet-body { padding: 18px; overflow: auto; }
+.sheet-body {
+  flex: 1;
+  min-height: 0;
+  padding: 18px;
+  overflow: auto;
+}
 
 .field { margin-bottom: 20px; }
 .field > label { display: block; font-weight: 600; margin-bottom: 6px; font-size: 13px; }
@@ -759,8 +764,15 @@ mark { background: var(--mark); color: inherit; border-radius: 2px; }
 
 /* ---------- 설정 창 왼쪽 메뉴 ---------- */
 
-/* 왼쪽 메뉴가 차지하는 만큼 본문 폭이 줄어들어 조금 넓혀 줍니다. */
-.sheet:has(.settings-layout) { width: min(840px, 100%); }
+/*
+ * 설정 창은 높이를 고정합니다.
+ * 묶음마다 내용 길이가 달라 창이 늘었다 줄었다 하면 메뉴 위치까지 흔들립니다.
+ * 화면이 낮으면 88vh 로 물러섭니다.
+ */
+.sheet:has(.settings-layout) {
+  width: min(840px, 100%);
+  height: min(660px, 88vh);
+}
 
 .settings-layout {
   display: flex;
@@ -803,6 +815,8 @@ mark { background: var(--mark); color: inherit; border-radius: 2px; }
   min-width: 0;
   padding: 18px;
   overflow-y: auto;
+  /* 스크롤이 생겼다 없어질 때 본문이 좌우로 밀리지 않게 자리를 미리 잡아 둡니다. */
+  scrollbar-gutter: stable;
 }
 
 @media (max-width: 640px) {
