@@ -815,6 +815,8 @@ mark { background: var(--mark); color: inherit; border-radius: 2px; }
   min-width: 0;
   padding: 18px;
   overflow-y: auto;
+  /* 메뉴로 뛸 때 묶음 머리가 위쪽 여백에 딱 붙도록 합니다. */
+  scroll-padding-block-start: 18px;
   /* 스크롤이 생겼다 없어질 때 본문이 좌우로 밀리지 않게 자리를 미리 잡아 둡니다. */
   scrollbar-gutter: stable;
 }
@@ -936,4 +938,21 @@ mark { background: var(--mark); color: inherit; border-radius: 2px; }
   padding: 12px 16px;
   border-top: 1px solid var(--border);
   background: var(--bg-sunken);
+}
+
+
+/* ---------- 설정 한 페이지 ---------- */
+
+.settings-section + .settings-section {
+  margin-block-start: 28px;
+  padding-block-start: 22px;
+  border-block-start: 1px solid var(--border);
+}
+/* 마지막 묶음도 맨 위까지 올라올 수 있도록 아래에 자리를 둡니다. */
+.settings-section:last-child { padding-block-end: 40vh; }
+
+.settings-heading {
+  margin: 0 0 14px;
+  font-size: 15px;
+  scroll-margin-block-start: 18px;
 }

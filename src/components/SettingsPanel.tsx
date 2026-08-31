@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   FONTS, SIZES, THEMES, WIDTHS,
   type FontId, type ModeSetting, type SizeId, type ThemeId, type WidthId,
@@ -25,14 +25,69 @@ interface SettingsPanelProps {
 type TabId = 'general' | 'appearance' | 'sync'
 
 const TABS: { id: TabId; name: string; hint: string }[] = [
-  { id: 'general', name: '일반', hint: '마지막 화면 상태 기억' },
-  { id: 'appearance', name: '모양', hint: '테마와 글꼴' },
-  { id: 'sync', name: 'GitHub 동기화', hint: '저장소와 자동 동기화 설정' },
+  { id: 'general', name: '일반', hint: '마지막 화면 상태 기억으로 이동' },
+  { id: 'appearance', name: '모양', hint: '테마와 글꼴로 이동' },
+  { id: 'sync', name: 'GitHub 동기화', hint: '저장소와 자동 동기화 설정으로 이동' },
 ]
 
-export function SettingsPanel({ onClose, sync, onShowReport, initialTab = 'appearance' }: SettingsPanelProps) {
+export function SettingsPanel({ onClose, sync, onShowReport, initialTab = 'general' }: SettingsPanelProps) {
   const { settings, isDark, update } = useTheme()
   const [tab, setTab] = useState<TabId>(initialTab)
+
+  const contentRef = useRef<HTMLDivElement>(null)
+  const sectionRefs = {
+    general: useRef<HTMLElement>(null),
+    appearance: useRef<HTMLElement>(null),
+    sync: useRef<HTMLElement>(null),
+  }
+  // 메뉴를 눌러 움직이는 동안에는 스크롤 위치로 강조를 바꾸지 않습니다.
+  const jumpingTo = useRef<TabId | null>(null)
+  const releaseTimer = useRef(0)
+
+  const jumpTo = useCallback((id: TabId) => {
+    setTab(id)
+    jumpingTo.current = id
+    sectionRefs[id].current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+
+    // 목적지에 정확히 닿지 않아도 잠시 뒤에는 다시 스크롤을 따르게 풀어 줍니다.
+    window.clearTimeout(releaseTimer.current)
+    releaseTimer.current = window.setTimeout(() => {
+      jumpingTo.current = null
+    }, 800)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  /** 스크롤에 따라 지금 보고 있는 묶음을 강조합니다. */
+  const onScroll = useCallback(() => {
+    const container = contentRef.current
+    if (!container) return
+
+    // 위로 뛸 때 scroll-padding 만큼 여백이 남으므로, 그보다 넉넉한 기준을 씁니다.
+    const THRESHOLD = 24
+    const top = container.getBoundingClientRect().top
+    let current: TabId = 'general'
+    for (const id of TABS.map((item) => item.id)) {
+      const element = sectionRefs[id].current
+      // 위쪽 경계를 살짝 넘긴 마지막 묶음이 지금 보고 있는 것입니다.
+      if (element && element.getBoundingClientRect().top - top <= THRESHOLD) current = id
+    }
+
+    // 부드럽게 움직이는 중이면 목적지에 닿았을 때만 놓아 줍니다.
+    if (jumpingTo.current) {
+      if (jumpingTo.current === current) jumpingTo.current = null
+      return
+    }
+    setTab(current)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // 창을 열 때 지정된 묶음으로 바로 이동합니다.
+  useEffect(() => {
+    if (initialTab === 'general') return
+    sectionRefs[initialTab].current?.scrollIntoView({ block: 'start' })
+    setTab(initialTab)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialTab])
   const [remember, setRemember] = useState(isRememberEnabled)
   const [cleared, setCleared] = useState(false)
 
@@ -59,24 +114,24 @@ export function SettingsPanel({ onClose, sync, onShowReport, initialTab = 'appea
         </header>
 
         <div className="sheet-body settings-layout">
-          <nav className="settings-nav" role="tablist" aria-label="설정 묶음">
+          <nav className="settings-nav" aria-label="설정 묶음">
             {TABS.map((item) => (
               <button
                 key={item.id}
                 type="button"
-                role="tab"
-                aria-selected={tab === item.id}
+                aria-current={tab === item.id ? 'location' : undefined}
                 className={tab === item.id ? 'is-active' : ''}
                 data-tip={item.hint}
-                onClick={() => setTab(item.id)}
+                onClick={() => jumpTo(item.id)}
               >
                 {item.name}
               </button>
             ))}
           </nav>
 
-          <div className="settings-content">
-          {tab === 'general' && (
+          <div className="settings-content" ref={contentRef} onScroll={onScroll}>
+            <section className="settings-section" ref={sectionRefs.general}>
+              <h3 className="settings-heading">일반</h3>
             <section className="field">
               <label>마지막 화면 상태</label>
               <label className="checkbox">
@@ -117,12 +172,12 @@ export function SettingsPanel({ onClose, sync, onShowReport, initialTab = 'appea
                 이 기록은 이 브라우저에만 남고 저장소로 올라가지 않습니다.
               </p>
             </section>
-          )}
+            </section>
 
-          {tab === 'sync' && <GitHubSettings sync={sync} onShowReport={onShowReport} />}
 
-          {tab === 'appearance' && (
-          <>
+            <section className="settings-section" ref={sectionRefs.appearance}>
+              <h3 className="settings-heading">모양</h3>
+
           <section className="field">
             <label>테마</label>
             <div className="theme-grid">
@@ -237,8 +292,13 @@ export function SettingsPanel({ onClose, sync, onShowReport, initialTab = 'appea
               코드 하이라이팅과 다이어그램 색도 고른 테마를 따라갑니다.
             </p>
           </section>
-          </>
-          )}
+
+            </section>
+
+            <section className="settings-section" ref={sectionRefs.sync}>
+              <h3 className="settings-heading">GitHub 동기화</h3>
+              <GitHubSettings sync={sync} onShowReport={onShowReport} />
+            </section>
           </div>
         </div>
       </div>

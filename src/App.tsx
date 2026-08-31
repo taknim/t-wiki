@@ -32,7 +32,7 @@ export default function App() {
   const [viewMode, setViewMode] = useState<ViewMode>('split')
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set())
   const [query, setQuery] = useState('')
-  const [settingsTab, setSettingsTab] = useState<'appearance' | 'sync' | null>(null)
+  const [settingsTab, setSettingsTab] = useState<'general' | 'appearance' | 'sync' | null>(null)
   const [reportOpen, setReportOpen] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
 
@@ -523,7 +523,7 @@ export default function App() {
             className="btn"
             data-tip="테마, 글꼴, GitHub 동기화를 설정합니다"
             aria-label="설정"
-            onClick={() => setSettingsTab('appearance')}
+            onClick={() => setSettingsTab('general')}
           >
             ⚙
           </button>
