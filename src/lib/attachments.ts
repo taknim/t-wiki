@@ -45,6 +45,11 @@ export function isSyncable(path: string, size: number): boolean {
   return isAttachment(path) && size <= MAX_ATTACHMENT_BYTES
 }
 
+/** 마크다운은 아니지만 글자로 되어 있어 고쳐 쓸 수 있는 형식. */
+export function isEditableText(path: string): boolean {
+  return attachmentKind(path) === 'text'
+}
+
 /** 미리보기를 어떤 방식으로 그릴지. */
 export function attachmentKind(path: string): AttachmentKind {
   const extension = extensionOf(path)

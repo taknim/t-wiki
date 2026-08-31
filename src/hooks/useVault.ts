@@ -20,6 +20,8 @@ export interface Vault {
   close: () => Promise<void>
   refresh: () => Promise<void>
   save: (path: string, content: string) => Promise<void>
+  /** 마크다운이 아닌 텍스트 파일을 저장합니다. 문서 색인은 건드리지 않습니다. */
+  saveText: (path: string, content: string) => Promise<void>
   createDoc: (dirPath: string, name: string) => Promise<string>
   createFolder: (dirPath: string, name: string) => Promise<void>
   rename: (path: string, nextName: string) => Promise<string>
@@ -200,6 +202,31 @@ export function useVault(): Vault {
     [requireRoot],
   )
 
+  /**
+   * 첨부 중 글자로 된 파일을 저장합니다.
+   * 문서 색인에는 마크다운만 들어가므로, 여기서는 첨부 정보(크기·시각)만 새로 맞춥니다.
+   * 매번 폴더를 다시 훑으면 저장할 때마다 느려집니다.
+   */
+  const saveText = useCallback(
+    async (path: string, content: string) => {
+      const root = requireRoot()
+      const lastModified = await fs.writeFile(root, path, content)
+      setAssets((previous) => {
+        const next = new Map(previous)
+        const entry = next.get(path)
+        if (entry) {
+          next.set(path, {
+            ...entry,
+            size: new TextEncoder().encode(content).length,
+            lastModified,
+          })
+        }
+        return next
+      })
+    },
+    [requireRoot],
+  )
+
   const createDoc = useCallback(
     async (dirPath: string, name: string) => {
       const root = requireRoot()
@@ -299,6 +326,7 @@ export function useVault(): Vault {
     close,
     refresh,
     save,
+    saveText,
     createDoc,
     createFolder,
     rename,

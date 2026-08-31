@@ -12,9 +12,10 @@ import { TreeView } from './components/TreeView'
 import { useGitHubSync } from './hooks/useGitHubSync'
 import { useVault } from './hooks/useVault'
 import {
-  ACCEPT_ATTRIBUTE, attachmentKind, formatBytes, isMarkdown, MAX_ATTACHMENT_BYTES,
+  ACCEPT_ATTRIBUTE, attachmentKind, formatBytes, isEditableText, isMarkdown, MAX_ATTACHMENT_BYTES,
 } from './lib/attachments'
 import { extractHeadings, parseFrontmatter } from './lib/markdown'
+import { readFile } from './lib/fsAccess'
 import { loadSession, saveSession } from './lib/session'
 import { titleOf } from './lib/wikilinks'
 import type { VaultNode } from './types'
@@ -78,7 +79,9 @@ export default function App() {
     if (!path || !dirty) return
     const snapshot = draftRef.current
     try {
-      await vault.save(path, snapshot)
+      // 마크다운은 문서 색인까지 갱신하고, 그 밖의 텍스트는 파일만 씁니다.
+      if (isMarkdown(path)) await vault.save(path, snapshot)
+      else await vault.saveText(path, snapshot)
       // 저장하는 동안 더 입력했거나 다른 문서로 옮겨갔다면 dirty 를 그대로 둡니다.
       // 여기서 무조건 내려버리면 대기 중이던 자동 저장이 취소되어 그 입력이 사라집니다.
       if (draftRef.current === snapshot && selectedRef.current === path) setDirty(false)
@@ -143,6 +146,29 @@ export default function App() {
     }
     void sync.run('manual')
   }, [sync])
+
+  const openAsset = useCallback(
+    async (path: string) => {
+      await commit()
+
+      // 글자로 된 첨부는 편집기에서 바로 고칠 수 있게 내용을 읽어 둡니다.
+      // 화면을 먼저 바꾸고 나중에 채우면, 그 틈에 친 글자가 덮여 사라집니다.
+      let content = ''
+      if (isEditableText(path) && vault.root) {
+        try {
+          content = await readFile(vault.root, path)
+        } catch (cause) {
+          report(cause)
+        }
+      }
+
+      setSelectedDir(null)
+      setSelectedPath(path)
+      setDraft(content)
+      setDirty(false)
+    },
+    [commit, report, vault.root],
+  )
 
   // 편집이 멈추면 잠시 뒤 자동 저장합니다.
   useEffect(() => {
@@ -215,17 +241,23 @@ export default function App() {
         return
       }
       // 지난번에 보던 문서가 아직 있을 때만 엽니다.
-      if (saved.selectedPath && (vault.index.has(saved.selectedPath) || vault.assets.has(saved.selectedPath))) {
-        setSelectedPath(saved.selectedPath)
-        setDraft(vault.index.get(saved.selectedPath)?.content ?? '')
+      const path = saved.selectedPath
+      if (!path) return
+
+      if (vault.index.has(path)) {
+        setSelectedPath(path)
+        setDraft(vault.index.get(path)?.content ?? '')
         setDirty(false)
+        return
       }
+      // 첨부는 문서 색인에 없으므로 여는 절차를 그대로 씁니다.
+      if (vault.assets.has(path)) await openAsset(path)
     })()
 
     return () => {
       cancelled = true
     }
-  }, [vault.status, vault.root, vault.index, vault.assets])
+  }, [vault.status, vault.root, vault.index, vault.assets, openAsset])
 
   // 펼친 폴더와 고른 항목이 바뀔 때마다 기억해 둡니다.
   // 사용자가 클릭할 때만 일어나는 변화라 그때그때 써도 부담이 없습니다.
@@ -234,14 +266,6 @@ export default function App() {
     if (vault.status !== 'ready' || !root || restoredFor.current !== root) return
     void saveSession(root, { expanded: [...expanded], selectedPath, selectedDir })
   }, [vault.status, vault.root, expanded, selectedPath, selectedDir])
-
-  const openAsset = useCallback((path: string) => {
-    void commit()
-    setSelectedDir(null)
-    setSelectedPath(path)
-    setDraft('')
-    setDirty(false)
-  }, [commit])
 
   const toggleFolder = useCallback((path: string) => {
     setExpanded((previous) => {
@@ -273,18 +297,15 @@ export default function App() {
 
         // 방금 넣은 파일을 바로 보여 줍니다.
         // 다만 폴더를 보고 있었다면 그대로 둡니다. 이어서 더 넣을 수 있게.
+        // 여는 방식은 트리에서 고를 때와 같아야 합니다. 직접 상태를 만지면
+        // 글자로 된 첨부의 내용을 못 읽어, 편집기가 빈 채로 열리고 고치는 순간 잘려 나갑니다.
         const first = result.added[0]
-        if (first && selectedDir === null) {
-          setSelectedDir(null)
-          setSelectedPath(first)
-          setDraft('')
-          setDirty(false)
-        }
+        if (first && selectedDir === null) await openAsset(first)
       } catch (cause) {
         report(cause)
       }
     },
-    [currentDir, flash, report, selectedDir, vault],
+    [currentDir, flash, openAsset, report, selectedDir, vault],
   )
 
 
@@ -328,6 +349,10 @@ export default function App() {
     }
     return null
   }, [selectedDir, selectedPath, vault.index, vault.assets, vault.tree, vault.vaultName])
+
+  // 마크다운은 아니지만 글자로 되어 있어 고쳐 쓸 수 있는 첨부인지.
+  const editableText =
+    selection !== null && selection.kind !== 'dir' && isEditableText(selection.path)
 
   const { fields, body } = useMemo(() => parseFrontmatter(draft), [draft])
   const headings = useMemo(() => extractHeadings(body), [body])
@@ -515,6 +540,7 @@ export default function App() {
           <span className="vault-name">{vault.vaultName}</span>
         </div>
         <div className="topbar-right">
+          {(selection === null || selection.kind === 'markdown') && (
           <div className="mode-switch" role="group" aria-label="보기 모드">
             {(['edit', 'split', 'preview'] as ViewMode[]).map((mode) => (
               <button
@@ -534,6 +560,7 @@ export default function App() {
               </button>
             ))}
           </div>
+          )}
           <button
             type="button"
             className="btn"
@@ -648,7 +675,7 @@ export default function App() {
                   selectedPath={selectedDir ?? selectedPath}
                   expanded={expanded}
                   onToggle={toggleFolder}
-                  onSelect={(path) => (isMarkdown(path) ? void openDoc(path) : openAsset(path))}
+                  onSelect={(path) => void (isMarkdown(path) ? openDoc(path) : openAsset(path))}
                   onSelectDir={(path: string) => {
                     setSelectedDir(path)
                     setSelectedPath(null)
@@ -671,9 +698,26 @@ export default function App() {
               <div className="doc-head">
                 <h1>{selection.name}</h1>
                 <span className="doc-path">{selection.path || '최상위'}</span>
-                {selection.kind !== 'dir' && <span className="pill">읽기 전용</span>}
+                {editableText && (
+                  <span className={dirty ? 'pill' : 'pill pill-ok'}>{dirty ? '저장 중…' : '저장됨'}</span>
+                )}
+                {selection.kind !== 'dir' && !editableText && <span className="pill">읽기 전용</span>}
               </div>
-              {selection.kind !== 'dir' && vault.root ? (
+
+              {editableText ? (
+                // 마크다운이 아니므로 렌더할 것이 없습니다. 편집기만 넓게 씁니다.
+                <div className="doc-body mode-edit">
+                  <Editor
+                    path={selection.path}
+                    value={draft}
+                    onChange={(next) => {
+                      setDraft(next)
+                      setDirty(true)
+                    }}
+                    onSave={() => void commit()}
+                  />
+                </div>
+              ) : selection.kind !== 'dir' && vault.root ? (
                 <AssetView root={vault.root} path={selection.path} size={selection.size} />
               ) : (
                 <FolderView
