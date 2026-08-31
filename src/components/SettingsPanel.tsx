@@ -5,6 +5,7 @@ import {
 } from '../lib/theme'
 import type { GitHubSync } from '../hooks/useGitHubSync'
 import { GitHubSettings } from './GitHubSettings'
+import { clearSessions, isRememberEnabled, setRememberEnabled } from '../lib/session'
 import { useTheme } from './themeContext'
 
 const MODES: { id: ModeSetting; name: string; hint: string }[] = [
@@ -21,9 +22,10 @@ interface SettingsPanelProps {
   initialTab?: TabId
 }
 
-type TabId = 'appearance' | 'sync'
+type TabId = 'general' | 'appearance' | 'sync'
 
 const TABS: { id: TabId; name: string; hint: string }[] = [
+  { id: 'general', name: '일반', hint: '마지막 화면 상태 기억' },
   { id: 'appearance', name: '모양', hint: '테마와 글꼴' },
   { id: 'sync', name: 'GitHub 동기화', hint: '저장소와 자동 동기화 설정' },
 ]
@@ -31,6 +33,8 @@ const TABS: { id: TabId; name: string; hint: string }[] = [
 export function SettingsPanel({ onClose, sync, onShowReport, initialTab = 'appearance' }: SettingsPanelProps) {
   const { settings, isDark, update } = useTheme()
   const [tab, setTab] = useState<TabId>(initialTab)
+  const [remember, setRemember] = useState(isRememberEnabled)
+  const [cleared, setCleared] = useState(false)
 
   return (
     <div
@@ -72,6 +76,49 @@ export function SettingsPanel({ onClose, sync, onShowReport, initialTab = 'appea
           </nav>
 
           <div className="settings-content">
+          {tab === 'general' && (
+            <section className="field">
+              <label>마지막 화면 상태</label>
+              <label className="checkbox">
+                <input
+                  type="checkbox"
+                  checked={remember}
+                  onChange={(event) => {
+                    setRemember(event.target.checked)
+                    setRememberEnabled(event.target.checked)
+                    setCleared(false)
+                  }}
+                />
+                폴더를 다시 열면 마지막 상태로 되돌리기
+                <span className="hint">
+                  펼쳐 두었던 폴더와 마지막으로 고른 문서를 기억합니다.
+                  새로고침하거나 폴더를 닫았다 다시 열어도 그대로 이어집니다.
+                  폴더는 이름이 아니라 실제 위치로 구분하므로, 같은 이름의 다른 폴더와 섞이지 않습니다.
+                </span>
+              </label>
+
+              <div className="row" style={{ marginTop: 12 }}>
+                <button
+                  type="button"
+                  className="btn"
+                  data-tip="기억해 둔 모든 폴더의 화면 상태를 지웁니다"
+                  onClick={() => {
+                    void clearSessions()
+                    setCleared(true)
+                  }}
+                >
+                  기억한 상태 지우기
+                </button>
+                {cleared && <span className="hint" style={{ margin: 0 }}>지웠습니다.</span>}
+              </div>
+
+              <p className="hint" style={{ marginTop: 14 }}>
+                최근 연 폴더 10개까지 기억하고, 그보다 오래된 것은 버립니다.
+                이 기록은 이 브라우저에만 남고 저장소로 올라가지 않습니다.
+              </p>
+            </section>
+          )}
+
           {tab === 'sync' && <GitHubSettings sync={sync} onShowReport={onShowReport} />}
 
           {tab === 'appearance' && (

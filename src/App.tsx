@@ -12,6 +12,7 @@ import { useGitHubSync } from './hooks/useGitHubSync'
 import { useVault } from './hooks/useVault'
 import { isMarkdown } from './lib/attachments'
 import { extractHeadings, parseFrontmatter } from './lib/markdown'
+import { loadSession, saveSession } from './lib/session'
 import { titleOf } from './lib/wikilinks'
 import type { VaultNode } from './types'
 
@@ -103,6 +104,22 @@ export default function App() {
     flash(sync.status.message)
   }, [sync.status, flash])
 
+  const closeVault = useCallback(async () => {
+    // 닫기 전에 지금 화면 상태를 남겨 둡니다. 다음에 같은 폴더를 열면 이대로 복원됩니다.
+    if (vault.root) {
+      await saveSession(vault.root, { expanded: [...expanded], selectedPath, selectedDir })
+    }
+    restoredFor.current = null
+    await vault.close()
+
+    // 닫은 뒤에도 펼침과 선택이 남아 있으면 다른 폴더를 열었을 때 엉뚱한 상태로 시작합니다.
+    setExpanded(new Set())
+    setSelectedPath(null)
+    setSelectedDir(null)
+    setDraft('')
+    setDirty(false)
+  }, [vault, expanded, selectedPath, selectedDir])
+
   const startSync = useCallback(() => {
     // 설정이 덜 됐으면 실행 대신 설정 창을 열어 줍니다.
     if (!sync.isConfigured) {
@@ -161,6 +178,47 @@ export default function App() {
     // dirty 를 의존성에 넣으면 편집 중에 되돌려버리므로 제외합니다.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vault.index, vault.assets, selectedPath])
+
+  // 같은 폴더를 다시 열면 지난번 화면 상태로 되돌립니다.
+  // 폴더마다 한 번씩만 복원하고, 그 뒤의 변경은 사용자의 조작으로 봅니다.
+  const restoredFor = useRef<FileSystemDirectoryHandle | null>(null)
+
+  useEffect(() => {
+    const root = vault.root
+    if (vault.status !== 'ready' || !root || restoredFor.current === root) return
+    restoredFor.current = root
+
+    let cancelled = false
+    void (async () => {
+      const saved = await loadSession(root)
+      if (!saved || cancelled) return
+
+      setExpanded(new Set(saved.expanded))
+
+      if (saved.selectedDir !== null) {
+        setSelectedDir(saved.selectedDir)
+        return
+      }
+      // 지난번에 보던 문서가 아직 있을 때만 엽니다.
+      if (saved.selectedPath && (vault.index.has(saved.selectedPath) || vault.assets.has(saved.selectedPath))) {
+        setSelectedPath(saved.selectedPath)
+        setDraft(vault.index.get(saved.selectedPath)?.content ?? '')
+        setDirty(false)
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [vault.status, vault.root, vault.index, vault.assets])
+
+  // 펼친 폴더와 고른 항목이 바뀔 때마다 기억해 둡니다.
+  // 사용자가 클릭할 때만 일어나는 변화라 그때그때 써도 부담이 없습니다.
+  useEffect(() => {
+    const root = vault.root
+    if (vault.status !== 'ready' || !root || restoredFor.current !== root) return
+    void saveSession(root, { expanded: [...expanded], selectedPath, selectedDir })
+  }, [vault.status, vault.root, expanded, selectedPath, selectedDir])
 
   const openAsset = useCallback((path: string) => {
     void commit()
@@ -473,7 +531,7 @@ export default function App() {
             type="button"
             className="btn"
             data-tip="이 폴더와의 연결을 끊습니다. 파일은 그대로 남습니다"
-            onClick={() => void vault.close()}
+            onClick={() => void closeVault()}
           >
             폴더 닫기
           </button>
