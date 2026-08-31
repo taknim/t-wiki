@@ -13,12 +13,13 @@ import { TreeView } from './components/TreeView'
 import { useGitHubSync } from './hooks/useGitHubSync'
 import { useVault } from './hooks/useVault'
 import {
-  ACCEPT_ATTRIBUTE, attachmentKind, formatBytes, isEditableText, isMarkdown, MAX_ATTACHMENT_BYTES,
+  ACCEPT_ATTRIBUTE, attachmentKind, extensionOf, formatBytes, isEditableText, isMarkdown,
+  MAX_ATTACHMENT_BYTES,
 } from './lib/attachments'
 import { extractHeadings, parseFrontmatter } from './lib/markdown'
 import { readFile } from './lib/fsAccess'
 import { loadSession, saveSession } from './lib/session'
-import { textPreviewKind } from './lib/textPreview'
+import { reindentJson, textPreviewKind } from './lib/textPreview'
 import { titleOf } from './lib/wikilinks'
 import type { VaultNode } from './types'
 
@@ -76,17 +77,42 @@ export default function App() {
     [flash],
   )
 
-  const commit = useCallback(async () => {
+  /**
+   * 편집 내용을 파일에 씁니다.
+   *
+   * tidy 는 이 파일에서 벗어날 때만 켭니다. 자동 저장이 돌 때마다 정돈하면
+   * 글을 쓰는 도중에 내용이 통째로 바뀌어 커서가 엉뚱한 곳으로 튑니다.
+   */
+  const commit = useCallback(async (tidy = false) => {
     const path = selectedRef.current
-    if (!path || !dirty) return
-    const snapshot = draftRef.current
+    if (!path) return
+
+    const original = draftRef.current
+    const candidate = tidy && extensionOf(path) === 'json' ? reindentJson(original) : null
+    // 이미 정돈되어 있으면 쓸 것이 없습니다.
+    const tidied = candidate !== null && candidate !== original ? candidate : null
+
+    // 자동 저장이 먼저 돌아 dirty 가 내려갔더라도, 정돈할 것이 있으면 씁니다.
+    if (!dirty && tidied === null) return
+
+    const snapshot = tidied ?? original
+
     try {
       // 마크다운은 문서 색인까지 갱신하고, 그 밖의 텍스트는 파일만 씁니다.
       if (isMarkdown(path)) await vault.save(path, snapshot)
       else await vault.saveText(path, snapshot)
+
+      if (tidied !== null) {
+        // 정돈한 내용으로 화면도 맞춥니다. 벗어나는 길이라 입력과 부딪히지 않습니다.
+        draftRef.current = tidied
+        setDraft(tidied)
+        setDirty(false)
+        return
+      }
+
       // 저장하는 동안 더 입력했거나 다른 문서로 옮겨갔다면 dirty 를 그대로 둡니다.
       // 여기서 무조건 내려버리면 대기 중이던 자동 저장이 취소되어 그 입력이 사라집니다.
-      if (draftRef.current === snapshot && selectedRef.current === path) setDirty(false)
+      if (draftRef.current === original && selectedRef.current === path) setDirty(false)
     } catch (cause) {
       report(cause)
     }
@@ -125,6 +151,9 @@ export default function App() {
   }, [sync.status, flash])
 
   const closeVault = useCallback(async () => {
+    // 자동 저장이 아직 안 돌았을 수 있으므로 먼저 씁니다.
+    await commit(true)
+
     // 닫기 전에 지금 화면 상태를 남겨 둡니다. 다음에 같은 폴더를 열면 이대로 복원됩니다.
     if (vault.root) {
       await saveSession(vault.root, { expanded: [...expanded], selectedPath, selectedDir })
@@ -138,7 +167,7 @@ export default function App() {
     setSelectedDir(null)
     setDraft('')
     setDirty(false)
-  }, [vault, expanded, selectedPath, selectedDir])
+  }, [commit, vault, expanded, selectedPath, selectedDir])
 
   const startSync = useCallback(() => {
     // 설정이 덜 됐으면 실행 대신 설정 창을 열어 줍니다.
@@ -151,7 +180,10 @@ export default function App() {
 
   const openAsset = useCallback(
     async (path: string) => {
-      await commit()
+      // 이미 보고 있는 파일을 다시 고르면 아무것도 하지 않습니다.
+      // 그러지 않으면 누를 때마다 정돈이 걸려, 열기만 해도 파일이 바뀝니다.
+      if (path === selectedRef.current) return
+      await commit(true)
 
       // 글자로 된 첨부는 편집기에서 바로 고칠 수 있게 내용을 읽어 둡니다.
       // 화면을 먼저 바꾸고 나중에 채우면, 그 틈에 친 글자가 덮여 사라집니다.
@@ -185,7 +217,7 @@ export default function App() {
   const openDoc = useCallback(
     async (path: string) => {
       if (path === selectedRef.current) return
-      await commit()
+      await commit(true)
       const entry = vault.index.get(path)
       setSelectedDir(null)
       setSelectedPath(path)

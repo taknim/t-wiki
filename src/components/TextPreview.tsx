@@ -1,7 +1,10 @@
 import DOMPurify from 'dompurify'
 import { useEffect, useState } from 'react'
 import { highlightCode } from '../lib/markdown'
-import { delimiterFor, highlightLanguage, parseDelimited, type TextPreviewKind } from '../lib/textPreview'
+import {
+  delimiterFor, highlightLanguage, parseDelimited, reindentJson, type TextPreviewKind,
+} from '../lib/textPreview'
+import { extensionOf } from '../lib/attachments'
 
 interface TextPreviewProps {
   kind: Exclude<TextPreviewKind, null>
@@ -60,15 +63,18 @@ function TablePreview({ path, text }: { path: string; text: string }) {
 function CodePreview({ path, text }: { path: string; text: string }) {
   const [html, setHtml] = useState('')
 
+  // 원문이 어긋나 있어도 보기에는 정돈해서 보여 줍니다. 파일은 건드리지 않습니다.
+  const shown = extensionOf(path) === 'json' ? reindentJson(text) ?? text : text
+
   useEffect(() => {
     let cancelled = false
-    void highlightCode(text, highlightLanguage(path)).then((result) => {
+    void highlightCode(shown, highlightLanguage(path)).then((result) => {
       if (!cancelled) setHtml(result)
     })
     return () => {
       cancelled = true
     }
-  }, [path, text])
+  }, [path, shown])
 
   return (
     <div className="preview text-preview">

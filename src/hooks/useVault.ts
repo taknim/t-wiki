@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { AssetIndex, DocIndex, VaultNode } from '../types'
-import { extensionOf, isAttachment, isMarkdown, MAX_ATTACHMENT_BYTES } from '../lib/attachments'
+import {
+  attachmentKind, extensionOf, isAttachment, isMarkdown, MAX_ATTACHMENT_BYTES,
+} from '../lib/attachments'
 import { clearAssetCache } from '../lib/assets'
 import * as fs from '../lib/fsAccess'
 import { clearVaultHandle, loadVaultHandle, saveVaultHandle } from '../lib/store'
@@ -231,9 +233,17 @@ export function useVault(): Vault {
     async (dirPath: string, name: string) => {
       const root = requireRoot()
       assertSafeName(name)
-      const path = joinPath(dirPath, ensureMdExtension(name.trim()))
+      const typed = name.trim()
+
+      // 확장자를 직접 적었고 글자로 된 형식이면 그대로 씁니다.
+      // 무턱대고 .md 를 붙이면 test.csv 가 test.csv.md 가 됩니다.
+      const keepsExtension = attachmentKind(typed) === 'text'
+      const path = joinPath(dirPath, keepsExtension ? typed : ensureMdExtension(typed))
       if (await fs.exists(root, path)) throw new Error(`"${path}" 가 이미 있습니다.`)
-      await fs.writeFile(root, path, `# ${name.trim().replace(/\.md$/i, '')}\n\n`)
+
+      // 마크다운에만 제목 줄을 넣습니다. 다른 형식에는 뜻이 없습니다.
+      const seed = isMarkdown(path) ? `# ${typed.replace(/\.md$/i, '')}\n\n` : ''
+      await fs.writeFile(root, path, seed)
       await refresh()
       return path
     },

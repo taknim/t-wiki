@@ -80,3 +80,96 @@ export function parseDelimited(text: string, delimiter: string): string[][] {
   }
   return rows
 }
+
+/**
+ * JSON 을 값은 그대로 두고 들여쓰기만 다시 맞춥니다.
+ *
+ * JSON.parse 후 다시 문자열로 만들면 간단하지만, 큰 정수의 정밀도가 조용히 깨집니다.
+ * (8143661439548533232 → 8143661439548533000)
+ * 그래서 글자를 훑으며 공백만 새로 넣습니다. 숫자와 문자열은 원문 그대로 옮깁니다.
+ *
+ * 형식이 어긋나면 null 을 돌려주고, 부르는 쪽은 원문을 그대로 씁니다.
+ */
+export function reindentJson(text: string, indent = '  '): string | null {
+  let out = ''
+  let depth = 0
+  let at = 0
+
+  const pad = (level: number) => '\n' + indent.repeat(level)
+  const lastMeaningful = () => out.trimEnd().slice(-1)
+
+  while (at < text.length) {
+    const char = text[at]
+
+    // 문자열은 따옴표가 닫힐 때까지 한 글자도 바꾸지 않고 옮깁니다.
+    if (char === '"') {
+      const start = at
+      at += 1
+      while (at < text.length) {
+        if (text[at] === '\\') {
+          at += 2
+          continue
+        }
+        if (text[at] === '"') {
+          at += 1
+          break
+        }
+        at += 1
+      }
+      if (text[at - 1] !== '"' || at - start < 2) return null
+      out += text.slice(start, at)
+      continue
+    }
+
+    if (char === ' ' || char === '\t' || char === '\n' || char === '\r') {
+      at += 1
+      continue
+    }
+
+    if (char === '{' || char === '[') {
+      out += char
+      depth += 1
+      at += 1
+      // 바로 닫히는 빈 묶음은 한 줄로 둡니다.
+      const next = text.slice(at).search(/\S/)
+      if (next !== -1 && (text[at + next] === '}' || text[at + next] === ']')) {
+        depth -= 1
+        out += text[at + next]
+        at += next + 1
+      } else {
+        out += pad(depth)
+      }
+      continue
+    }
+
+    if (char === '}' || char === ']') {
+      depth -= 1
+      if (depth < 0) return null
+      out += pad(depth) + char
+      at += 1
+      continue
+    }
+
+    if (char === ',') {
+      out += ',' + pad(depth)
+      at += 1
+      continue
+    }
+
+    if (char === ':') {
+      out += ': '
+      at += 1
+      continue
+    }
+
+    // 숫자, true/false/null 같은 값은 통째로 옮깁니다.
+    const literal = /^[^\s,:{}[\]"]+/.exec(text.slice(at))
+    if (!literal) return null
+    out += literal[0]
+    at += literal[0].length
+  }
+
+  if (depth !== 0) return null
+  // 값 하나만 덩그러니 있거나 뒤에 군더더기가 붙은 경우는 손대지 않습니다.
+  return lastMeaningful() === '}' || lastMeaningful() === ']' ? out + '\n' : null
+}
