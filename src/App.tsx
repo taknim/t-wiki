@@ -11,7 +11,9 @@ import { SyncReportSheet } from './components/SyncReportSheet'
 import { TreeView } from './components/TreeView'
 import { useGitHubSync } from './hooks/useGitHubSync'
 import { useVault } from './hooks/useVault'
-import { ACCEPT_ATTRIBUTE, formatBytes, isMarkdown, MAX_ATTACHMENT_BYTES } from './lib/attachments'
+import {
+  ACCEPT_ATTRIBUTE, attachmentKind, formatBytes, isMarkdown, MAX_ATTACHMENT_BYTES,
+} from './lib/attachments'
 import { extractHeadings, parseFrontmatter } from './lib/markdown'
 import { loadSession, saveSession } from './lib/session'
 import { titleOf } from './lib/wikilinks'
@@ -306,7 +308,7 @@ export default function App() {
     const doc = vault.index.get(selectedPath)
     if (doc) {
       return {
-        kind: 'doc',
+        kind: 'markdown',
         path: selectedPath,
         name: selectedPath.split('/').pop() ?? selectedPath,
         size: new TextEncoder().encode(doc.content).length,
@@ -317,7 +319,7 @@ export default function App() {
     const asset = vault.assets.get(selectedPath)
     if (asset) {
       return {
-        kind: 'asset',
+        kind: attachmentKind(selectedPath) === 'image' ? 'image' : 'document',
         path: selectedPath,
         name: selectedPath.split('/').pop() ?? selectedPath,
         size: asset.size,
@@ -664,21 +666,17 @@ export default function App() {
         </aside>
 
         <main className="main">
-          {selection && selection.kind !== 'doc' ? (
+          {selection && selection.kind !== 'markdown' ? (
             <>
               <div className="doc-head">
                 <h1>{selection.name}</h1>
                 <span className="doc-path">{selection.path || '최상위'}</span>
-                {selection.kind === 'asset' && <span className="pill">읽기 전용</span>}
+                {selection.kind !== 'dir' && <span className="pill">읽기 전용</span>}
               </div>
-              {selection.kind === 'asset' && vault.root ? (
+              {selection.kind !== 'dir' && vault.root ? (
                 <AssetView root={vault.root} path={selection.path} size={selection.size} />
               ) : (
                 <FolderView
-                  path={selection.path}
-                  name={selection.name}
-                  fileCount={selection.fileCount ?? 0}
-                  size={selection.size}
                   onDropFiles={(files) => void handleAddFiles(files, selection.path)}
                   onPickFiles={() => filePicker.current?.click()}
                 />

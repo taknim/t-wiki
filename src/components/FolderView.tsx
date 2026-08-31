@@ -1,11 +1,7 @@
 import { useState, type DragEvent } from 'react'
-import { formatBytes, DOCUMENT_EXTENSIONS, IMAGE_EXTENSIONS } from '../lib/attachments'
+import { DOCUMENT_EXTENSIONS, IMAGE_EXTENSIONS } from '../lib/attachments'
 
 interface FolderViewProps {
-  path: string
-  name: string
-  fileCount: number
-  size: number
   onDropFiles: (files: File[]) => void
   onPickFiles: () => void
 }
@@ -13,8 +9,9 @@ interface FolderViewProps {
 /**
  * 폴더를 골랐을 때 나오는 자리.
  * 편집할 것이 없으므로, 이 폴더에 파일을 넣는 자리로 씁니다.
+ * 폴더의 경로와 크기는 아래 상태 표시줄에 이미 있으므로 여기서는 되풀이하지 않습니다.
  */
-export function FolderView({ path, name, fileCount, size, onDropFiles, onPickFiles }: FolderViewProps) {
+export function FolderView({ onDropFiles, onPickFiles }: FolderViewProps) {
   const [over, setOver] = useState(false)
 
   const stop = (event: DragEvent) => {
@@ -51,28 +48,10 @@ export function FolderView({ path, name, fileCount, size, onDropFiles, onPickFil
           </button>
         </p>
         <p className="folder-drop-types">
-          이미지 {IMAGE_EXTENSIONS.length}종 · 문서 {DOCUMENT_EXTENSIONS.length}종을 받습니다
+          <strong>이미지</strong> ({IMAGE_EXTENSIONS.join(', ')}),{' '}
+          <strong>문서</strong> ({DOCUMENT_EXTENSIONS.join(', ')}) 형식의 파일을 추가하실 수 있습니다.
         </p>
       </div>
-
-      <dl className="folder-facts">
-        <div>
-          <dt>폴더</dt>
-          <dd>{name}</dd>
-        </div>
-        <div>
-          <dt>경로</dt>
-          <dd className="mono">{path || '최상위'}</dd>
-        </div>
-        <div>
-          <dt>담긴 파일</dt>
-          <dd>{fileCount}개</dd>
-        </div>
-        <div>
-          <dt>크기 합계</dt>
-          <dd>{formatBytes(size)}</dd>
-        </div>
-      </dl>
     </div>
   )
 }

@@ -5,8 +5,11 @@ import { formatBytes } from '../lib/attachments'
 import { Backlinks } from './Backlinks'
 import { Toc } from './Toc'
 
+/** 첨부는 이미지와 그 밖의 문서로 나눠 표시합니다. */
+export type SelectionKind = 'markdown' | 'image' | 'document' | 'dir'
+
 export interface SelectionInfo {
-  kind: 'doc' | 'asset' | 'dir'
+  kind: SelectionKind
   path: string
   name: string
   size: number
@@ -23,9 +26,10 @@ interface InfoBarProps {
   onOpen: (path: string) => void
 }
 
-const KIND_LABEL: Record<SelectionInfo['kind'], string> = {
-  doc: '문서',
-  asset: '첨부',
+const KIND_LABEL: Record<SelectionKind, string> = {
+  markdown: '마크다운',
+  image: '이미지',
+  document: '문서',
   dir: '폴더',
 }
 
@@ -34,8 +38,8 @@ type Panel = 'toc' | 'backlinks' | null
 export function InfoBar({ info, headings, index, showToc, onOpen }: InfoBarProps) {
   const [panel, setPanel] = useState<Panel>(null)
 
-  const backlinkCount = info.kind === 'doc' ? countBacklinks(info.path, index) : 0
-  const tocAvailable = showToc && info.kind === 'doc' && headings.length >= 2
+  const backlinkCount = info.kind === 'markdown' ? countBacklinks(info.path, index) : 0
+  const tocAvailable = showToc && info.kind === 'markdown' && headings.length >= 2
   const toggle = (next: Panel) => setPanel((current) => (current === next ? null : next))
 
   // 최상위 폴더는 경로가 비어 있으므로 폴더 이름을 씁니다.
@@ -56,7 +60,7 @@ export function InfoBar({ info, headings, index, showToc, onOpen }: InfoBarProps
       )}
 
       <div className="info-bar">
-        <span className="info-kind">{KIND_LABEL[info.kind]}</span>
+        <span className={`info-kind info-kind-${info.kind}`}>{KIND_LABEL[info.kind]}</span>
         <span className="info-path" title={fullPath}>
           {fullPath}
         </span>
@@ -91,7 +95,7 @@ export function InfoBar({ info, headings, index, showToc, onOpen }: InfoBarProps
           </button>
         )}
 
-        {info.kind === 'doc' && (
+        {info.kind === 'markdown' && (
           <button
             type="button"
             className={panel === 'backlinks' ? 'info-toggle is-open' : 'info-toggle'}

@@ -905,10 +905,17 @@ mark { background: var(--mark); color: inherit; border-radius: 2px; }
 }
 .info-kind {
   padding: 1px 7px;
-  border: 1px solid var(--border-strong);
+  border: 1px solid currentColor;
   border-radius: 999px;
   flex-shrink: 0;
+  /* 종류를 색으로도 구분합니다. 글자를 읽기 전에 눈에 들어오도록. */
+  color: var(--text-muted);
+  background: color-mix(in srgb, currentColor 10%, transparent);
 }
+.info-kind-markdown { color: var(--accent); }
+.info-kind-image { color: var(--ok); }
+.info-kind-document { color: var(--warn); }
+.info-kind-dir { color: var(--text-muted); }
 .info-path {
   color: var(--text);
   font-family: var(--mono);
@@ -1002,7 +1009,14 @@ mark { background: var(--mark); color: inherit; border-radius: 2px; }
 }
 .folder-drop-title { margin: 0; font-size: 15px; font-weight: 600; }
 .folder-drop-hint { margin: 0; font-size: 13px; color: var(--text-muted); }
-.folder-drop-types { margin: 0; font-size: 12px; color: var(--text-muted); }
+.folder-drop-types {
+  margin: 4px 0 0;
+  max-width: 46em;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+.folder-drop-types strong { color: var(--text); }
 
 .link-button {
   padding: 0;
@@ -1014,14 +1028,3 @@ mark { background: var(--mark); color: inherit; border-radius: 2px; }
   text-decoration: underline;
 }
 
-.folder-facts {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: 10px 20px;
-  margin: 0;
-  font-size: 13px;
-}
-.folder-facts > div { display: flex; flex-direction: column; gap: 2px; }
-.folder-facts dt { color: var(--text-muted); font-size: 12px; }
-.folder-facts dd { margin: 0; }
-.folder-facts .mono { font-family: var(--mono); word-break: break-all; }
