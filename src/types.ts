@@ -1,0 +1,78 @@
+export type NodeKind = 'file' | 'dir'
+
+/** 볼트(로컬 폴더) 안의 파일 또는 폴더 한 개. path 는 볼트 루트 기준 상대경로이고 구분자는 항상 '/'. */
+export interface VaultNode {
+  kind: NodeKind
+  name: string
+  path: string
+  children?: VaultNode[]
+  lastModified?: number
+  size?: number
+}
+
+/** 메모리에 올려둔 문서 본문. 검색·백링크·위키링크 해석이 전부 이 인덱스를 씁니다. */
+export interface DocEntry {
+  path: string
+  content: string
+  lastModified: number
+}
+
+export type DocIndex = Map<string, DocEntry>
+
+/**
+ * 마크다운이 아닌 파일(이미지 등)의 위치. 파일명(소문자) → 경로 목록.
+ * `![[그림.png]]` 처럼 경로 없이 파일명만 쓴 임베드를 찾아내는 데 씁니다.
+ */
+export type AssetIndex = Map<string, string[]>
+
+export interface SearchHit {
+  path: string
+  title: string
+  /** 매치 주변 발췌. <mark> 를 쓰지 않고 조각으로 나눠 React 에서 직접 렌더합니다. */
+  snippet: { text: string; hit: boolean }[]
+  score: number
+}
+
+/**
+ * 마지막으로 로컬과 원격이 같았던 시점의 blob SHA.
+ * git 은 내용으로 해시를 만들기 때문에 이 값 하나로 3-way 비교가 됩니다.
+ * (수정 시각을 견주지 않으므로 시계 오차를 신경 쓸 필요가 없습니다.)
+ */
+export type SyncState = Record<string, string>
+
+export type ConflictPolicy = 'keep-both' | 'local-wins' | 'remote-wins'
+
+export interface GitHubConfig {
+  /** fine-grained personal access token. 브라우저 IndexedDB 에만 보관됩니다. */
+  token: string
+  owner: string
+  repo: string
+  branch: string
+  /** 저장소 안에서 위키로 쓸 하위 폴더. 빈 문자열이면 저장소 루트. */
+  basePath: string
+  conflictPolicy: ConflictPolicy
+  propagateDeletes: boolean
+  /** 켜면 일정 간격으로 알아서 동기화합니다. */
+  autoSync: boolean
+  /** 자동 동기화 간격(분). */
+  autoSyncMinutes: number
+}
+
+export type SyncAction =
+  | 'upload-new' | 'upload-update'
+  | 'download-new' | 'download-update'
+  | 'delete-local' | 'delete-remote'
+  | 'conflict' | 'skip'
+
+export interface SyncPlanItem {
+  path: string
+  action: SyncAction
+  reason: string
+}
+
+export interface SyncLogLine {
+  path: string
+  action: SyncAction
+  status: 'ok' | 'error'
+  detail?: string
+}

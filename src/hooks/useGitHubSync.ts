@@ -1,0 +1,271 @@
+import { useCallback, useEffect, useRef, useState } from 'react'
+import type { DocIndex, GitHubConfig, SyncLogLine, SyncPlanItem } from '../types'
+import { applyPlan, buildPlan, localShas, scanRemote } from '../lib/github/sync'
+import {
+  loadGitHubConfig,
+  loadLastSyncAt,
+  loadSyncState,
+  saveGitHubConfig,
+  saveLastSyncAt,
+  saveSyncState,
+} from '../lib/store'
+
+export const DEFAULT_GITHUB_CONFIG: GitHubConfig = {
+  token: '',
+  owner: '',
+  repo: '',
+  branch: 'main',
+  basePath: '',
+  conflictPolicy: 'keep-both',
+  propagateDeletes: false,
+  autoSync: false,
+  autoSyncMinutes: 10,
+}
+
+export type SyncPhase = 'idle' | 'running' | 'done' | 'error' | 'blocked'
+
+export interface SyncStatus {
+  phase: SyncPhase
+  message: string
+  progress: { done: number; total: number } | null
+}
+
+export interface SyncReport {
+  at: number
+  trigger: 'manual' | 'auto'
+  plan: SyncPlanItem[]
+  log: SyncLogLine[]
+  commitSha: string | null
+  error: string | null
+}
+
+export interface GitHubSync {
+  config: GitHubConfig
+  loaded: boolean
+  isConfigured: boolean
+  status: SyncStatus
+  report: SyncReport | null
+  lastSyncAt: number | null
+  update: (patch: Partial<GitHubConfig>) => void
+  run: (trigger?: 'manual' | 'auto') => Promise<void>
+  dismissReport: () => void
+}
+
+interface Options {
+  root: FileSystemDirectoryHandle | null
+  docs: DocIndex
+  /** 동기화 전에 편집 중인 내용을 파일에 반영합니다. */
+  onBeforeSync: () => Promise<void>
+  /** 로컬 파일이 바뀌었을 때 볼트를 다시 읽습니다. */
+  onLocalChanged: () => Promise<void>
+}
+
+const IDLE: SyncStatus = { phase: 'idle', message: '', progress: null }
+
+/** 자동 동기화가 켜져 있을 때, 볼트를 연 직후 한 번 돌기까지 두는 여유. */
+const FIRST_RUN_DELAY = 5000
+
+/**
+ * 브라우저 전체에서 하나만 잡을 수 있는 이름.
+ * 저장소나 하위 폴더를 이름에 넣으면, 설정이 어긋난 탭끼리는 서로 다른 잠금을 잡아
+ * 정작 막아야 할 상황을 못 막습니다. 그래서 일부러 고정된 이름을 씁니다.
+ */
+const SYNC_LOCK = 'mdwiki:github-sync'
+
+const BUSY = Symbol('다른 탭이 동기화 중')
+
+/**
+ * 같은 볼트를 연 탭이 여럿이면 각자 자동 동기화를 돌려 서로의 결과를 되돌립니다.
+ * 한쪽이 원격에서 지운 문서를 다른 쪽이 "사라졌네" 하며 복원하는 식입니다.
+ * Web Locks 로 브라우저 전체에서 한 번에 하나만 돌게 막습니다.
+ */
+async function runExclusively<T>(task: () => Promise<T>): Promise<T | typeof BUSY> {
+  const manager = navigator.locks
+  if (!manager) return task()
+
+  return manager.request(SYNC_LOCK, { ifAvailable: true }, async (lock) => {
+    // 이미 다른 탭이 잡고 있으면 기다리지 않고 이번 회차를 건너뜁니다.
+    if (!lock) return BUSY
+    return task()
+  })
+}
+
+export function useGitHubSync({ root, docs, onBeforeSync, onLocalChanged }: Options): GitHubSync {
+  const [config, setConfig] = useState<GitHubConfig>(DEFAULT_GITHUB_CONFIG)
+  const [loaded, setLoaded] = useState(false)
+  const [status, setStatus] = useState<SyncStatus>(IDLE)
+  const [report, setReport] = useState<SyncReport | null>(null)
+  const [lastSyncAt, setLastSyncAt] = useState<number | null>(null)
+
+  // 타이머에서 부를 때 오래된 값을 붙잡지 않도록 최신 상태를 ref 로도 들고 있습니다.
+  // 설정만은 실행 직전에 저장소에서 다시 읽으므로 여기 두지 않습니다.
+  const rootRef = useRef(root)
+  const docsRef = useRef(docs)
+  const busyRef = useRef(false)
+  const pendingSaveRef = useRef<Promise<void>>(Promise.resolve())
+  const callbacksRef = useRef({ onBeforeSync, onLocalChanged })
+
+  // ref 쓰기는 렌더가 아니라 커밋 뒤에 해야 합니다.
+  // 의존성 배열이 없으므로 렌더할 때마다 최신 값으로 갱신됩니다.
+  useEffect(() => {
+    rootRef.current = root
+    docsRef.current = docs
+    callbacksRef.current = { onBeforeSync, onLocalChanged }
+  })
+
+  useEffect(() => {
+    void (async () => {
+      const saved = await loadGitHubConfig()
+      setConfig({ ...DEFAULT_GITHUB_CONFIG, ...saved })
+      setLastSyncAt((await loadLastSyncAt()) ?? null)
+      setLoaded(true)
+    })()
+  }, [])
+
+  const update = useCallback((patch: Partial<GitHubConfig>) => {
+    setConfig((previous) => ({ ...previous, ...patch }))
+  }, [])
+
+  // 저장은 상태 갱신 함수 안이 아니라 여기서 합니다.
+  // 실행 직전에 저장이 끝났는지 기다릴 수 있도록 마지막 저장을 붙잡아 둡니다.
+  useEffect(() => {
+    if (!loaded) return
+    pendingSaveRef.current = saveGitHubConfig(config)
+  }, [config, loaded])
+
+  const run = useCallback(async (trigger: 'manual' | 'auto' = 'manual') => {
+    const vault = rootRef.current
+    if (busyRef.current || !vault) return
+
+    // 중복 실행 막기와 진행 표시를 먼저 겁니다.
+    // 설정을 읽는 동안 버튼이 열려 있으면 같은 탭에서 두 번 눌릴 수 있습니다.
+    busyRef.current = true
+    setStatus({ phase: 'running', message: '설정을 확인하는 중…', progress: null })
+
+    try {
+      // 설정은 메모리가 아니라 저장소에서 다시 읽습니다.
+      // 다른 탭에서 바꾼 값이 이 탭 메모리에는 남아 있지 않아,
+      // 굳은 옛 설정으로 돌면 한쪽이 지운 문서를 다른 쪽이 되살립니다.
+      await pendingSaveRef.current
+      const current = { ...DEFAULT_GITHUB_CONFIG, ...(await loadGitHubConfig()) }
+      setConfig(current)
+
+      if (!isReady(current)) {
+        setStatus(IDLE)
+        return
+      }
+
+      setStatus({ phase: 'running', message: '변경 사항을 비교하는 중…', progress: null })
+
+      const outcome = await runExclusively(async () => {
+        try {
+          // 편집 중이던 내용이 아직 파일에 없으면 그대로 덮어써질 수 있습니다.
+          await callbacksRef.current.onBeforeSync()
+
+          const remote = await scanRemote(current)
+          if (remote.truncated) {
+            throw new Error('저장소가 너무 커서 파일 목록을 다 받지 못했습니다. 하위 폴더를 지정해 범위를 좁혀 주세요.')
+          }
+
+          const synced = await loadSyncState()
+          const plan = buildPlan(await localShas(docsRef.current), remote.files, synced, current)
+          const pending = plan.filter((item) => item.action !== 'skip')
+          const at = Date.now()
+
+          if (pending.length === 0) {
+            await saveSyncState(synced)
+            await saveLastSyncAt(at)
+            setLastSyncAt(at)
+            setReport({ at, trigger, plan, log: [], commitSha: null, error: null })
+            setStatus({ phase: 'done', message: '이미 저장소와 같습니다', progress: null })
+            return
+          }
+
+          setStatus({ phase: 'running', message: '동기화하는 중…', progress: { done: 0, total: pending.length } })
+
+          const result = await applyPlan({
+            root: vault,
+            config: current,
+            plan,
+            remote,
+            synced,
+            onProgress: (done, total) => setStatus((previous) => ({ ...previous, progress: { done, total } })),
+          })
+
+          await saveSyncState(result.synced)
+          await saveLastSyncAt(at)
+          setLastSyncAt(at)
+          if (result.localChanged) await callbacksRef.current.onLocalChanged()
+
+          const failures = result.log.filter((line) => line.status === 'error')
+          setReport({ at, trigger, plan, log: result.log, commitSha: result.commitSha, error: null })
+          setStatus({
+            phase: failures.length > 0 ? 'error' : 'done',
+            message: failures.length > 0 ? `${failures.length}건 실패` : summarize(result.log),
+            progress: null,
+          })
+        } catch (cause) {
+          const message = cause instanceof Error ? cause.message : String(cause)
+          setReport({ at: Date.now(), trigger, plan: [], log: [], commitSha: null, error: message })
+          setStatus({ phase: 'error', message, progress: null })
+        }
+      })
+
+      if (outcome === BUSY) {
+        // 자동 회차는 조용히 건너뜁니다. 직접 누른 경우에만 왜 안 됐는지 알려 줍니다.
+        // 실패가 아니라 '지금은 못 돈다' 이므로 오류와 구분되는 상태로 둡니다.
+        setStatus(
+          trigger === 'manual'
+            ? { phase: 'blocked', message: '다른 탭에서 동기화 중입니다. 끝난 뒤 다시 눌러 주세요.', progress: null }
+            : IDLE,
+        )
+      }
+    } finally {
+      busyRef.current = false
+    }
+  }, [])
+
+  const runRef = useRef(run)
+  useEffect(() => {
+    runRef.current = run
+  }, [run])
+
+  const isConfigured = isReady(config)
+  const autoOn = loaded && config.autoSync && isConfigured && root !== null
+
+  // 켜져 있으면 볼트를 연 직후 한 번, 그 뒤로는 정해진 간격마다 돕니다.
+  useEffect(() => {
+    if (!autoOn) return
+
+    const minutes = Math.min(Math.max(config.autoSyncMinutes, 1), 1440)
+    const first = window.setTimeout(() => void runRef.current('auto'), FIRST_RUN_DELAY)
+    const repeat = window.setInterval(() => void runRef.current('auto'), minutes * 60_000)
+
+    return () => {
+      window.clearTimeout(first)
+      window.clearInterval(repeat)
+    }
+  }, [autoOn, config.autoSyncMinutes])
+
+  const dismissReport = useCallback(() => setReport(null), [])
+
+  return { config, loaded, isConfigured, status, report, lastSyncAt, update, run, dismissReport }
+}
+
+function isReady(config: GitHubConfig): boolean {
+  return Boolean(config.token.trim() && config.owner.trim() && config.repo.trim() && config.branch.trim())
+}
+
+function summarize(log: SyncLogLine[]): string {
+  const uploaded = log.filter((line) => line.action.startsWith('upload')).length
+  const downloaded = log.filter((line) => line.action.startsWith('download')).length
+  const removed = log.filter((line) => line.action.startsWith('delete')).length
+  const conflicts = log.filter((line) => line.action === 'conflict').length
+
+  const parts: string[] = []
+  if (uploaded > 0) parts.push(`${uploaded}건 커밋`)
+  if (downloaded > 0) parts.push(`${downloaded}건 내려받음`)
+  if (removed > 0) parts.push(`${removed}건 삭제`)
+  if (conflicts > 0) parts.push(`충돌 ${conflicts}건`)
+  return parts.length > 0 ? parts.join(' · ') : '변경 없음'
+}
