@@ -115,6 +115,43 @@ export async function localShas(
  * 로컬 해시 · 원격 해시 · 마지막으로 합의했던 해시를 3-way 로 비교합니다.
  * 세 값이 모두 내용에서 나온 것이라 시계나 수정 시각에 기대지 않습니다.
  */
+/**
+ * 이름을 바꾸면 한쪽에서는 사라지고 다른 쪽에서는 새로 생긴 것처럼 보입니다.
+ * 그대로 두면 삭제 전파가 꺼져 있을 때 옛 이름이 되살아나 같은 문서가 둘이 됩니다.
+ *
+ * 내용 해시가 같으면 옮긴 것으로 봅니다. 다만 같은 내용의 파일이 여럿이면
+ * 어느 것이 어디로 갔는지 알 수 없으므로, 짝이 하나뿐일 때만 이동으로 처리합니다.
+ */
+function detectRenames(
+  local: Map<string, string>,
+  remote: Map<string, string>,
+  synced: SyncState,
+): Map<string, string> {
+  const goneFromLocal = new Map<string, string[]>()
+  const newInLocal = new Map<string, string[]>()
+
+  for (const [path, sha] of remote) {
+    // 전에 맞춰 본 적 있는 파일만 이동 후보로 봅니다.
+    if (!local.has(path) && synced[path]) push(goneFromLocal, sha, path)
+  }
+  for (const [path, sha] of local) {
+    if (!remote.has(path) && !synced[path]) push(newInLocal, sha, path)
+  }
+
+  const renames = new Map<string, string>()
+  for (const [sha, oldPaths] of goneFromLocal) {
+    const newPaths = newInLocal.get(sha)
+    if (oldPaths.length === 1 && newPaths?.length === 1) renames.set(oldPaths[0], newPaths[0])
+  }
+  return renames
+}
+
+function push(map: Map<string, string[]>, key: string, value: string): void {
+  const list = map.get(key) ?? []
+  list.push(value)
+  map.set(key, list)
+}
+
 export function buildPlan(
   local: Map<string, string>,
   remote: Map<string, string>,
@@ -123,6 +160,9 @@ export function buildPlan(
 ): SyncPlanItem[] {
   const paths = new Set<string>([...local.keys(), ...remote.keys()])
   const plan: SyncPlanItem[] = []
+
+  const renames = detectRenames(local, remote, synced)
+  const movedTo = new Set(renames.values())
 
   for (const path of [...paths].sort()) {
     const localSha = local.get(path)
@@ -147,7 +187,9 @@ export function buildPlan(
     }
 
     if (localSha !== undefined) {
-      if (base && config.propagateDeletes) {
+      if (movedTo.has(path)) {
+        plan.push({ path, action: 'upload-new', reason: '이름이 바뀜 → 새 경로로 올림' })
+      } else if (base && config.propagateDeletes) {
         plan.push({ path, action: 'delete-local', reason: '저장소에서 삭제됨' })
       } else {
         plan.push({ path, action: 'upload-new', reason: base ? '저장소에서 삭제됨 → 복원' : '로컬에만 있음' })
@@ -156,7 +198,11 @@ export function buildPlan(
     }
 
     if (remoteSha !== undefined) {
-      if (base && config.propagateDeletes) {
+      const movedFrom = renames.get(path)
+      if (movedFrom) {
+        // 지운 게 아니라 옮긴 것이므로 삭제 전파 설정과 무관하게 옛 경로를 치웁니다.
+        plan.push({ path, action: 'delete-remote', reason: `이름이 바뀜 → ${movedFrom} 로 옮김` })
+      } else if (base && config.propagateDeletes) {
         plan.push({ path, action: 'delete-remote', reason: '로컬에서 삭제됨' })
       } else {
         plan.push({ path, action: 'download-new', reason: base ? '로컬에서 삭제됨 → 복원' : '저장소에만 있음' })

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { AssetIndex, DocIndex, VaultNode } from '../types'
-import { isAttachment, MAX_ATTACHMENT_BYTES } from '../lib/attachments'
+import { extensionOf, isAttachment, isMarkdown, MAX_ATTACHMENT_BYTES } from '../lib/attachments'
 import { clearAssetCache } from '../lib/assets'
 import * as fs from '../lib/fsAccess'
 import { clearVaultHandle, loadVaultHandle, saveVaultHandle } from '../lib/store'
@@ -43,6 +43,22 @@ function joinPath(dir: string, name: string): string {
 
 function ensureMdExtension(name: string): string {
   return name.toLowerCase().endsWith('.md') ? name : `${name}.md`
+}
+
+/**
+ * 이름을 바꿀 때 확장자를 지키는 규칙.
+ * 사용자가 확장자를 직접 적었으면 그대로 두고, 적지 않았으면 원래 것을 붙입니다.
+ * 그러지 않으면 `도표.svg` 를 `구조도` 로 바꿨을 때 확장자가 사라져
+ * 첨부로 인식되지 않고 동기화에서도 빠집니다.
+ */
+function renamedFile(path: string, nextName: string): string {
+  if (isMarkdown(path)) return ensureMdExtension(nextName)
+
+  const typed = extensionOf(nextName)
+  if (typed) return nextName
+
+  const original = extensionOf(path)
+  return original ? `${nextName}.${original}` : nextName
 }
 
 /** 파일명에 쓸 수 없는 문자를 걸러냅니다. */
@@ -214,8 +230,7 @@ export function useVault(): Vault {
       const root = requireRoot()
       assertSafeName(nextName)
       const dirPath = path.split('/').slice(0, -1).join('/')
-      const isDoc = path.toLowerCase().endsWith('.md')
-      const target = joinPath(dirPath, isDoc ? ensureMdExtension(nextName.trim()) : nextName.trim())
+      const target = joinPath(dirPath, renamedFile(path, nextName.trim()))
       await fs.movePath(root, path, target)
       await refresh()
       return target
