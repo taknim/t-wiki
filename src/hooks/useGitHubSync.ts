@@ -80,7 +80,6 @@ interface Options {
 const IDLE: SyncStatus = { phase: 'idle', message: '', progress: null }
 
 /** 자동 동기화가 켜져 있을 때, 볼트를 연 직후 한 번 돌기까지 두는 여유. */
-const FIRST_RUN_DELAY = 5000
 
 /** 저장소가 그 사이에 바뀌었을 때 다시 맞춰 볼 횟수. */
 const MAX_ATTEMPTS = 3
@@ -402,14 +401,18 @@ export function useGitHubSync({ root, docs, assets, onBeforeSync, onLocalChanged
   const autoOn = loaded && config.autoSync && isConfigured && root !== null
 
   /**
-   * 켜져 있으면 볼트를 연 직후 한 번, 그 뒤로는 정해진 간격마다 돕니다.
+   * 켜져 있으면 정해진 간격마다 돕니다.
    *
    * setInterval 대신 한 번 돌 때마다 다시 잡습니다.
    * 그래야 동기화에 걸린 시간과 무관하게 다음 예정 시각이 정확해지고,
    * 그 값을 화면에 남은 시간으로 보여 줄 수 있습니다.
+   *
+   * 폴더가 바뀌면 셈도 처음부터 다시 시작합니다. 폴더마다 맞춰 둔 저장소가
+   * 다른데, 앞 폴더에서 세던 시간을 그대로 이어 가면 남은 시간이 지금 폴더와
+   * 아무 상관 없는 값이 됩니다.
    */
   useEffect(() => {
-    if (!autoOn) return
+    if (!autoOn || !vaultKey) return
 
     const minutes = Math.min(Math.max(config.autoSyncMinutes, 1), 1440)
     let timer = 0
@@ -430,7 +433,8 @@ export function useGitHubSync({ root, docs, assets, onBeforeSync, onLocalChanged
     restartCountdownRef.current = () => {
       if (!cancelled) schedule(minutes * 60_000)
     }
-    schedule(FIRST_RUN_DELAY)
+    // 새로 시작할 때도 정해진 간격을 그대로 씁니다. 화면에 뜬 남은 시간이 곧 예정 시각입니다.
+    schedule(minutes * 60_000)
 
     return () => {
       cancelled = true
@@ -438,7 +442,7 @@ export function useGitHubSync({ root, docs, assets, onBeforeSync, onLocalChanged
       window.clearTimeout(timer)
       setNextAutoSyncAt(null)
     }
-  }, [autoOn, config.autoSyncMinutes])
+  }, [autoOn, config.autoSyncMinutes, vaultKey])
 
   const dismissReport = useCallback(() => setReport(null), [])
 
