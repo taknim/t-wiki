@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 
 interface TipState {
   text: string
@@ -19,6 +19,7 @@ const EDGE = 8
  */
 export function TooltipLayer() {
   const [tip, setTip] = useState<TipState | null>(null)
+  const boxRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     let timer = 0
@@ -30,7 +31,7 @@ export function TooltipLayer() {
       setTip({
         text,
         top: below ? box.bottom + GAP : box.top - GAP,
-        left: Math.min(Math.max(box.left + box.width / 2, EDGE + 60), window.innerWidth - EDGE - 60),
+        left: box.left + box.width / 2,
         below,
       })
     }
@@ -75,10 +76,28 @@ export function TooltipLayer() {
     }
   }, [])
 
+  /*
+   * 자리는 그린 뒤에 잡습니다. 미리 반폭을 어림해 밀어 두면, 짧은 안내까지
+   * 가리키는 곳에서 멀어집니다. 그려 놓고 화면 밖으로 나간 만큼만 밀어 넣습니다.
+   */
+  useLayoutEffect(() => {
+    const box = boxRef.current
+    if (!box || !tip) return
+
+    box.style.left = `${tip.left}px`
+    const rect = box.getBoundingClientRect()
+    if (rect.left < EDGE) {
+      box.style.left = `${tip.left + (EDGE - rect.left)}px`
+    } else if (rect.right > window.innerWidth - EDGE) {
+      box.style.left = `${tip.left - (rect.right - (window.innerWidth - EDGE))}px`
+    }
+  }, [tip])
+
   if (!tip) return null
 
   return (
     <div
+      ref={boxRef}
       className={tip.below ? 'tooltip' : 'tooltip is-above'}
       role="tooltip"
       style={{ top: tip.top, left: tip.left }}

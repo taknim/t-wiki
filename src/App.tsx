@@ -9,7 +9,7 @@ import { SearchPanel } from './components/SearchPanel'
 import { SyncCountdown } from './components/SyncCountdown'
 import { ViewModeSwitch } from './components/ViewModeSwitch'
 import {
-  GitHubIcon, SettingsIcon, SidebarCloseIcon, SidebarOpenIcon, SyncIcon,
+  GitHubIcon, SettingsIcon, SidebarCloseIcon, SidebarOpenIcon, SyncIcon, XIcon,
 } from './components/icons'
 import { TextPreview } from './components/TextPreview'
 import { SettingsPanel } from './components/SettingsPanel'
@@ -317,6 +317,7 @@ export default function App() {
 
   // 파일 고르기 창을 어디서 열었는지 기억해 둡니다. 창은 하나를 돌려 씁니다.
   const pickerDir = useRef<string | null>(null)
+  const searchInput = useRef<HTMLInputElement>(null)
   const [sidebarOpen, setSidebarOpen] = useState(readSidebarOpen)
   const currentDir = selectedDir ?? (selectedPath ? selectedPath.split('/').slice(0, -1).join('/') : '')
 
@@ -643,31 +644,52 @@ export default function App() {
 
       <div className="body">
         <aside className={sidebarOpen ? 'sidebar' : 'sidebar is-rail'}>
-          <button
-            type="button"
-            className="sidebar-toggle"
-            aria-label={sidebarOpen ? '트리 접기' : '트리 펴기'}
-            aria-expanded={sidebarOpen}
-            data-tip={sidebarOpen ? '폴더 트리 접기' : '폴더 트리 펴기'}
-            onClick={() => {
-              setSidebarOpen((open) => {
-                writeSidebarOpen(!open)
-                return !open
-              })
-            }}
-          >
-            {sidebarOpen ? <SidebarCloseIcon /> : <SidebarOpenIcon />}
-          </button>
-
-          {sidebarOpen && (
-          <>
+          {/* 접으면 검색란은 접히고 이 줄에는 펴기 단추만 남습니다. */}
           <div className="sidebar-head">
-            <input
-              className="search-input"
-              value={query}
-              placeholder="문서 검색"
-              onChange={(event) => setQuery(event.target.value)}
-            />
+            <div className="sidebar-search">
+              {sidebarOpen && (
+                <div className="search-field">
+                  <input
+                    ref={searchInput}
+                    className="search-input"
+                    value={query}
+                    placeholder="문서 검색"
+                    onChange={(event) => setQuery(event.target.value)}
+                  />
+                  {/* 한 글자라도 있으면 지울 수 있게 합니다. */}
+                  {query.length > 0 && (
+                    <button
+                      type="button"
+                      className="search-clear"
+                      aria-label="검색어 지우기"
+                      data-tip="검색어 지우기"
+                      onClick={() => {
+                        setQuery('')
+                        // 지운 뒤 바로 다시 칠 수 있도록 자리를 돌려 줍니다.
+                        searchInput.current?.focus()
+                      }}
+                    >
+                      <XIcon />
+                    </button>
+                  )}
+                </div>
+              )}
+              <button
+                type="button"
+                className="sidebar-toggle"
+                aria-label={sidebarOpen ? '트리 접기' : '트리 펴기'}
+                aria-expanded={sidebarOpen}
+                data-tip={sidebarOpen ? '폴더 트리 접기' : '폴더 트리 펴기'}
+                onClick={() => {
+                  setSidebarOpen((open) => {
+                    writeSidebarOpen(!open)
+                    return !open
+                  })
+                }}
+              >
+                {sidebarOpen ? <SidebarCloseIcon /> : <SidebarOpenIcon />}
+              </button>
+            </div>
 
             {/* 파일 고르기 창은 브라우저가 띄웁니다. 목록에 있는 형식만 걸러 보여 줍니다. */}
             <input
@@ -687,6 +709,7 @@ export default function App() {
             />
           </div>
 
+          {sidebarOpen && (
           <div className="sidebar-scroll">
             {query.trim() ? (
               <SearchPanel query={query} index={vault.index} onOpen={(path) => void openDoc(path)} />
@@ -723,7 +746,6 @@ export default function App() {
               )
             )}
           </div>
-          </>
           )}
         </aside>
 

@@ -250,3 +250,12 @@ export function SidebarOpenIcon(props: IconProps) {
     </Svg>
   )
 }
+
+/** 입력한 것을 지웁니다. */
+export function XIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M4.4 4.4l7.2 7.2M11.6 4.4l-7.2 7.2" />
+    </Svg>
+  )
+}

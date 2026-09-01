@@ -154,14 +154,33 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .btn-icon { padding: 6px; }
 
 /*
- * 트리 오른쪽 아래에 띄웁니다. 접히면 좁아진 칸 한가운데로 옮겨 갑니다.
- * 트리 칸 안에 있으므로 본문 아래 상태 표시줄이 덮을 일이 없습니다.
+ * 검색란과 한 줄에 섭니다. 접히면 검색란이 빠지고 이 단추만 남습니다.
+ * 본문 위에 띄워 두었더니 아래 상태 표시줄에 덮였습니다. 트리 칸 안이 안전합니다.
  */
-.sidebar-toggle {
+.sidebar-search { display: flex; align-items: center; gap: 8px; }
+.search-field { position: relative; flex: 1; min-width: 0; }
+/* 지우기 단추가 설 자리를 글자 쪽에서 비워 둡니다. */
+.search-field .search-input { padding-inline-end: 30px; }
+.search-clear {
   position: absolute;
-  z-index: 3;
-  bottom: 14px;
-  right: 14px;
+  inset-block: 0;
+  inset-inline-end: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  margin: auto 0;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.search-clear:hover { background: var(--bg-sunken); color: var(--text); }
+.sidebar-toggle {
+  flex: none;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -169,16 +188,16 @@ button, input, select, textarea { font: inherit; color: inherit; }
   height: 32px;
   padding: 0;
   border: 1px solid var(--border-strong);
-  border-radius: 8px;
+  border-radius: 6px;
   background: var(--bg-raised);
   color: var(--text-muted);
   cursor: pointer;
-  box-shadow: 0 2px 8px rgb(0 0 0 / 0.14);
   transition: color 140ms ease;
 }
 .sidebar-toggle:hover { color: var(--text); background: var(--bg-sunken); }
-/* 좁은 칸 한가운데: (52 - 32) / 2 */
-.sidebar.is-rail .sidebar-toggle { right: 10px; }
+/* 접히면 단추만 남으므로 좁은 칸 한가운데로 옵니다. */
+.sidebar.is-rail .sidebar-head { padding: 10px; }
+.sidebar.is-rail .sidebar-search { justify-content: center; }
 @media (prefers-reduced-motion: reduce) {
   .sidebar-toggle { transition: none; }
 }
@@ -258,7 +277,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 /* row 안에서는 남는 폭만 차지해야 옆 버튼이 아래로 밀리지 않습니다. */
 .row > .dialog-input { flex: 1 1 140px; width: auto; min-width: 0; }
 .search-input:focus, .dialog-input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
-.sidebar-scroll { flex: 1; overflow: auto; padding: 0 6px 56px; min-height: 0; }
+.sidebar-scroll { flex: 1; overflow: auto; padding: 0 6px 16px; min-height: 0; }
 
 
 .tree { min-height: 100%; }
@@ -782,7 +801,13 @@ mark { background: var(--mark); color: inherit; border-radius: 2px; }
 .tooltip {
   position: fixed;
   z-index: 80;
-  max-width: 260px;
+  /*
+   * max-content 가 없으면 폭이 "왼쪽 끝에서 화면 오른쪽 끝까지" 남은 자리에
+   * 갇힙니다. 오른쪽 끝 단추에서는 그 자리가 몇십 px 뿐이라 한 글자씩 끊깁니다.
+   * 두 줄 안팎으로 읽히도록 위쪽만 막아 둡니다.
+   */
+  width: max-content;
+  max-width: min(220px, calc(100vw - 16px));
   padding: 5px 9px;
   border-radius: 6px;
   background: var(--text);
