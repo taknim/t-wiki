@@ -180,9 +180,9 @@ button, input, select, textarea { font: inherit; color: inherit; }
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 5px;
-  width: 92px;
-  padding: 5px 8px;
+  width: 34px;
+  height: 28px;
+  padding: 0;
   border: 0;
   background: var(--bg-raised);
   cursor: pointer;

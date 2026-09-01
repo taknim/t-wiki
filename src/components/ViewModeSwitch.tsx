@@ -7,12 +7,18 @@ interface ViewModeSwitchProps {
 }
 
 const MODES: { key: ViewMode; label: string; tip: string }[] = [
-  { key: 'edit', label: '편집', tip: '원문만 보기' },
-  { key: 'split', label: '나란히', tip: '원문과 미리보기를 나란히 보기' },
-  { key: 'preview', label: '미리보기', tip: '결과만 보기' },
+  // 글자를 지웠으므로 안내에 이름을 함께 담습니다. 아이콘만으로는 뜻이 좁습니다.
+  { key: 'edit', label: '편집', tip: '편집 · 원문만 보기' },
+  { key: 'split', label: '나란히', tip: '나란히 · 원문과 미리보기를 함께 보기' },
+  { key: 'preview', label: '미리보기', tip: '미리보기 · 결과만 보기' },
 ]
 
-/** 문서 제목 옆에 섭니다. 보여 줄 것이 있는 문서에서만 나옵니다. */
+/**
+ * 문서 제목 옆에 섭니다. 보여 줄 것이 있는 문서에서만 나옵니다.
+ *
+ * 아이콘만 세우므로 이름은 aria-label 로 남깁니다.
+ * 그러지 않으면 읽어 주는 화면에서 단추 셋을 구분할 길이 없습니다.
+ */
 export function ViewModeSwitch({ mode, onChange }: ViewModeSwitchProps) {
   return (
     <div className="mode-switch" role="group" aria-label="보기 모드">
@@ -22,10 +28,11 @@ export function ViewModeSwitch({ mode, onChange }: ViewModeSwitchProps) {
           type="button"
           className={mode === entry.key ? 'is-active' : ''}
           data-tip={entry.tip}
+          aria-label={entry.label}
+          aria-pressed={mode === entry.key}
           onClick={() => onChange(entry.key)}
         >
           {entry.key === 'edit' ? <PencilIcon /> : entry.key === 'split' ? <ColumnsIcon /> : <EyeIcon />}
-          <span>{entry.label}</span>
         </button>
       ))}
     </div>
