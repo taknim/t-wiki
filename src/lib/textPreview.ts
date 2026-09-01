@@ -173,3 +173,183 @@ export function reindentJson(text: string, indent = '  '): string | null {
   // 값 하나만 덩그러니 있거나 뒤에 군더더기가 붙은 경우는 손대지 않습니다.
   return lastMeaningful() === '}' || lastMeaningful() === ']' ? out + '\n' : null
 }
+
+/*
+ * XML 들여쓰기.
+ *
+ * DOMParser 로 읽고 다시 써 내는 길도 있지만, 그러면 원문에 있던 것이 조용히
+ * 바뀝니다. 실체 참조가 풀리고, 빈 요소가 <a/> 로 접히고, 선언이 사라집니다.
+ * 그래서 JSON 때와 같이 글자를 그대로 두고 줄과 들여쓰기만 새로 잡습니다.
+ *
+ * 되돌릴 수 없는 곳에는 손대지 않습니다.
+ * - 글이 태그와 섞여 있는 요소(<p>앞 <b>강조</b> 뒤</p>)는 통째로 원문 그대로 둡니다.
+ *   줄을 바꾸면 없던 공백이 생겨 뜻이 달라집니다.
+ * - xml:space="preserve" 가 붙은 요소도 마찬가지입니다.
+ * - 짝이 맞지 않으면 null 을 돌려주고 아무것도 하지 않습니다.
+ */
+type XmlNode =
+  | { kind: 'raw'; text: string }
+  | { kind: 'text'; text: string }
+  | { kind: 'element'; open: string; close: string; children: XmlNode[]; source: string }
+
+interface Scanner {
+  text: string
+  at: number
+  /** 방금 닫은 태그가 시작한 자리. 원문을 그대로 떠 올 때 씁니다. */
+  closeFrom: number
+  /** 방금 닫은 태그의 원문. `</ a >` 처럼 띄어 쓴 것도 그대로 지킵니다. */
+  closeTag: string
+}
+
+/** 여는 태그의 끝 `>`. 속성값 안의 `>` 에 속지 않도록 따옴표를 셉니다. */
+function tagEnd(text: string, from: number): number {
+  let quote = ''
+  for (let at = from; at < text.length; at += 1) {
+    const letter = text[at]
+    if (quote) {
+      if (letter === quote) quote = ''
+    } else if (letter === '"' || letter === "'") {
+      quote = letter
+    } else if (letter === '>') {
+      return at
+    }
+  }
+  return -1
+}
+
+/** 닫는 기호까지의 덩어리를 통째로 집습니다. 주석·CDATA·선언에 씁니다. */
+function chunkUntil(scan: Scanner, ending: string): string | null {
+  const end = scan.text.indexOf(ending, scan.at)
+  if (end === -1) return null
+  const piece = scan.text.slice(scan.at, end + ending.length)
+  scan.at = end + ending.length
+  return piece
+}
+
+function parseNodes(scan: Scanner, until: string | null): XmlNode[] | null {
+  const nodes: XmlNode[] = []
+
+  while (scan.at < scan.text.length) {
+    if (scan.text[scan.at] !== '<') {
+      const next = scan.text.indexOf('<', scan.at)
+      const end = next === -1 ? scan.text.length : next
+      nodes.push({ kind: 'text', text: scan.text.slice(scan.at, end) })
+      scan.at = end
+      continue
+    }
+
+    if (scan.text.startsWith('</', scan.at)) {
+      const end = scan.text.indexOf('>', scan.at)
+      if (end === -1) return null
+      const name = scan.text.slice(scan.at + 2, end).trim()
+      if (name !== until) return null
+      scan.closeFrom = scan.at
+      scan.closeTag = scan.text.slice(scan.at, end + 1)
+      scan.at = end + 1
+      return nodes
+    }
+
+    if (scan.text.startsWith('<!--', scan.at)) {
+      const piece = chunkUntil(scan, '-->')
+      if (piece === null) return null
+      nodes.push({ kind: 'raw', text: piece })
+      continue
+    }
+    if (scan.text.startsWith('<![CDATA[', scan.at)) {
+      const piece = chunkUntil(scan, ']]>')
+      if (piece === null) return null
+      // 글자 그대로여야 하므로 글로 셉니다. 이 요소는 줄을 바꾸지 않습니다.
+      nodes.push({ kind: 'text', text: piece })
+      continue
+    }
+    if (scan.text.startsWith('<?', scan.at)) {
+      const piece = chunkUntil(scan, '?>')
+      if (piece === null) return null
+      nodes.push({ kind: 'raw', text: piece })
+      continue
+    }
+    if (scan.text.startsWith('<!', scan.at)) {
+      const end = tagEnd(scan.text, scan.at)
+      if (end === -1) return null
+      nodes.push({ kind: 'raw', text: scan.text.slice(scan.at, end + 1) })
+      scan.at = end + 1
+      continue
+    }
+
+    const end = tagEnd(scan.text, scan.at)
+    if (end === -1) return null
+    const open = scan.text.slice(scan.at, end + 1)
+    scan.at = end + 1
+
+    if (open.endsWith('/>')) {
+      nodes.push({ kind: 'raw', text: open })
+      continue
+    }
+
+    const name = /^<\s*([^\s/>]+)/.exec(open)?.[1]
+    if (!name) return null
+
+    const innerFrom = scan.at
+    const children = parseNodes(scan, name)
+    if (children === null) return null
+
+    nodes.push({
+      kind: 'element',
+      open,
+      close: scan.closeTag,
+      children,
+      source: open + scan.text.slice(innerFrom, scan.closeFrom) + scan.closeTag,
+    })
+  }
+
+  // 닫는 태그를 기다리고 있었는데 글이 끝났으면 짝이 맞지 않는 것입니다.
+  return until === null ? nodes : null
+}
+
+function hasWords(node: XmlNode): boolean {
+  return node.kind === 'text' && node.text.trim().length > 0
+}
+
+function render(nodes: XmlNode[], depth: number, indent: string): string[] {
+  const lines: string[] = []
+  const pad = indent.repeat(depth)
+
+  for (const node of nodes) {
+    if (node.kind === 'text') {
+      if (node.text.trim().length > 0) lines.push(pad + node.text.trim())
+      continue
+    }
+    if (node.kind === 'raw') {
+      lines.push(pad + node.text.trim())
+      continue
+    }
+
+    // 글이 섞여 있거나 공백을 지키라고 했으면 원문 그대로 한 줄에 둡니다.
+    if (node.children.some(hasWords) || /\sxml:space\s*=\s*(["'])preserve\1/.test(node.open)) {
+      lines.push(pad + node.source.trim())
+      continue
+    }
+    if (node.children.length === 0 || node.children.every((child) => child.kind === 'text')) {
+      lines.push(pad + node.open + node.close)
+      continue
+    }
+
+    lines.push(pad + node.open)
+    lines.push(...render(node.children, depth + 1, indent))
+    lines.push(pad + node.close)
+  }
+
+  return lines
+}
+
+/** 정돈한 XML. 짝이 맞지 않거나 손댈 것이 없으면 null 입니다. */
+export function reindentXml(text: string, indent = '  '): string | null {
+  if (text.trim().length === 0) return null
+
+  const nodes = parseNodes({ text, at: 0, closeFrom: 0, closeTag: '' }, null)
+  if (nodes === null) return null
+  if (!nodes.some((node) => node.kind === 'element' || node.kind === 'raw')) return null
+
+  const lines = render(nodes, 0, indent)
+  return lines.length > 0 ? `${lines.join('\n')}\n` : null
+}
