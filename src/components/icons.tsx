@@ -10,7 +10,9 @@ interface IconProps {
   className?: string
 }
 
-function Svg({ children, className }: IconProps & { children: React.ReactNode }) {
+function Svg({
+  children, className, strokeWidth = 1.6,
+}: IconProps & { children: React.ReactNode; strokeWidth?: number }) {
   return (
     <svg
       className={className ? `icon ${className}` : 'icon'}
@@ -19,7 +21,7 @@ function Svg({ children, className }: IconProps & { children: React.ReactNode })
       height="16"
       fill="none"
       stroke="currentColor"
-      strokeWidth="1.6"
+      strokeWidth={strokeWidth}
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden="true"
@@ -94,12 +96,17 @@ export function SyncIcon(props: IconProps) {
   )
 }
 
-/** 설정. 톱니 좌표는 원을 여덟로 나눠 계산해 두어 이빨이 고르게 벌어집니다. */
+/**
+ * 설정. 테두리 원 없이 톱니 윤곽만 그립니다.
+ *
+ * 좌표는 원을 여덟로 나눠 계산해 둡니다. 손으로 찍으면 이빨이 고르지 않고,
+ * 촘촘하면 이 크기에서 서로 붙어 그냥 동그라미로 보입니다.
+ */
 export function SettingsIcon(props: IconProps) {
   return (
-    <Svg {...props}>
-      <path d="M6.12 1.93 L9.88 1.93 L10.02 3.92 L9.45 3.69 L10.96 2.38 L13.62 5.04 L12.31 6.55 L12.08 5.98 L14.07 6.12 L14.07 9.88 L12.08 10.02 L12.31 9.45 L13.62 10.96 L10.96 13.62 L9.45 12.31 L10.02 12.08 L9.88 14.07 L6.12 14.07 L5.98 12.08 L6.55 12.31 L5.04 13.62 L2.38 10.96 L3.69 9.45 L3.92 10.02 L1.93 9.88 L1.93 6.12 L3.92 5.98 L3.69 6.55 L2.38 5.04 L5.04 2.38 L6.55 3.69 L5.98 3.92 Z" />
-      <circle cx="8" cy="8" r="2.1" />
+    <Svg {...props} strokeWidth={1.3}>
+      <path d="M6.49 1.27 L9.51 1.27 L9.92 3.71 L9.68 3.61 L11.7 2.17 L13.83 4.3 L12.39 6.32 L12.29 6.08 L14.73 6.49 L14.73 9.51 L12.29 9.92 L12.39 9.68 L13.83 11.7 L11.7 13.83 L9.68 12.39 L9.92 12.29 L9.51 14.73 L6.49 14.73 L6.08 12.29 L6.32 12.39 L4.3 13.83 L2.17 11.7 L3.61 9.68 L3.71 9.92 L1.27 9.51 L1.27 6.49 L3.71 6.08 L3.61 6.32 L2.17 4.3 L4.3 2.17 L6.32 3.61 L6.08 3.71 Z" />
+      <circle cx="8" cy="8" r="2.2" />
     </Svg>
   )
 }
