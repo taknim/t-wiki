@@ -642,24 +642,25 @@ export default function App() {
       </header>
 
       <div className="body">
-        <button
-          type="button"
-          className={sidebarOpen ? 'sidebar-toggle' : 'sidebar-toggle is-collapsed'}
-          aria-label={sidebarOpen ? '트리 접기' : '트리 펴기'}
-          aria-expanded={sidebarOpen}
-          data-tip={sidebarOpen ? '폴더 트리 접기' : '폴더 트리 펴기'}
-          onClick={() => {
-            setSidebarOpen((open) => {
-              writeSidebarOpen(!open)
-              return !open
-            })
-          }}
-        >
-          {sidebarOpen ? <SidebarCloseIcon /> : <SidebarOpenIcon />}
-        </button>
+        <aside className={sidebarOpen ? 'sidebar' : 'sidebar is-rail'}>
+          <button
+            type="button"
+            className="sidebar-toggle"
+            aria-label={sidebarOpen ? '트리 접기' : '트리 펴기'}
+            aria-expanded={sidebarOpen}
+            data-tip={sidebarOpen ? '폴더 트리 접기' : '폴더 트리 펴기'}
+            onClick={() => {
+              setSidebarOpen((open) => {
+                writeSidebarOpen(!open)
+                return !open
+              })
+            }}
+          >
+            {sidebarOpen ? <SidebarCloseIcon /> : <SidebarOpenIcon />}
+          </button>
 
-        {sidebarOpen && (
-        <aside className="sidebar">
+          {sidebarOpen && (
+          <>
           <div className="sidebar-head">
             <input
               className="search-input"
@@ -722,9 +723,9 @@ export default function App() {
               )
             )}
           </div>
-
+          </>
+          )}
         </aside>
-        )}
 
         <main className="main">
           {selection && selection.kind !== 'markdown' ? (
