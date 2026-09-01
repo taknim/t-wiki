@@ -11,7 +11,8 @@ import {
   saveSyncState,
   syncSignature,
   hasAnyBaseline,
-  adoptLegacy,
+  migrateLegacy,
+  clearGitHubConfig,
 } from '../lib/store'
 
 export const DEFAULT_GITHUB_CONFIG: GitHubConfig = {
@@ -61,6 +62,8 @@ export interface GitHubSync {
   run: (trigger?: 'manual' | 'auto') => Promise<void>
   /** 대상이 바뀌어 멈춘 계획을 그대로 진행합니다. */
   confirmTarget: () => Promise<void>
+  /** 이 폴더의 저장소 설정을 지웁니다. */
+  reset: () => Promise<void>
   dismissReport: () => void
 }
 
@@ -163,6 +166,8 @@ export function useGitHubSync({ root, docs, assets, onBeforeSync, onLocalChanged
         return
       }
 
+      // 옛 한 벌짜리 값이 남아 있으면 먼저 제 주인에게 옮겨 둡니다.
+      await migrateLegacy()
       const key = await vaultKeyFor(root)
       if (!key) {
         // 어느 폴더인지 가려내지 못했습니다. 남의 설정을 끌어다 쓰느니 빈 채로 둡니다.
@@ -174,7 +179,6 @@ export function useGitHubSync({ root, docs, assets, onBeforeSync, onLocalChanged
         return
       }
 
-      await adoptLegacy(key, root)
       const saved = await loadGitHubConfig(key)
       const at = await loadLastSyncAt(key)
       if (cancelled) return
@@ -367,6 +371,19 @@ export function useGitHubSync({ root, docs, assets, onBeforeSync, onLocalChanged
     }
   }, [attemptSync])
 
+  /** 이 폴더의 저장소 설정을 지웁니다. 토큰까지 함께 지웁니다. */
+  const reset = useCallback(async () => {
+    const key = vaultKeyRef.current
+    if (!key) return
+    // 방금까지의 저장이 끝난 뒤에 지워야 지운 것이 되살아나지 않습니다.
+    await pendingSaveRef.current
+    await clearGitHubConfig(key)
+    confirmedRef.current = null
+    setConfig(DEFAULT_GITHUB_CONFIG)
+    setReport(null)
+    setStatus(IDLE)
+  }, [])
+
   const confirmTarget = useCallback(async () => {
     const key = vaultKeyRef.current
     if (!key) return
@@ -429,7 +446,7 @@ export function useGitHubSync({ root, docs, assets, onBeforeSync, onLocalChanged
     config, loaded, isConfigured, status, report, lastSyncAt,
     // 꺼져 있으면 예정 시각도 없는 것으로 봅니다. 상태가 남아 있어도 화면에는 안 나옵니다.
     nextAutoSyncAt: autoOn ? nextAutoSyncAt : null,
-    update, run, confirmTarget, dismissReport,
+    update, run, confirmTarget, dismissReport, reset,
   }
 }
 

@@ -9,7 +9,8 @@ interface GitHubSettingsProps {
 }
 
 export function GitHubSettings({ sync, onShowReport }: GitHubSettingsProps) {
-  const { config, update } = sync
+  const { config, update, reset } = sync
+  const [confirming, setConfirming] = useState(false)
   const [viewer, setViewer] = useState<string | null>(null)
   const [repos, setRepos] = useState<api.RepoInfo[] | null>(null)
   const [branches, setBranches] = useState<string[] | null>(null)
@@ -270,6 +271,36 @@ export function GitHubSettings({ sync, onShowReport }: GitHubSettingsProps) {
         {busy && <p className="status">{busy}</p>}
         {error && <p className="status status-error">{error}</p>}
       </section>
+      <section className="field">
+        <label>이 폴더의 설정</label>
+        <p className="hint" style={{ marginTop: 0 }}>
+          저장소 설정과 액세스 토큰은 <strong>지금 열려 있는 폴더</strong>에만 딸려 있습니다.
+          다른 폴더를 열면 그 폴더의 설정이 따로 있습니다.
+        </p>
+        <div className="row">
+          <button
+            type="button"
+            className={confirming ? 'btn btn-danger' : 'btn'}
+            data-tip="이 폴더에 맞춰 둔 저장소 설정과 토큰을 지웁니다"
+            onClick={() => {
+              if (!confirming) {
+                setConfirming(true)
+                return
+              }
+              setConfirming(false)
+              void reset()
+            }}
+          >
+            {confirming ? '정말 지울까요?' : '이 폴더의 설정 지우기'}
+          </button>
+          {confirming && (
+            <button type="button" className="btn" onClick={() => setConfirming(false)}>
+              그만두기
+            </button>
+          )}
+        </div>
+      </section>
+
     </>
   )
 }

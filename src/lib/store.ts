@@ -1,4 +1,5 @@
 import { del, get, set } from 'idb-keyval'
+import { vaultKeyFor } from './vaultKey'
 import type { GitHubConfig, SyncState } from '../types'
 
 const VAULT_HANDLE = 'mdwiki:vault-handle'
@@ -11,7 +12,13 @@ const ASSET_HASHES = 'mdwiki:asset-hashes'
  * FileSystemDirectoryHandle 은 구조화 복제가 되므로 IndexedDB 에 그대로 넣어둘 수 있습니다.
  * 다음 방문 때 권한만 다시 확인하면 같은 폴더를 그대로 씁니다.
  */
-export const saveVaultHandle = (handle: FileSystemDirectoryHandle) => set(VAULT_HANDLE, handle)
+/*
+ * 옮겨 담기를 먼저 끝냅니다. 이 값을 덮어쓰고 나면 옛 설정의 주인을 알 수 없습니다.
+ */
+export const saveVaultHandle = async (handle: FileSystemDirectoryHandle) => {
+  await migrateLegacy()
+  return set(VAULT_HANDLE, handle)
+}
 export const loadVaultHandle = () => get<FileSystemDirectoryHandle>(VAULT_HANDLE)
 export const clearVaultHandle = () => del(VAULT_HANDLE)
 
@@ -131,34 +138,47 @@ export const loadLastSyncAt = async (vault: string): Promise<number | undefined>
   (await readByVault<number>(LAST_SYNC))[vault]
 
 /**
- * 폴더별로 가르기 전에 쓰던 한 벌짜리 값을 옮겨 담습니다.
+ * 폴더별로 가르기 전에 쓰던 한 벌짜리 값을 제 주인에게 옮겨 담습니다.
  *
- * 그 값이 어느 폴더 것인지는 적혀 있지 않습니다. 그래서 마지막으로 열어 두었던
- * 폴더일 때만 물려줍니다. 그 폴더가 곧 그 설정을 쓰던 폴더입니다.
- * 짐작으로 아무 폴더에나 물려주면 고치려던 사고를 그대로 되풀이하게 됩니다.
+ * 그 값이 어느 폴더 것인지는 적혀 있지 않습니다. 단서는 마지막으로 열어 두었던
+ * 폴더뿐인데, 폴더를 새로 열면 그 자리가 곧바로 덮입니다. 그래서 폴더를 열기 전에,
+ * 앱이 뜨자마자 한 번만 봅니다. 열고 나서 물으면 방금 연 폴더가 나오고,
+ * 처음 보는 폴더에까지 옛 토큰이 딸려 들어갑니다.
+ *
+ * 주인을 못 찾으면 물려주지 않고 버립니다. 짐작으로 아무 폴더에나 붙이면
+ * 남의 저장소에 남의 토큰으로 동기화하게 됩니다.
  */
-export async function adoptLegacy(vault: string, root: FileSystemDirectoryHandle): Promise<void> {
-  const config = await get<unknown>(GITHUB_CONFIG)
-  // 이미 폴더별로 갈라 둔 모양이면 옮길 것이 없습니다.
-  if (!config || typeof config !== 'object' || !('token' in config)) return
+let migration: Promise<void> | null = null
 
+export function migrateLegacy(): Promise<void> {
+  migration ??= runMigration()
+  return migration
+}
+
+async function runMigration(): Promise<void> {
   try {
+    const config = await get<unknown>(GITHUB_CONFIG)
+    // 이미 폴더별로 갈라 둔 모양이면 옮길 것이 없습니다.
+    if (!config || typeof config !== 'object' || !('token' in config)) return
+
     const last = await loadVaultHandle()
-    if (!last || !(await root.isSameEntry(last))) return
+    const key = last ? await vaultKeyFor(last) : null
+    if (!key) {
+      await Promise.all([del(GITHUB_CONFIG), del(SYNC_STATE), del(LAST_SYNC), del(ASSET_HASHES)])
+      return
+    }
+
+    await set(GITHUB_CONFIG, { [key]: config as GitHubConfig })
+
+    const baselines = await get<unknown>(SYNC_STATE)
+    if (baselines && typeof baselines === 'object') await set(SYNC_STATE, { [key]: baselines })
+
+    const at = await get<unknown>(LAST_SYNC)
+    if (typeof at === 'number') await set(LAST_SYNC, { [key]: at })
+
+    const hashes = await get<unknown>(ASSET_HASHES)
+    if (hashes && typeof hashes === 'object') await set(ASSET_HASHES, { [key]: hashes })
   } catch {
-    return
+    // 옮기지 못해도 쓰던 흐름은 끊지 않습니다. 설정을 다시 넣으면 됩니다.
   }
-
-  await set(GITHUB_CONFIG, { [vault]: config as GitHubConfig })
-
-  const baselines = await get<unknown>(SYNC_STATE)
-  if (baselines && typeof baselines === 'object') {
-    await set(SYNC_STATE, { [vault]: baselines })
-  }
-
-  const at = await get<unknown>(LAST_SYNC)
-  if (typeof at === 'number') await set(LAST_SYNC, { [vault]: at })
-
-  const hashes = await get<unknown>(ASSET_HASHES)
-  if (hashes && typeof hashes === 'object') await set(ASSET_HASHES, { [vault]: hashes })
 }
