@@ -164,6 +164,16 @@ export function useGitHubSync({ root, docs, assets, onBeforeSync, onLocalChanged
       }
 
       const key = await vaultKeyFor(root)
+      if (!key) {
+        // 어느 폴더인지 가려내지 못했습니다. 남의 설정을 끌어다 쓰느니 빈 채로 둡니다.
+        if (cancelled) return
+        setVaultKey(null)
+        setConfig(DEFAULT_GITHUB_CONFIG)
+        setLastSyncAt(null)
+        setLoaded(false)
+        return
+      }
+
       await adoptLegacy(key, root)
       const saved = await loadGitHubConfig(key)
       const at = await loadLastSyncAt(key)

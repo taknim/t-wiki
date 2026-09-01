@@ -31,8 +31,17 @@ async function findIndex(refs: VaultRef[], root: FileSystemDirectoryHandle): Pro
   return -1
 }
 
-/** 이 폴더의 표. 처음 보는 폴더면 새로 매겨 둡니다. */
-export async function vaultKeyFor(root: FileSystemDirectoryHandle): Promise<string> {
+/**
+ * 이 폴더의 표. 처음 보는 폴더면 새로 매겨 둡니다.
+ *
+ * 폴더를 가려낼 수 없으면 null 입니다. 그때는 아무 설정도 읽지도 쓰지도 않습니다.
+ * 가려내지 못하는데 표를 새로 매기면, 이미 표가 있는 폴더에 표가 하나 더 생깁니다.
+ * 그러면 같은 폴더가 둘로 갈려 맞춰 둔 설정이 사라진 것처럼 보입니다.
+ */
+export async function vaultKeyFor(root: FileSystemDirectoryHandle): Promise<string | null> {
+  // 견줄 수단이 없으면 이 폴더가 어느 폴더인지 알 길이 없습니다.
+  if (typeof root.isSameEntry !== 'function') return null
+
   try {
     const refs = (await get<VaultRef[]>(REGISTRY)) ?? []
     const at = await findIndex(refs, root)
@@ -49,10 +58,7 @@ export async function vaultKeyFor(root: FileSystemDirectoryHandle): Promise<stri
     await set(REGISTRY, refs.slice(0, MAX_KEYS))
     return key
   } catch {
-    /*
-     * 저장이 막혔으면 이번 판에만 쓰는 표를 냅니다.
-     * 설정이 남지 않을 뿐, 남의 폴더 설정을 끌어다 쓰는 일은 없습니다.
-     */
-    return crypto.randomUUID()
+    // 저장소를 못 쓰면 폴더를 가려낼 수도 없습니다. 설정 없이 씁니다.
+    return null
   }
 }
