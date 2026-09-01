@@ -82,6 +82,8 @@ export async function localShas(
   root: FileSystemDirectoryHandle,
   index: DocIndex,
   assets: AssetIndex,
+  /** 해시 캐시는 폴더마다 따로 둡니다. 같은 경로라도 폴더가 다르면 다른 파일입니다. */
+  vaultKey: string,
 ): Promise<Map<string, string>> {
   const shas = new Map<string, string>()
 
@@ -89,7 +91,7 @@ export async function localShas(
     shas.set(entry.path, await gitBlobSha(entry.content))
   }
 
-  const cache = await loadAssetHashes()
+  const cache = await loadAssetHashes(vaultKey)
   const next: Record<string, { sha: string; size: number; lastModified: number }> = {}
 
   for (const asset of assets.values()) {
@@ -108,7 +110,7 @@ export async function localShas(
     next[asset.path] = { sha, size: asset.size, lastModified: asset.lastModified }
   }
 
-  await saveAssetHashes(next)
+  await saveAssetHashes(vaultKey, next)
   return shas
 }
 

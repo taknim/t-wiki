@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { AssetIndex, DocIndex, GitHubConfig, SyncLogLine, SyncPlanItem } from '../types'
 import { applyPlan, buildPlan, localShas, scanRemote } from '../lib/github/sync'
+import { vaultKeyFor } from '../lib/vaultKey'
 import {
   loadGitHubConfig,
   loadLastSyncAt,
@@ -10,6 +11,7 @@ import {
   saveSyncState,
   syncSignature,
   hasAnyBaseline,
+  adoptLegacy,
 } from '../lib/store'
 
 export const DEFAULT_GITHUB_CONFIG: GitHubConfig = {
@@ -112,6 +114,8 @@ export function useGitHubSync({ root, docs, assets, onBeforeSync, onLocalChanged
   const [report, setReport] = useState<SyncReport | null>(null)
   const [lastSyncAt, setLastSyncAt] = useState<number | null>(null)
   const [nextAutoSyncAt, setNextAutoSyncAt] = useState<number | null>(null)
+  // 지금 열려 있는 폴더의 표. 설정과 기준점을 이 표 아래에 둡니다.
+  const [vaultKey, setVaultKey] = useState<string | null>(null)
 
   // 타이머에서 부를 때 오래된 값을 붙잡지 않도록 최신 상태를 ref 로도 들고 있습니다.
   // 설정만은 실행 직전에 저장소에서 다시 읽으므로 여기 두지 않습니다.
@@ -122,6 +126,7 @@ export function useGitHubSync({ root, docs, assets, onBeforeSync, onLocalChanged
   // 자동 동기화가 켜져 있는 동안, 다음 차례를 처음부터 다시 세게 하는 손잡이입니다.
   const restartCountdownRef = useRef<(() => void) | null>(null)
   const pendingSaveRef = useRef<Promise<void>>(Promise.resolve())
+  const vaultKeyRef = useRef<string | null>(null)
   // 사용자가 "이 대상으로 진행" 을 누른 서명. 한 번 확인하면 다시 묻지 않습니다.
   const confirmedRef = useRef<string | null>(null)
   const callbacksRef = useRef({ onBeforeSync, onLocalChanged })
@@ -135,14 +140,46 @@ export function useGitHubSync({ root, docs, assets, onBeforeSync, onLocalChanged
     callbacksRef.current = { onBeforeSync, onLocalChanged }
   })
 
+  /*
+   * 폴더가 바뀌면 설정을 그 폴더 것으로 갈아 끼웁니다.
+   *
+   * 예전에는 설정이 한 벌뿐이라, A 폴더에 맞춰 둔 저장소 설정을 B 폴더가 그대로
+   * 물려받았습니다. 그 상태로 동기화하면 A 의 파일들이 B 에 없으니 "지워졌다" 로
+   * 읽혀 저장소에서 사라집니다. 처음 보는 폴더는 빈 설정으로 시작해야 합니다.
+   */
   useEffect(() => {
+    let cancelled = false
+
     void (async () => {
-      const saved = await loadGitHubConfig()
+      vaultKeyRef.current = null
+      confirmedRef.current = null
+
+      if (!root) {
+        if (cancelled) return
+        setVaultKey(null)
+        setConfig(DEFAULT_GITHUB_CONFIG)
+        setLastSyncAt(null)
+        setLoaded(false)
+        return
+      }
+
+      const key = await vaultKeyFor(root)
+      await adoptLegacy(key, root)
+      const saved = await loadGitHubConfig(key)
+      const at = await loadLastSyncAt(key)
+      if (cancelled) return
+
+      vaultKeyRef.current = key
+      setVaultKey(key)
       setConfig({ ...DEFAULT_GITHUB_CONFIG, ...saved })
-      setLastSyncAt((await loadLastSyncAt()) ?? null)
+      setLastSyncAt(at ?? null)
       setLoaded(true)
     })()
-  }, [])
+
+    return () => {
+      cancelled = true
+    }
+  }, [root])
 
   const update = useCallback((patch: Partial<GitHubConfig>) => {
     setConfig((previous) => ({ ...previous, ...patch }))
@@ -151,9 +188,9 @@ export function useGitHubSync({ root, docs, assets, onBeforeSync, onLocalChanged
   // 저장은 상태 갱신 함수 안이 아니라 여기서 합니다.
   // 실행 직전에 저장이 끝났는지 기다릴 수 있도록 마지막 저장을 붙잡아 둡니다.
   useEffect(() => {
-    if (!loaded) return
-    pendingSaveRef.current = saveGitHubConfig(config)
-  }, [config, loaded])
+    if (!loaded || !vaultKey) return
+    pendingSaveRef.current = saveGitHubConfig(vaultKey, config)
+  }, [config, loaded, vaultKey])
 
   /**
    * 한 번의 비교와 적용. 저장소가 그 사이에 바뀌어 커밋이 거부되면 true 를 돌려주고,
@@ -163,6 +200,7 @@ export function useGitHubSync({ root, docs, assets, onBeforeSync, onLocalChanged
     async (
       current: GitHubConfig,
       vault: FileSystemDirectoryHandle,
+      key: string,
       trigger: 'manual' | 'auto',
       attempt: number,
     ): Promise<boolean> => {
@@ -177,8 +215,8 @@ export function useGitHubSync({ root, docs, assets, onBeforeSync, onLocalChanged
 
         // 기준점은 이 저장소·브랜치·하위 폴더 조합의 것만 씁니다.
         const signature = syncSignature(current)
-        const synced = await loadSyncState(signature)
-        const local = await localShas(vault, docsRef.current, assetsRef.current)
+        const synced = await loadSyncState(key, signature)
+        const local = await localShas(vault, docsRef.current, assetsRef.current, key)
         const plan = buildPlan(local, remote.files, synced, current)
         const pending = plan.filter((item) => item.action !== 'skip')
         const at = Date.now()
@@ -190,7 +228,7 @@ export function useGitHubSync({ root, docs, assets, onBeforeSync, onLocalChanged
           pending.length > 0 &&
           confirmedRef.current !== signature &&
           Object.keys(synced).length === 0 &&
-          (await hasAnyBaseline())
+          (await hasAnyBaseline(key))
         ) {
           setReport({ at, trigger, plan, log: [], commitSha: null, error: null, needsConfirm: true })
           setStatus({
@@ -202,8 +240,8 @@ export function useGitHubSync({ root, docs, assets, onBeforeSync, onLocalChanged
         }
 
         if (pending.length === 0) {
-          await saveSyncState(signature, synced)
-          await saveLastSyncAt(at)
+          await saveSyncState(key, signature, synced)
+          await saveLastSyncAt(key, at)
           setLastSyncAt(at)
           setReport({ at, trigger, plan, log: [], commitSha: null, error: null })
           setStatus({ phase: 'done', message: '이미 저장소와 같습니다', progress: null })
@@ -221,13 +259,13 @@ export function useGitHubSync({ root, docs, assets, onBeforeSync, onLocalChanged
           onProgress: (done, total) => setStatus((previous) => ({ ...previous, progress: { done, total } })),
         })
 
-        await saveSyncState(signature, result.synced)
+        await saveSyncState(key, signature, result.synced)
         if (result.localChanged) await callbacksRef.current.onLocalChanged()
 
         // 커밋이 거부됐을 뿐이라면 결과를 남기지 않고 다시 시도합니다.
         if (result.staleRemote && attempt < MAX_ATTEMPTS) return true
 
-        await saveLastSyncAt(at)
+        await saveLastSyncAt(key, at)
         setLastSyncAt(at)
 
         const failures = result.log.filter((line) => line.status === 'error')
@@ -269,7 +307,14 @@ export function useGitHubSync({ root, docs, assets, onBeforeSync, onLocalChanged
       // 다른 탭에서 바꾼 값이 이 탭 메모리에는 남아 있지 않아,
       // 굳은 옛 설정으로 돌면 한쪽이 지운 문서를 다른 쪽이 되살립니다.
       await pendingSaveRef.current
-      const current = { ...DEFAULT_GITHUB_CONFIG, ...(await loadGitHubConfig()) }
+      // 표가 아직 없으면 폴더를 여는 중입니다. 그때는 돌 것이 없습니다.
+      const key = vaultKeyRef.current
+      if (!key) {
+        setStatus(IDLE)
+        return
+      }
+
+      const current = { ...DEFAULT_GITHUB_CONFIG, ...(await loadGitHubConfig(key)) }
       setConfig(current)
 
       if (!isReady(current)) {
@@ -283,7 +328,7 @@ export function useGitHubSync({ root, docs, assets, onBeforeSync, onLocalChanged
         // 우리가 저장소를 읽은 뒤 다른 쪽이 먼저 올리면 커밋이 거부됩니다.
         // 잘못된 게 아니라 기준이 낡은 것뿐이라, 다시 읽고 다시 세워 시도합니다.
         for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
-          const again = await attemptSync(current, vault, trigger, attempt)
+          const again = await attemptSync(current, vault, key, trigger, attempt)
           if (!again) return
           setStatus({
             phase: 'running',
@@ -313,7 +358,9 @@ export function useGitHubSync({ root, docs, assets, onBeforeSync, onLocalChanged
   }, [attemptSync])
 
   const confirmTarget = useCallback(async () => {
-    const current = { ...DEFAULT_GITHUB_CONFIG, ...(await loadGitHubConfig()) }
+    const key = vaultKeyRef.current
+    if (!key) return
+    const current = { ...DEFAULT_GITHUB_CONFIG, ...(await loadGitHubConfig(key)) }
     confirmedRef.current = syncSignature(current)
     setReport(null)
     await run('manual')
