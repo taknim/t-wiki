@@ -2,10 +2,8 @@ import DOMPurify from 'dompurify'
 import { useEffect, useState } from 'react'
 import { highlightCode } from '../lib/markdown'
 import {
-  delimiterFor, highlightLanguage, parseDelimited, reindentJson, reindentXml,
-  type TextPreviewKind,
+  delimiterFor, highlightLanguage, parseDelimited, previewTidyFor, type TextPreviewKind,
 } from '../lib/textPreview'
-import { extensionOf } from '../lib/attachments'
 
 interface TextPreviewProps {
   kind: Exclude<TextPreviewKind, null>
@@ -15,12 +13,6 @@ interface TextPreviewProps {
 
 /** 표가 아주 크면 화면이 멎으므로 앞부분만 그립니다. */
 const MAX_ROWS = 500
-
-/** 보여 줄 때 줄과 들여쓰기를 새로 잡아 주는 형식. */
-const TIDY: Record<string, (text: string) => string | null> = {
-  json: reindentJson,
-  xml: reindentXml,
-}
 
 export function TextPreview({ kind, path, text }: TextPreviewProps) {
   if (kind === 'table') return <TablePreview path={path} text={text} />
@@ -74,11 +66,11 @@ function CodePreview({ path, text }: { path: string; text: string }) {
    * 원문이 어긋나 있어도 보기에는 정돈해서 보여 줍니다. 파일은 건드리지 않습니다.
    * 정돈할 수 없는 글(짝이 안 맞는 등)이면 원문을 그대로 보여 줍니다.
    *
-   * YAML 은 여기에 넣지 않습니다. YAML 은 들여쓰기가 곧 뜻이라, 다시 잡는다는 것은
-   * 문서를 다르게 읽는다는 말이 됩니다. 고칠 어긋남이라는 것이 아예 없습니다.
+   * YAML 은 깊이를 다시 잡지 않습니다. 들여쓰기가 곧 뜻이라, 다시 잡는다는 것은
+   * 문서를 다르게 읽겠다는 말이 됩니다. 다만 규격이 금하는 탭은 공백으로 바꿉니다.
    */
-  const tidied = TIDY[extensionOf(path)]
-  const shown = tidied ? tidied(text) ?? text : text
+  const tidy = previewTidyFor(path)
+  const shown = tidy ? tidy(text) ?? text : text
 
   useEffect(() => {
     let cancelled = false

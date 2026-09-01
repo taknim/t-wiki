@@ -353,3 +353,91 @@ export function reindentXml(text: string, indent = '  '): string | null {
   const lines = render(nodes, 0, indent)
   return lines.length > 0 ? `${lines.join('\n')}\n` : null
 }
+
+/*
+ * YAML 들여쓰기의 탭을 공백으로 바꿉니다.
+ *
+ * YAML 은 들여쓰기에 탭을 쓸 수 없습니다. 규격이 금하고 있어서, 탭으로 들여쓴
+ * 문서는 보기에만 그럴듯할 뿐 어떤 도구로 읽어도 오류가 납니다. 그러니 이것은
+ * 모양을 다듬는 일이 아니라 깨진 것을 고치는 일입니다.
+ *
+ * 들여쓰기에 있는 탭만 건드립니다.
+ * - 값 안의 탭(`이름: 가<탭>나`)은 글자 그대로의 내용이라 그대로 둡니다.
+ * - 블록 스칼라(`|`, `>`) 안쪽도 전부 내용이므로 손대지 않습니다.
+ *
+ * 탭 하나를 정해진 폭으로 바꾸므로 깊이의 앞뒤 관계가 그대로 지켜집니다.
+ * YAML 에서 뜻을 가르는 것은 절대 칸 수가 아니라 서로 간의 깊이입니다.
+ */
+const BLOCK_SCALAR = /(?:^|[\s:])[|>][-+]?\d*[ \t]*(?:#.*)?$/
+
+function leadingSpace(line: string): string {
+  return /^[ \t]*/.exec(line)?.[0] ?? ''
+}
+
+function widthOf(space: string, tabWidth: number): number {
+  let width = 0
+  for (const letter of space) width += letter === '\t' ? tabWidth : 1
+  return width
+}
+
+/** 탭을 공백으로 바꾼 YAML. 들여쓰기에 탭이 없으면 null 입니다. */
+export function untabYaml(text: string, indent = '  '): string | null {
+  // 줄 첫머리에 탭이 있는 줄이 하나도 없으면 할 일이 없습니다.
+  if (!/^[ \t]*\t/m.test(text)) return null
+
+  const lines = text.split('\n')
+  const out: string[] = []
+  // 블록 스칼라를 연 줄의 깊이. 그보다 깊은 줄은 전부 그 안의 내용입니다.
+  let blockAt: number | null = null
+
+  for (const line of lines) {
+    const space = leadingSpace(line)
+    const body = line.slice(space.length)
+    const width = widthOf(space, indent.length)
+
+    if (blockAt !== null) {
+      if (body.trim().length === 0 || width > blockAt) {
+        out.push(line)
+        continue
+      }
+      blockAt = null
+    }
+
+    const fixed = [...space].map((letter) => (letter === '\t' ? indent : letter)).join('')
+    out.push(fixed + body)
+
+    if (BLOCK_SCALAR.test(body)) blockAt = widthOf(fixed, indent.length)
+  }
+
+  const result = out.join('\n')
+  return result === text ? null : result
+}
+
+/**
+ * 그 파일을 보여 줄 때 줄과 들여쓰기를 새로 잡아 주는 방법.
+ * 없으면 원문 그대로 보여 주는 형식입니다.
+ */
+export function previewTidyFor(path: string): ((text: string) => string | null) | null {
+  const how: Record<string, (text: string) => string | null> = {
+    json: reindentJson,
+    xml: reindentXml,
+    yaml: untabYaml,
+    yml: untabYaml,
+  }
+  return how[extensionOf(path)] ?? null
+}
+
+/**
+ * 파일 자체를 고쳐 저장하는 방법. 보여 줄 때만 하는 정돈보다 좁습니다.
+ *
+ * XML 은 여기 없습니다. 줄을 다시 잡는 것은 취향의 문제라, 남의 파일을 말없이
+ * 다시 쓸 일이 아닙니다. JSON 정돈과 YAML 탭 고치기는 사용자가 시킨 것입니다.
+ */
+export function fileTidyFor(path: string): ((text: string) => string | null) | null {
+  const how: Record<string, (text: string) => string | null> = {
+    json: reindentJson,
+    yaml: untabYaml,
+    yml: untabYaml,
+  }
+  return how[extensionOf(path)] ?? null
+}

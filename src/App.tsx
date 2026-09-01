@@ -18,13 +18,13 @@ import { TreeView } from './components/TreeView'
 import { useGitHubSync } from './hooks/useGitHubSync'
 import { useVault } from './hooks/useVault'
 import {
-  ACCEPT_ATTRIBUTE, attachmentKind, extensionOf, formatBytes, isEditableText, isMarkdown,
+  ACCEPT_ATTRIBUTE, attachmentKind, formatBytes, isEditableText, isMarkdown,
   MAX_ATTACHMENT_BYTES,
 } from './lib/attachments'
 import { extractHeadings, parseFrontmatter } from './lib/markdown'
 import { readFile } from './lib/fsAccess'
 import { loadSession, saveSession } from './lib/session'
-import { reindentJson, textPreviewKind } from './lib/textPreview'
+import { fileTidyFor, textPreviewKind } from './lib/textPreview'
 import { displayPath, fileNameOf } from './lib/paths'
 import type { CSSProperties } from 'react'
 import type { ViewMode, VaultNode } from './types'
@@ -93,7 +93,8 @@ export default function App() {
     if (!path) return
 
     const original = draftRef.current
-    const candidate = tidy && extensionOf(path) === 'json' ? reindentJson(original) : null
+    const tidier = tidy ? fileTidyFor(path) : null
+    const candidate = tidier ? tidier(original) : null
     // 이미 정돈되어 있으면 쓸 것이 없습니다.
     const tidied = candidate !== null && candidate !== original ? candidate : null
 
