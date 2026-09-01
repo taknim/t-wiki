@@ -82,3 +82,6 @@ export interface SyncLogLine {
   status: 'ok' | 'error'
   detail?: string
 }
+
+/** 문서를 원문만, 나란히, 결과만 중 어떻게 보여 줄지. */
+export type ViewMode = 'edit' | 'split' | 'preview'

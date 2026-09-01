@@ -1,6 +1,4 @@
 :root {
-  /* 머리줄 버튼의 붙박이 너비. 가장 긴 글자에 맞춰 둡니다. */
-  --topbar-btn-w: 150px;
   --bg: #ffffff;
   --bg-sunken: #f6f7f9;
   --bg-raised: #ffffff;
@@ -142,22 +140,22 @@ button, input, select, textarea { font: inherit; color: inherit; }
 }
 .topbar-left, .topbar-right { display: flex; align-items: center; gap: 8px; }
 
-/*
- * 머리줄 버튼은 아이콘과 글자를 함께 세우고 너비를 붙박이로 둡니다.
- * 동기화 버튼은 도는 동안 글자가 바뀌는데, 너비가 따라 움직이면
- * 옆 버튼들이 밀려 눌리던 자리가 어긋납니다.
- */
+/* 머리줄 버튼은 아이콘과 글자를 나란히 세웁니다. 너비는 글자에 맡깁니다. */
 .topbar .btn {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
   gap: 6px;
-  width: var(--topbar-btn-w);
-  padding-inline: 8px;
-  overflow: hidden;
 }
-.topbar .btn > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .icon { flex: none; }
+
+/*
+ * 동기화 버튼만 글자가 도중에 바뀝니다. 너비가 따라 움직이면 옆 버튼들이
+ * 밀려 누르던 자리가 어긋납니다. 두 글자를 같은 칸에 겹쳐 놓아
+ * 늘 긴 쪽만큼 자리를 차지하게 합니다.
+ */
+.btn-label { display: grid; }
+.btn-label > span { grid-area: 1 / 1; white-space: nowrap; text-align: center; }
+.btn-label-ghost { visibility: hidden; }
 
 /* 진행 건수는 안내로 옮기고, 얼마나 갔는지는 버튼 안쪽을 채워 보여 줍니다. */
 .topbar .btn[style*="--sync-fill"] {
@@ -175,6 +173,8 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .brand { letter-spacing: -0.01em; }
 .vault-name { color: var(--text-muted); font-size: 13px; }
 
+/* 제목 줄 오른쪽 끝에 붙습니다. 제목이 길어져도 자리를 지킵니다. */
+.doc-head .mode-switch { margin-left: auto; align-self: center; }
 .mode-switch { display: flex; border: 1px solid var(--border-strong); border-radius: 6px; overflow: hidden; }
 .mode-switch button {
   display: inline-flex;

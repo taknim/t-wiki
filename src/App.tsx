@@ -7,9 +7,8 @@ import { FolderView } from './components/FolderView'
 import { InfoBar, type SelectionInfo } from './components/InfoBar'
 import { SearchPanel } from './components/SearchPanel'
 import { SyncCountdown } from './components/SyncCountdown'
-import {
-  ColumnsIcon, EyeIcon, FolderExitIcon, GitHubIcon, PencilIcon, RefreshIcon, SettingsIcon, SyncIcon,
-} from './components/icons'
+import { ViewModeSwitch } from './components/ViewModeSwitch'
+import { FolderExitIcon, GitHubIcon, RefreshIcon, SettingsIcon, SyncIcon } from './components/icons'
 import { TextPreview } from './components/TextPreview'
 import { SettingsPanel } from './components/SettingsPanel'
 import { SyncReportSheet } from './components/SyncReportSheet'
@@ -26,9 +25,8 @@ import { loadSession, saveSession } from './lib/session'
 import { reindentJson, textPreviewKind } from './lib/textPreview'
 import { titleOf } from './lib/wikilinks'
 import type { CSSProperties } from 'react'
-import type { VaultNode } from './types'
+import type { ViewMode, VaultNode } from './types'
 
-type ViewMode = 'edit' | 'split' | 'preview'
 
 const AUTOSAVE_DELAY = 800
 
@@ -593,28 +591,6 @@ export default function App() {
           <span className="vault-name">{vault.vaultName}</span>
         </div>
         <div className="topbar-right">
-          {(selection === null || selection.kind === 'markdown' || textPreview !== null) && (
-          <div className="mode-switch" role="group" aria-label="보기 모드">
-            {(['edit', 'split', 'preview'] as ViewMode[]).map((mode) => (
-              <button
-                key={mode}
-                type="button"
-                className={viewMode === mode ? 'is-active' : ''}
-                data-tip={
-                  mode === 'edit'
-                    ? '원문만 보기'
-                    : mode === 'split'
-                      ? '원문과 미리보기를 나란히 보기'
-                      : '결과만 보기'
-                }
-                onClick={() => setViewMode(mode)}
-              >
-                {mode === 'edit' ? <PencilIcon /> : mode === 'split' ? <ColumnsIcon /> : <EyeIcon />}
-                <span>{mode === 'edit' ? '편집' : mode === 'split' ? '나란히' : '미리보기'}</span>
-              </button>
-            ))}
-          </div>
-          )}
           <button
             type="button"
             className="btn"
@@ -639,7 +615,15 @@ export default function App() {
             style={syncFillStyle}
           >
             {sync.status.phase === 'running' ? <SyncIcon className="is-spinning" /> : <GitHubIcon />}
-            <span>{sync.status.phase === 'running' ? '동기화 중…' : 'GitHub 동기화'}</span>
+            <span className="btn-label">
+              <span>{sync.status.phase === 'running' ? '동기화 중…' : 'GitHub 동기화'}</span>
+              {/*
+                글자가 바뀌어도 단추 너비가 흔들리지 않도록, 가장 긴 글자를
+                보이지 않게 겹쳐 두어 자리를 잡습니다. px 로 못 박으면
+                글꼴이 바뀔 때 글자가 잘립니다.
+              */}
+              <span className="btn-label-ghost" aria-hidden="true">GitHub 동기화</span>
+            </span>
           </button>
           {sync.nextAutoSyncAt !== null && (
             <SyncCountdown
@@ -758,6 +742,9 @@ export default function App() {
                   <span className={dirty ? 'pill' : 'pill pill-ok'}>{dirty ? '저장 중…' : '저장됨'}</span>
                 )}
                 {selection.kind !== 'dir' && !editableText && <span className="pill">읽기 전용</span>}
+                {editableText && textPreview && (
+                  <ViewModeSwitch mode={viewMode} onChange={setViewMode} />
+                )}
               </div>
 
               {editableText ? (
@@ -793,6 +780,7 @@ export default function App() {
                 <h1>{titleOf(selectedPath)}</h1>
                 <span className="doc-path">{selectedPath}</span>
                 <span className={dirty ? 'pill' : 'pill pill-ok'}>{dirty ? '저장 중…' : '저장됨'}</span>
+                <ViewModeSwitch mode={viewMode} onChange={setViewMode} />
               </div>
 
               {fields.length > 0 && (
