@@ -8,7 +8,7 @@ import { InfoBar, type SelectionInfo } from './components/InfoBar'
 import { SearchPanel } from './components/SearchPanel'
 import { SyncCountdown } from './components/SyncCountdown'
 import { ViewModeSwitch } from './components/ViewModeSwitch'
-import { FolderExitIcon, GitHubIcon, RefreshIcon, SettingsIcon, SyncIcon } from './components/icons'
+import { GitHubIcon, SettingsIcon, SyncIcon } from './components/icons'
 import { TextPreview } from './components/TextPreview'
 import { SettingsPanel } from './components/SettingsPanel'
 import { SyncReportSheet } from './components/SyncReportSheet'
@@ -313,6 +313,8 @@ export default function App() {
     })
   }, [])
 
+  // 파일 고르기 창을 어디서 열었는지 기억해 둡니다. 창은 하나를 돌려 씁니다.
+  const pickerDir = useRef<string | null>(null)
   const currentDir = selectedDir ?? (selectedPath ? selectedPath.split('/').slice(0, -1).join('/') : '')
 
   const filePicker = useRef<HTMLInputElement>(null)
@@ -593,15 +595,6 @@ export default function App() {
         <div className="topbar-right">
           <button
             type="button"
-            className="btn"
-            data-tip="폴더를 다시 읽어 바깥에서 바뀐 파일을 반영합니다"
-            onClick={() => void vault.refresh()}
-          >
-            <RefreshIcon />
-            <span>새로고침</span>
-          </button>
-          <button
-            type="button"
             className={sync.status.phase === 'error' ? 'btn btn-warned' : 'btn'}
             data-tip={
               sync.status.phase === 'running'
@@ -642,15 +635,6 @@ export default function App() {
             <SettingsIcon />
             <span>설정</span>
           </button>
-          <button
-            type="button"
-            className="btn"
-            data-tip="이 폴더와의 연결을 끊습니다. 파일은 그대로 남습니다"
-            onClick={() => void closeVault()}
-          >
-            <FolderExitIcon />
-            <span>폴더 닫기</span>
-          </button>
         </div>
       </header>
 
@@ -663,32 +647,6 @@ export default function App() {
               placeholder="문서 검색"
               onChange={(event) => setQuery(event.target.value)}
             />
-            <div className="row">
-              <button
-                type="button"
-                className="btn btn-small"
-                data-tip={`새 문서를 만듭니다 (${currentDir || '최상위'})`}
-                onClick={() => void handleNewDoc(currentDir)}
-              >
-                ＋ 문서
-              </button>
-              <button
-                type="button"
-                className="btn btn-small"
-                data-tip={`새 폴더를 만듭니다 (${currentDir || '최상위'})`}
-                onClick={() => void handleNewFolder(currentDir)}
-              >
-                ＋ 폴더
-              </button>
-              <button
-                type="button"
-                className="btn btn-small"
-                data-tip={`이미지·문서 파일을 골라 넣습니다 (${currentDir || '최상위'})`}
-                onClick={() => filePicker.current?.click()}
-              >
-                ＋ 파일
-              </button>
-            </div>
 
             {/* 파일 고르기 창은 브라우저가 띄웁니다. 목록에 있는 형식만 걸러 보여 줍니다. */}
             <input
@@ -700,7 +658,10 @@ export default function App() {
               onChange={(event) => {
                 const files = [...(event.target.files ?? [])]
                 event.target.value = ''
-                void handleAddFiles(files)
+                // 뿌리 줄에서 열었으면 최상위로, 그 밖에는 고른 폴더로 갑니다.
+                const target = pickerDir.current
+                pickerDir.current = null
+                void handleAddFiles(files, target ?? undefined)
               }}
             />
           </div>
@@ -712,7 +673,14 @@ export default function App() {
               vault.tree && (
                 <TreeView
                   root={vault.tree}
+                  rootName={vault.vaultName}
                   selectedPath={selectedDir ?? selectedPath}
+                  onPickFiles={() => {
+                    pickerDir.current = ''
+                    filePicker.current?.click()
+                  }}
+                  onRefresh={() => void vault.refresh()}
+                  onCloseVault={() => void closeVault()}
                   expanded={expanded}
                   onToggle={toggleFolder}
                   onSelect={(path) => void (isMarkdown(path) ? openDoc(path) : openAsset(path))}
@@ -730,6 +698,7 @@ export default function App() {
               )
             )}
           </div>
+
         </aside>
 
         <main className="main">

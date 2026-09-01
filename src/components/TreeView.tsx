@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { VaultNode } from '../types'
+import { ClipIcon, DocPlusIcon, FolderExitIcon, FolderPlusIcon, RefreshIcon } from './icons'
 import { isMarkdown } from '../lib/attachments'
 import { titleOf } from '../lib/wikilinks'
 
@@ -18,13 +19,34 @@ export interface TreeActions {
 
 interface TreeViewProps extends TreeActions {
   root: VaultNode
+  /** 뿌리 줄에 보여 줄 폴더 이름. */
+  rootName: string
   selectedPath: string | null
   expanded: Set<string>
   onToggle: (path: string) => void
+  /** 뿌리에 넣을 파일을 고르는 창을 엽니다. */
+  onPickFiles: () => void
+  onRefresh: () => void
+  onCloseVault: () => void
 }
 
-export function TreeView({ root, ...props }: TreeViewProps) {
+export function TreeView({
+  root, rootName, onPickFiles, onRefresh, onCloseVault, ...props
+}: TreeViewProps) {
   const children = root.children ?? []
+  // 뿌리 줄의 단추는 늘 뿌리를 가리킵니다. 폴더마다 필요한 것은 그 줄에 따로 있습니다.
+  const rootTools = [
+    { key: 'folder', label: '새 폴더', tip: '최상위에 새 폴더 만들기',
+      icon: <FolderPlusIcon />, run: () => props.onNewFolder('') },
+    { key: 'doc', label: '새 문서', tip: '최상위에 새 문서 만들기',
+      icon: <DocPlusIcon />, run: () => props.onNewDoc('') },
+    { key: 'file', label: '파일 추가', tip: '이미지·문서 파일을 골라 최상위에 넣기',
+      icon: <ClipIcon />, run: onPickFiles },
+    { key: 'refresh', label: '새로고침', tip: '폴더를 다시 읽어 바깥에서 바뀐 파일을 반영합니다',
+      icon: <RefreshIcon />, run: onRefresh },
+    { key: 'close', label: '폴더 닫기', tip: '이 폴더와의 연결을 끊습니다. 파일은 그대로 남습니다',
+      icon: <FolderExitIcon />, run: onCloseVault },
+  ]
 
   return (
     <div
@@ -42,6 +64,24 @@ export function TreeView({ root, ...props }: TreeViewProps) {
         if (from) props.onMove(from, '')
       }}
     >
+      <div
+        className={props.selectedPath === '' ? 'tree-row tree-root is-selected' : 'tree-row tree-root'}
+        onClick={() => props.onSelectDir('')}
+      >
+        <span className="tree-caret" />
+        <span className="tree-icon">🗂</span>
+        <span className="tree-name">{rootName}</span>
+        {/* 뿌리 줄의 단추는 늘 보입니다. 다른 줄과 달리 늘 쓰는 것들입니다. */}
+        <span className="tree-tools is-pinned" onClick={(event) => event.stopPropagation()}>
+          {rootTools.map((tool) => (
+            <button key={tool.key} type="button" aria-label={tool.label} data-tip={tool.tip}
+                    onClick={tool.run}>
+              {tool.icon}
+            </button>
+          ))}
+        </span>
+      </div>
+
       {children.length === 0 && <p className="tree-empty">비어 있습니다. 문서를 만들어 보세요.</p>}
       {children.map((node) => (
         <TreeRow key={node.path} node={node} depth={0} {...props} />

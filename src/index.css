@@ -215,9 +215,33 @@ button, input, select, textarea { font: inherit; color: inherit; }
 /* row 안에서는 남는 폭만 차지해야 옆 버튼이 아래로 밀리지 않습니다. */
 .row > .dialog-input { flex: 1 1 140px; width: auto; min-width: 0; }
 .search-input:focus, .dialog-input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
-.sidebar-scroll { flex: 1; overflow: auto; padding: 0 6px 16px; }
+.sidebar-scroll { flex: 1; overflow: auto; padding: 0 6px 16px; min-height: 0; }
+
 
 .tree { min-height: 100%; }
+
+/*
+ * 뿌리 줄. 폴더 전체를 가리키므로 트리 맨 위에 한 줄로 세웁니다.
+ * 단추는 늘 쓰는 것들이라 다른 줄과 달리 감추지 않습니다.
+ */
+.tree-root {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  margin-block-end: 2px;
+  background: var(--bg-sunken);
+  border-block-end: 1px solid var(--border);
+  border-radius: 0;
+  font-weight: 600;
+}
+.tree-root.is-selected { background: var(--bg-raised); }
+.tree-tools.is-pinned { display: flex; }
+.tree-tools.is-pinned button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px;
+}
 .tree-empty { color: var(--text-muted); font-size: 13px; padding: 8px; }
 
 .tree-row {

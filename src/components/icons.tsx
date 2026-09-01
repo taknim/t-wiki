@@ -117,3 +117,31 @@ export function FolderExitIcon(props: IconProps) {
     </Svg>
   )
 }
+
+export function FolderPlusIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M1.6 12V4a1 1 0 0 1 1-1h3.1l1.3 1.6h6.4a1 1 0 0 1 1 1V12a1 1 0 0 1-1 1H2.6a1 1 0 0 1-1-1z" />
+      <path d="M8 7.4v3.4M6.3 9.1h3.4" />
+    </Svg>
+  )
+}
+
+export function DocPlusIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M4 1.9h4.5L12 5.4V13a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V2.9a1 1 0 0 1 1-1z" />
+      <path d="M8.4 2v3.4h3.4" />
+      <path d="M7.5 8.4v3.3M5.9 10.05h3.2" />
+    </Svg>
+  )
+}
+
+/** 첨부 파일. 클립은 이 크기에서도 뜻이 또렷합니다. */
+export function ClipIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M11.6 7.4l-4.3 4.3a2.4 2.4 0 0 1-3.4-3.4l5.2-5.2a1.7 1.7 0 0 1 2.4 2.4l-5 5a.85.85 0 0 1-1.2-1.2l4.6-4.6" />
+    </Svg>
+  )
+}
