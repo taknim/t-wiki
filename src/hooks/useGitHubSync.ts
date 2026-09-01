@@ -119,6 +119,8 @@ export function useGitHubSync({ root, docs, assets, onBeforeSync, onLocalChanged
   const docsRef = useRef(docs)
   const assetsRef = useRef(assets)
   const busyRef = useRef(false)
+  // 자동 동기화가 켜져 있는 동안, 다음 차례를 처음부터 다시 세게 하는 손잡이입니다.
+  const restartCountdownRef = useRef<(() => void) | null>(null)
   const pendingSaveRef = useRef<Promise<void>>(Promise.resolve())
   // 사용자가 "이 대상으로 진행" 을 누른 서명. 한 번 확인하면 다시 묻지 않습니다.
   const confirmedRef = useRef<string | null>(null)
@@ -254,6 +256,14 @@ export function useGitHubSync({ root, docs, assets, onBeforeSync, onLocalChanged
     busyRef.current = true
     setStatus({ phase: 'running', message: '설정을 확인하는 중…', progress: null })
 
+    /*
+     * 시작 시점의 손잡이를 적어 둡니다. 도는 동안 자동 동기화가 새로 켜지면
+     * (다른 탭에서 켠 설정을 이 동기화가 읽어 오는 경우가 그렇습니다)
+     * 그쪽이 곧바로 첫 회차를 잡아 둡니다. 끝나면서 우리가 되돌려 놓으면
+     * 그 첫 회차를 지우고 간격만큼 미뤄 버립니다.
+     */
+    const countdownAtStart = restartCountdownRef.current
+
     try {
       // 설정은 메모리가 아니라 저장소에서 다시 읽습니다.
       // 다른 탭에서 바꾼 값이 이 탭 메모리에는 남아 있지 않아,
@@ -296,6 +306,9 @@ export function useGitHubSync({ root, docs, assets, onBeforeSync, onLocalChanged
       }
     } finally {
       busyRef.current = false
+      // 직접 눌러 돌렸어도 다음 자동 차례는 간격만큼 처음부터 다시 셉니다.
+      // 방금 맞춰 놓고 몇십 초 뒤에 또 도는 것은 의미가 없습니다.
+      if (restartCountdownRef.current === countdownAtStart) restartCountdownRef.current?.()
     }
   }, [attemptSync])
 
@@ -328,7 +341,9 @@ export function useGitHubSync({ root, docs, assets, onBeforeSync, onLocalChanged
     let timer = 0
     let cancelled = false
 
+    // 이미 잡아 둔 차례가 있으면 버리고 새로 잡습니다. 두 번 겹쳐 돌지 않습니다.
     const schedule = (delay: number) => {
+      window.clearTimeout(timer)
       setNextAutoSyncAt(Date.now() + delay)
       timer = window.setTimeout(() => {
         void (async () => {
@@ -338,10 +353,14 @@ export function useGitHubSync({ root, docs, assets, onBeforeSync, onLocalChanged
       }, delay)
     }
 
+    restartCountdownRef.current = () => {
+      if (!cancelled) schedule(minutes * 60_000)
+    }
     schedule(FIRST_RUN_DELAY)
 
     return () => {
       cancelled = true
+      restartCountdownRef.current = null
       window.clearTimeout(timer)
       setNextAutoSyncAt(null)
     }

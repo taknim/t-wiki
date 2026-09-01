@@ -7,6 +7,9 @@ import { FolderView } from './components/FolderView'
 import { InfoBar, type SelectionInfo } from './components/InfoBar'
 import { SearchPanel } from './components/SearchPanel'
 import { SyncCountdown } from './components/SyncCountdown'
+import {
+  ColumnsIcon, EyeIcon, FolderExitIcon, GitHubIcon, PencilIcon, RefreshIcon, SettingsIcon, SyncIcon,
+} from './components/icons'
 import { TextPreview } from './components/TextPreview'
 import { SettingsPanel } from './components/SettingsPanel'
 import { SyncReportSheet } from './components/SyncReportSheet'
@@ -22,6 +25,7 @@ import { readFile } from './lib/fsAccess'
 import { loadSession, saveSession } from './lib/session'
 import { reindentJson, textPreviewKind } from './lib/textPreview'
 import { titleOf } from './lib/wikilinks'
+import type { CSSProperties } from 'react'
 import type { VaultNode } from './types'
 
 type ViewMode = 'edit' | 'split' | 'preview'
@@ -569,6 +573,18 @@ export default function App() {
     )
   }
 
+  /*
+   * 버튼 너비를 고정했으므로 진행 건수를 글자로 붙이면 잘립니다.
+   * 숫자는 안내로 옮기고, 진행은 버튼 안쪽을 채우는 막대로 보여 줍니다.
+   */
+  const progress = sync.status.phase === 'running' ? sync.status.progress : null
+  const syncProgressTip = progress
+    ? `${progress.done}/${progress.total} 처리 중입니다`
+    : '동기화하는 중입니다'
+  const syncFillStyle = progress && progress.total > 0
+    ? ({ '--sync-fill': `${Math.round((progress.done / progress.total) * 100)}%` } as CSSProperties)
+    : undefined
+
   return (
     <div className="app">
       <header className="topbar">
@@ -593,7 +609,8 @@ export default function App() {
                 }
                 onClick={() => setViewMode(mode)}
               >
-                {mode === 'edit' ? '편집' : mode === 'split' ? '나란히' : '미리보기'}
+                {mode === 'edit' ? <PencilIcon /> : mode === 'split' ? <ColumnsIcon /> : <EyeIcon />}
+                <span>{mode === 'edit' ? '편집' : mode === 'split' ? '나란히' : '미리보기'}</span>
               </button>
             ))}
           </div>
@@ -604,24 +621,25 @@ export default function App() {
             data-tip="폴더를 다시 읽어 바깥에서 바뀐 파일을 반영합니다"
             onClick={() => void vault.refresh()}
           >
-            새로고침
+            <RefreshIcon />
+            <span>새로고침</span>
           </button>
           <button
             type="button"
             className={sync.status.phase === 'error' ? 'btn btn-warned' : 'btn'}
             data-tip={
               sync.status.phase === 'running'
-                ? '동기화하는 중입니다'
+                ? syncProgressTip
                 : sync.isConfigured
                   ? `${sync.config.owner}/${sync.config.repo} 와 지금 동기화합니다`
                   : '아직 저장소가 지정되지 않았습니다. 눌러서 설정하세요'
             }
             onClick={startSync}
             disabled={sync.status.phase === 'running'}
+            style={syncFillStyle}
           >
-            {sync.status.phase === 'running'
-              ? `동기화 중…${sync.status.progress ? ` ${sync.status.progress.done}/${sync.status.progress.total}` : ''}`
-              : 'GitHub 동기화'}
+            {sync.status.phase === 'running' ? <SyncIcon className="is-spinning" /> : <GitHubIcon />}
+            <span>{sync.status.phase === 'running' ? '동기화 중…' : 'GitHub 동기화'}</span>
           </button>
           {sync.nextAutoSyncAt !== null && (
             <SyncCountdown
@@ -637,7 +655,8 @@ export default function App() {
             aria-label="설정"
             onClick={() => setSettingsTab('general')}
           >
-            ⚙
+            <SettingsIcon />
+            <span>설정</span>
           </button>
           <button
             type="button"
@@ -645,7 +664,8 @@ export default function App() {
             data-tip="이 폴더와의 연결을 끊습니다. 파일은 그대로 남습니다"
             onClick={() => void closeVault()}
           >
-            폴더 닫기
+            <FolderExitIcon />
+            <span>폴더 닫기</span>
           </button>
         </div>
       </header>
