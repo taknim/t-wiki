@@ -3,6 +3,7 @@ import { isAttachment, isMarkdown } from '../attachments'
 import * as fs from '../fsAccess'
 import { loadAssetHashes, saveAssetHashes } from '../store'
 import * as api from './api'
+import { displayPath } from '../paths'
 
 /**
  * git 이 파일 내용에 매기는 것과 같은 해시를 계산합니다: sha1("blob <바이트수>\0" + 내용).
@@ -223,17 +224,41 @@ function conflictPath(path: string): string {
   return `${path.replace(/\.md$/i, '')} (저장소 사본 ${stamp()}).md`
 }
 
-function commitMessage(uploads: string[], deletions: string[]): string {
-  const parts: string[] = []
-  if (uploads.length > 0) parts.push(`문서 ${uploads.length}건`)
-  if (deletions.length > 0) parts.push(`삭제 ${deletions.length}건`)
+/** 무엇을 했는지 갈래. 커밋 글에서 이 차례대로 묶어 보여 줍니다. */
+export type StagedKind = 'add' | 'update'
 
-  const body = [
-    ...uploads.map((path) => `+ ${path}`),
-    ...deletions.map((path) => `- ${path}`),
-  ].join('\n')
+const SECTIONS = [
+  { key: 'add', label: '추가', mark: '+' },
+  { key: 'update', label: '수정', mark: '~' },
+  { key: 'delete', label: '삭제', mark: '-' },
+] as const
 
-  return `t-WiKi: ${parts.join(', ')}\n\n${body}`
+/**
+ * 커밋 글. 첫 줄에 몇 건인지, 그 아래에 갈래별로 무엇인지 적습니다.
+ *
+ * 예전에는 마크다운만 세고 첨부는 빠뜨렸습니다. 그림 한 장만 올린 회차는
+ * 셀 것이 없어 "t-WiKi:" 뒤가 텅 빈 채로 올라갔습니다.
+ * 또 올린 것을 모두 "문서"로만 묶어, 새로 만든 것과 고친 것을 가릴 수 없었습니다.
+ */
+export function commitMessage(staged: Map<string, StagedKind>, deletions: Iterable<string>): string {
+  const groups: Record<'add' | 'update' | 'delete', string[]> = {
+    add: [],
+    update: [],
+    delete: [...deletions],
+  }
+  for (const [path, kind] of staged) groups[kind].push(path)
+  for (const list of Object.values(groups)) list.sort()
+
+  const filled = SECTIONS.filter((section) => groups[section.key].length > 0)
+  const summary = filled.map((section) => `${section.label} ${groups[section.key].length}건`).join(', ')
+  const body = filled
+    .map((section) => [
+      section.label,
+      ...groups[section.key].map((path) => `${section.mark} ${displayPath(path)}`),
+    ].join('\n'))
+    .join('\n\n')
+
+  return `t-WiKi: ${summary}\n\n${body}\n`
 }
 
 export interface ApplyOptions {
@@ -268,6 +293,8 @@ export async function applyPlan(options: ApplyOptions): Promise<ApplyResult> {
   const uploads = new Map<string, string>()
   const binaryUploads = new Map<string, Uint8Array>()
   const deletions = new Set<string>()
+  // 올릴 것이 새로 만든 것인지 고친 것인지. 커밋 글을 갈래별로 묶는 데 씁니다.
+  const staged = new Map<string, StagedKind>()
 
   const todo = plan.filter((item) => item.action !== 'skip')
   const totalSteps = todo.length + 1
@@ -294,7 +321,8 @@ export async function applyPlan(options: ApplyOptions): Promise<ApplyResult> {
     localChanged = true
   }
 
-  const stageUpload = async (path: string) => {
+  const stageUpload = async (path: string, kind: StagedKind) => {
+    staged.set(path, kind)
     if (isMarkdown(path)) {
       uploads.set(path, await fs.readFile(root, path))
       return
@@ -305,16 +333,17 @@ export async function applyPlan(options: ApplyOptions): Promise<ApplyResult> {
 
   const resolveConflict = async (path: string) => {
     const sha = remote.files.get(path)
-    if (!sha) return stageUpload(path)
+    // 저장소에 없으면 부딪힐 것도 없습니다. 새로 올리는 셈입니다.
+    if (!sha) return stageUpload(path, 'add')
 
     if (config.conflictPolicy === 'remote-wins') return download(path)
-    if (config.conflictPolicy === 'local-wins') return stageUpload(path)
+    if (config.conflictPolicy === 'local-wins') return stageUpload(path, 'update')
 
     // keep-both: 저장소 버전을 사본으로 남기고 원래 자리에는 로컬 버전을 올립니다.
     const remoteContent = await api.getBlobText(config, sha)
     await fs.writeFile(root, conflictPath(path), remoteContent)
     localChanged = true
-    await stageUpload(path)
+    await stageUpload(path, 'update')
   }
 
   let done = 0
@@ -323,8 +352,10 @@ export async function applyPlan(options: ApplyOptions): Promise<ApplyResult> {
     try {
       switch (item.action) {
         case 'upload-new':
+          await stageUpload(item.path, 'add')
+          break
         case 'upload-update':
-          await stageUpload(item.path)
+          await stageUpload(item.path, 'update')
           break
         case 'download-new':
         case 'download-update':
@@ -360,7 +391,7 @@ export async function applyPlan(options: ApplyOptions): Promise<ApplyResult> {
   if (uploads.size > 0 || binaryUploads.size > 0 || deletions.size > 0) {
     onProgress?.(done, totalSteps, '커밋하는 중')
     try {
-      commitSha = await commitChanges(config, remote.head, uploads, binaryUploads, deletions)
+      commitSha = await commitChanges(config, remote.head, uploads, binaryUploads, deletions, staged)
 
       // 커밋된 실제 blob SHA 를 다시 읽어 기준점으로 삼습니다.
       // 직접 계산한 값을 믿는 대신 서버가 저장한 값을 그대로 씁니다.
@@ -401,6 +432,7 @@ async function commitChanges(
   uploads: Map<string, string>,
   binaryUploads: Map<string, Uint8Array>,
   deletions: Set<string>,
+  staged: Map<string, StagedKind>,
 ): Promise<string> {
   const changes: api.TreeChange[] = []
 
@@ -419,7 +451,7 @@ async function commitChanges(
   const treeSha = await api.createTree(config, changes, head?.treeSha ?? null)
   const commitSha = await api.createCommit(
     config,
-    commitMessage([...uploads.keys()], [...deletions]),
+    commitMessage(staged, deletions),
     treeSha,
     head?.commitSha ?? null,
   )

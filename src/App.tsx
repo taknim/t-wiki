@@ -656,6 +656,14 @@ export default function App() {
                     value={query}
                     placeholder="문서 검색"
                     onChange={(event) => setQuery(event.target.value)}
+                    onKeyDown={(event) => {
+                      // 아래 방향키로 결과 목록으로 내려갑니다.
+                      if (event.key !== 'ArrowDown') return
+                      const first = document.querySelector<HTMLButtonElement>('.search-results button')
+                      if (!first) return
+                      event.preventDefault()
+                      first.focus()
+                    }}
                   />
                   {/* 한 글자라도 있으면 지울 수 있게 합니다. */}
                   {query.length > 0 && (
@@ -713,7 +721,18 @@ export default function App() {
           {sidebarOpen && (
           <div className="sidebar-scroll">
             {query.trim() ? (
-              <SearchPanel query={query} index={vault.index} onOpen={(path) => void openDoc(path)} />
+              <SearchPanel
+                query={query}
+                index={vault.index}
+                onOpen={(path) => void openDoc(path)}
+                onLeaveTop={() => {
+                  const box = searchInput.current
+                  if (!box) return
+                  box.focus()
+                  // 이어서 칠 수 있도록 글자 끝에 자리를 둡니다.
+                  box.setSelectionRange(box.value.length, box.value.length)
+                }}
+              />
             ) : (
               vault.tree && (
                 <TreeView
