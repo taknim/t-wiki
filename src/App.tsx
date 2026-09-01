@@ -899,6 +899,7 @@ export default function App() {
         <SettingsPanel
           initialTab={settingsTab}
           sync={sync}
+          vaultName={vault.vaultName ?? null}
           onShowReport={() => setReportOpen(true)}
           onClose={() => setSettingsTab(null)}
         />

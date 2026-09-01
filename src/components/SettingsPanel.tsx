@@ -7,6 +7,7 @@ import type { GitHubSync } from '../hooks/useGitHubSync'
 import { GitHubSettings } from './GitHubSettings'
 import { clearSessions, isRememberEnabled, setRememberEnabled } from '../lib/session'
 import { readSaveOptions, writeSaveOptions, type SaveOptions } from '../lib/saveOptions'
+import { buildBundle, bundleFileName, parseBundle } from '../lib/settingsFile'
 import { useTheme } from './themeContext'
 
 const MODES: { id: ModeSetting; name: string; hint: string }[] = [
@@ -21,6 +22,8 @@ interface SettingsPanelProps {
   onShowReport: () => void
   /** 설정 창을 열 때 바로 보여 줄 묶음. */
   initialTab?: TabId
+  /** 지금 열려 있는 폴더 이름. 내보낸 파일에 적어 둡니다. */
+  vaultName: string | null
 }
 
 type TabId = 'general' | 'appearance' | 'sync'
@@ -31,10 +34,68 @@ const TABS: { id: TabId; name: string; hint: string }[] = [
   { id: 'sync', name: 'GitHub 동기화', hint: '저장소와 자동 동기화 설정으로 이동' },
 ]
 
-export function SettingsPanel({ onClose, sync, onShowReport, initialTab = 'general' }: SettingsPanelProps) {
+export function SettingsPanel({
+  onClose, sync, onShowReport, vaultName, initialTab = 'general',
+}: SettingsPanelProps) {
   const { settings, isDark, update } = useTheme()
   const [tab, setTab] = useState<TabId>(initialTab)
   const [saveOptions, setSaveOptions] = useState<SaveOptions>(readSaveOptions)
+  const [includeToken, setIncludeToken] = useState(false)
+  const [transfer, setTransfer] = useState<string | null>(null)
+  const bundleInput = useRef<HTMLInputElement>(null)
+
+  const exportSettings = () => {
+    const bundle = buildBundle({
+      vaultName: vaultName,
+      appearance: settings,
+      rememberSession: remember,
+      saveOptions,
+      github: sync.isConfigured || sync.config.token ? sync.config : null,
+      includeToken,
+    })
+
+    const url = URL.createObjectURL(
+      new Blob([JSON.stringify(bundle, null, 2)], { type: 'application/json' }),
+    )
+    const link = document.createElement('a')
+    link.href = url
+    link.download = bundleFileName(vaultName)
+    link.click()
+    // 브라우저가 다 읽을 틈을 주고 치웁니다.
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
+    setTransfer(includeToken ? '내보냈습니다. 토큰이 들어 있으니 파일을 잘 간수해 주세요.' : '내보냈습니다.')
+  }
+
+  const importSettings = async (file: File) => {
+    const bundle = parseBundle(await file.text())
+    if (!bundle) {
+      setTransfer('t-WiKi 설정 파일이 아닙니다.')
+      return
+    }
+
+    update(bundle.appearance)
+    setRemember(bundle.general.rememberSession)
+    setRememberEnabled(bundle.general.rememberSession)
+    const next = {
+      trimWhitespace: bundle.general.trimWhitespace,
+      tidyFormat: bundle.general.tidyFormat,
+    }
+    setSaveOptions(next)
+    writeSaveOptions(next)
+
+    if (bundle.github) {
+      // 저장소 설정은 지금 열려 있는 폴더에만 넣습니다.
+      // 토큰이 비어 있으면 여기 있던 것을 지우지 않고 그대로 둡니다.
+      const { token, ...rest } = bundle.github
+      sync.update(token ? bundle.github : rest)
+    }
+
+    setTransfer(
+      bundle.github
+        ? `가져왔습니다${vaultName ? ` · 저장소 설정은 "${vaultName}" 에 넣었습니다` : ''}.`
+        : '가져왔습니다.',
+    )
+  }
 
   const changeSave = (patch: Partial<SaveOptions>) => {
     const next = { ...saveOptions, ...patch }
@@ -216,6 +277,62 @@ export function SettingsPanel({ onClose, sync, onShowReport, initialTab = 'gener
                   마크다운·글(txt)·표(csv·tsv)는 정해진 모양이 없어 그대로 둡니다.
                 </span>
               </label>
+            </section>
+
+            <section className="field">
+              <label>설정 주고받기</label>
+              <p className="hint" style={{ marginTop: 0 }}>
+                모양·저장 방식과 <strong>지금 열려 있는 폴더</strong>의 저장소 설정을 파일 하나로 담습니다.
+                다른 기기에서는 폴더를 먼저 연 뒤 가져오면 그 폴더에 들어갑니다.
+                동기화 기준점은 담지 않습니다. 그 폴더가 저장소와 어디까지 맞췄는지는 기기마다 다르고,
+                남의 기준점을 들여오면 여기 없는 파일이 지워진 것으로 읽힙니다.
+              </p>
+
+              <label className="checkbox">
+                <input
+                  type="checkbox"
+                  checked={includeToken}
+                  onChange={(event) => setIncludeToken(event.target.checked)}
+                />
+                액세스 토큰도 함께 내보내기
+                <span className="hint">
+                  파일에 토큰이 그대로 적힙니다. 메일이나 채팅으로 주고받지 마세요.
+                  켜지 않으면 나머지 설정만 담기고, 가져온 뒤 토큰만 새로 넣으면 됩니다.
+                </span>
+              </label>
+
+              <div className="row" style={{ marginTop: 12 }}>
+                <button
+                  type="button"
+                  className="btn"
+                  data-tip="지금 설정을 파일로 내려받습니다"
+                  onClick={exportSettings}
+                >
+                  설정 내보내기
+                </button>
+                <button
+                  type="button"
+                  className="btn"
+                  data-tip="내려받아 둔 설정 파일을 읽어 옵니다"
+                  onClick={() => bundleInput.current?.click()}
+                >
+                  설정 가져오기
+                </button>
+                {transfer && <span className="hint" style={{ margin: 0 }}>{transfer}</span>}
+              </div>
+
+              <input
+                ref={bundleInput}
+                id="settings-bundle"
+                type="file"
+                accept="application/json,.json"
+                className="visually-hidden"
+                onChange={(event) => {
+                  const file = event.target.files?.[0]
+                  event.target.value = ''
+                  if (file) void importSettings(file)
+                }}
+              />
             </section>
             </section>
 
