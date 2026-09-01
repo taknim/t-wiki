@@ -24,7 +24,8 @@ import {
 import { extractHeadings, parseFrontmatter } from './lib/markdown'
 import { readFile } from './lib/fsAccess'
 import { loadSession, saveSession } from './lib/session'
-import { fileTidyFor, textPreviewKind } from './lib/textPreview'
+import { formatTidyFor, textPreviewKind, trimWhitespace } from './lib/textPreview'
+import { readSaveOptions } from './lib/saveOptions'
 import { displayPath, fileNameOf } from './lib/paths'
 import type { CSSProperties } from 'react'
 import type { ViewMode, VaultNode } from './types'
@@ -85,18 +86,28 @@ export default function App() {
   /**
    * 편집 내용을 파일에 씁니다.
    *
-   * tidy 는 이 파일에서 벗어날 때만 켭니다. 자동 저장이 돌 때마다 정돈하면
-   * 글을 쓰는 도중에 내용이 통째로 바뀌어 커서가 엉뚱한 곳으로 튑니다.
+   * tidy 는 이 파일에서 벗어날 때만 켭니다. 자동 저장이 돌 때마다 손을 대면
+   * 글을 쓰는 도중에 내용이 바뀌어 커서가 엉뚱한 곳으로 튑니다.
+   *
+   * 손을 댈지 말지는 설정을 따릅니다. 둘 다 꺼져 있으면 쓴 그대로 저장합니다.
+   * 저장하는 이 자리에서 곧바로 읽습니다. 설정 창에서 방금 바꾼 값이 바로 먹습니다.
    */
   const commit = useCallback(async (tidy = false) => {
     const path = selectedRef.current
     if (!path) return
 
     const original = draftRef.current
-    const tidier = tidy ? fileTidyFor(path) : null
-    const candidate = tidier ? tidier(original) : null
-    // 이미 정돈되어 있으면 쓸 것이 없습니다.
-    const tidied = candidate !== null && candidate !== original ? candidate : null
+    let candidate = original
+
+    if (tidy) {
+      const options = readSaveOptions()
+      if (options.tidyFormat) candidate = formatTidyFor(path)?.(candidate) ?? candidate
+      // 정돈이 끝난 뒤에 지웁니다. 순서가 뒤바뀌면 정돈이 남긴 공백이 그대로 남습니다.
+      if (options.trimWhitespace) candidate = trimWhitespace(candidate, path) ?? candidate
+    }
+
+    // 이미 그 모양이면 쓸 것이 없습니다.
+    const tidied = candidate !== original ? candidate : null
 
     // 자동 저장이 먼저 돌아 dirty 가 내려갔더라도, 정돈할 것이 있으면 씁니다.
     if (!dirty && tidied === null) return

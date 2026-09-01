@@ -6,6 +6,7 @@ import {
 import type { GitHubSync } from '../hooks/useGitHubSync'
 import { GitHubSettings } from './GitHubSettings'
 import { clearSessions, isRememberEnabled, setRememberEnabled } from '../lib/session'
+import { readSaveOptions, writeSaveOptions, type SaveOptions } from '../lib/saveOptions'
 import { useTheme } from './themeContext'
 
 const MODES: { id: ModeSetting; name: string; hint: string }[] = [
@@ -25,7 +26,7 @@ interface SettingsPanelProps {
 type TabId = 'general' | 'appearance' | 'sync'
 
 const TABS: { id: TabId; name: string; hint: string }[] = [
-  { id: 'general', name: '일반', hint: '마지막 화면 상태 기억으로 이동' },
+  { id: 'general', name: '일반', hint: '저장 방식과 마지막 화면 상태 기억으로 이동' },
   { id: 'appearance', name: '모양', hint: '테마와 글꼴로 이동' },
   { id: 'sync', name: 'GitHub 동기화', hint: '저장소와 자동 동기화 설정으로 이동' },
 ]
@@ -33,6 +34,13 @@ const TABS: { id: TabId; name: string; hint: string }[] = [
 export function SettingsPanel({ onClose, sync, onShowReport, initialTab = 'general' }: SettingsPanelProps) {
   const { settings, isDark, update } = useTheme()
   const [tab, setTab] = useState<TabId>(initialTab)
+  const [saveOptions, setSaveOptions] = useState<SaveOptions>(readSaveOptions)
+
+  const changeSave = (patch: Partial<SaveOptions>) => {
+    const next = { ...saveOptions, ...patch }
+    setSaveOptions(next)
+    writeSaveOptions(next)
+  }
 
   const contentRef = useRef<HTMLDivElement>(null)
   const sectionRefs = {
@@ -171,6 +179,43 @@ export function SettingsPanel({ onClose, sync, onShowReport, initialTab = 'gener
                 최근 연 폴더 10개까지 기억하고, 그보다 오래된 것은 버립니다.
                 이 기록은 이 브라우저에만 남고 저장소로 올라가지 않습니다.
               </p>
+            </section>
+
+            <section className="field">
+              <label>저장할 때 정돈</label>
+              <p className="hint" style={{ marginTop: 0 }}>
+                아무것도 켜지 않으면 <strong>쓴 그대로</strong> 저장합니다.
+                미리보기는 설정과 상관없이 늘 형식에 맞춰 보여 주지만, 그때는 파일을 건드리지 않습니다.
+                정돈은 그 문서에서 벗어날 때 한 번만 합니다. 글을 쓰는 도중에 손대면 커서가 튑니다.
+              </p>
+
+              <label className="checkbox">
+                <input
+                  type="checkbox"
+                  checked={saveOptions.trimWhitespace}
+                  onChange={(event) => changeSave({ trimWhitespace: event.target.checked })}
+                />
+                줄 끝 공백과 문서 앞뒤의 빈 줄 지우기
+                <span className="hint">
+                  줄 끝에 남은 공백·탭을 지우고, 문서 앞뒤의 빈 줄을 걷어낸 뒤 줄바꿈 하나로 끝맺습니다.
+                  뜻을 가진 공백은 남깁니다. 마크다운에서 줄 끝의 공백 둘 이상은 줄바꿈이라 그대로 두고,
+                  YAML 블록 스칼라(<code>|</code>, <code>&gt;</code>) 안쪽도 전부 내용이라 손대지 않습니다.
+                </span>
+              </label>
+
+              <label className="checkbox">
+                <input
+                  type="checkbox"
+                  checked={saveOptions.tidyFormat}
+                  onChange={(event) => changeSave({ tidyFormat: event.target.checked })}
+                />
+                문서 형식에 맞춰 들여쓰기 다시 잡기
+                <span className="hint">
+                  JSON·XML 은 들여쓰기를 맞추고, YAML 은 규격이 금하는 들여쓰기의 탭을 공백으로 바꿉니다.
+                  YAML 의 깊이 자체는 건드리지 않습니다. 들여쓰기가 곧 뜻이라 다시 잡으면 문서가 달라집니다.
+                  마크다운·글(txt)·표(csv·tsv)는 정해진 모양이 없어 그대로 둡니다.
+                </span>
+              </label>
             </section>
             </section>
 

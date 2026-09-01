@@ -380,36 +380,97 @@ function widthOf(space: string, tabWidth: number): number {
   return width
 }
 
-/** 탭을 공백으로 바꾼 YAML. 들여쓰기에 탭이 없으면 null 입니다. */
-export function untabYaml(text: string, indent = '  '): string | null {
-  // 줄 첫머리에 탭이 있는 줄이 하나도 없으면 할 일이 없습니다.
-  if (!/^[ \t]*\t/m.test(text)) return null
-
-  const lines = text.split('\n')
-  const out: string[] = []
+/**
+ * 줄마다 블록 스칼라 안쪽인지 표시합니다.
+ * 안쪽은 전부 글자 그대로의 내용이라, 어떤 정돈도 해서는 안 됩니다.
+ */
+function blockScalarMask(lines: string[], tabWidth: number): boolean[] {
+  const inside: boolean[] = []
   // 블록 스칼라를 연 줄의 깊이. 그보다 깊은 줄은 전부 그 안의 내용입니다.
   let blockAt: number | null = null
 
   for (const line of lines) {
     const space = leadingSpace(line)
     const body = line.slice(space.length)
-    const width = widthOf(space, indent.length)
+    const width = widthOf(space, tabWidth)
 
     if (blockAt !== null) {
       if (body.trim().length === 0 || width > blockAt) {
-        out.push(line)
+        inside.push(true)
         continue
       }
       blockAt = null
     }
 
-    const fixed = [...space].map((letter) => (letter === '\t' ? indent : letter)).join('')
-    out.push(fixed + body)
-
-    if (BLOCK_SCALAR.test(body)) blockAt = widthOf(fixed, indent.length)
+    inside.push(false)
+    if (BLOCK_SCALAR.test(body)) blockAt = width
   }
 
+  return inside
+}
+
+/** 탭을 공백으로 바꾼 YAML. 들여쓰기에 탭이 없으면 null 입니다. */
+export function untabYaml(text: string, indent = '  '): string | null {
+  // 줄 첫머리에 탭이 있는 줄이 하나도 없으면 할 일이 없습니다.
+  if (!/^[ \t]*\t/m.test(text)) return null
+
+  const lines = text.split('\n')
+  const inside = blockScalarMask(lines, indent.length)
+
+  const out = lines.map((line, at) => {
+    if (inside[at]) return line
+    const space = leadingSpace(line)
+    const fixed = [...space].map((letter) => (letter === '\t' ? indent : letter)).join('')
+    return fixed + line.slice(space.length)
+  })
+
   const result = out.join('\n')
+  return result === text ? null : result
+}
+
+/**
+ * 줄 끝 공백과 문서 앞뒤의 빈 줄을 지웁니다. 바뀔 것이 없으면 null 입니다.
+ *
+ * 뜻을 가진 공백은 남깁니다.
+ * - 마크다운에서 줄 끝의 공백 둘 이상은 줄바꿈입니다. 지우면 줄이 붙어 버립니다.
+ * - YAML 블록 스칼라 안쪽은 전부 내용입니다. 끝의 빈 줄도 `|+` 에서는 값의 일부입니다.
+ */
+export function trimWhitespace(text: string, path: string): string | null {
+  if (text.length === 0) return null
+
+  const extension = extensionOf(path)
+  /*
+   * 줄바꿈으로 끝나는 글을 나누면 마지막에 빈 조각이 하나 남습니다.
+   * 그것은 줄이 아니라 끝맺음 표시입니다. 줄로 세면 끝에 줄바꿈이 하나 더 붙고,
+   * `|+` 처럼 끝의 빈 줄이 값인 경우와도 뒤엉킵니다.
+   */
+  const lines = text.split('\n')
+  if (text.endsWith('\n')) lines.pop()
+
+  const inside = extension === 'yaml' || extension === 'yml'
+    ? blockScalarMask(lines, 2)
+    : lines.map(() => false)
+  const keepsHardBreaks = extension === 'md'
+
+  const out = lines.map((line, at) => {
+    if (inside[at]) return line
+    // 윈도 줄바꿈의 \r 은 줄 끝 표시라 건드리지 않습니다.
+    const carriage = line.endsWith('\r') ? '\r' : ''
+    const body = carriage ? line.slice(0, -1) : line
+    if (keepsHardBreaks && /\S[ ]{2,}$/.test(body)) return line
+    return body.replace(/[ \t]+$/, '') + carriage
+  })
+
+  // 앞쪽의 빈 줄을 걷어냅니다.
+  let from = 0
+  while (from < out.length && out[from].trim().length === 0) from += 1
+
+  // 뒤쪽도 마찬가지입니다. 다만 블록 스칼라 안에서 끝났다면 그 빈 줄은 값입니다.
+  let to = out.length
+  while (to > from && out[to - 1].trim().length === 0 && !inside[to - 1]) to -= 1
+
+  // 파일은 줄바꿈 하나로 끝맺습니다. 다 지워졌다면 빈 파일로 둡니다.
+  const result = to <= from ? '' : `${out.slice(from, to).join('\n')}\n`
   return result === text ? null : result
 }
 
@@ -428,14 +489,15 @@ export function previewTidyFor(path: string): ((text: string) => string | null) 
 }
 
 /**
- * 파일 자체를 고쳐 저장하는 방법. 보여 줄 때만 하는 정돈보다 좁습니다.
+ * 저장할 때 형식에 맞춰 정돈하는 방법. 설정에서 켰을 때만 씁니다.
  *
- * XML 은 여기 없습니다. 줄을 다시 잡는 것은 취향의 문제라, 남의 파일을 말없이
- * 다시 쓸 일이 아닙니다. JSON 정돈과 YAML 탭 고치기는 사용자가 시킨 것입니다.
+ * 마크다운과 그냥 글(txt), 표(csv·tsv)는 없습니다. 무엇이 "형식에 맞는" 모양인지
+ * 정해진 것이 없어, 다시 쓰면 취향을 강요하는 일이 됩니다.
  */
-export function fileTidyFor(path: string): ((text: string) => string | null) | null {
+export function formatTidyFor(path: string): ((text: string) => string | null) | null {
   const how: Record<string, (text: string) => string | null> = {
     json: reindentJson,
+    xml: reindentXml,
     yaml: untabYaml,
     yml: untabYaml,
   }
