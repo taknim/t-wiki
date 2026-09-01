@@ -1,6 +1,10 @@
 import { useState } from 'react'
 import type { VaultNode } from '../types'
-import { ClipIcon, DocPlusIcon, FolderExitIcon, FolderPlusIcon, RefreshIcon } from './icons'
+import {
+  ChevronIcon, ClipIcon, DocIcon, DocPlusIcon, FolderCloseIcon, FolderIcon, FolderPlusIcon,
+  ImageIcon, PencilIcon, RefreshIcon, TrashIcon,
+} from './icons'
+import { attachmentKind } from '../lib/attachments'
 import { isMarkdown } from '../lib/attachments'
 import { titleOf } from '../lib/wikilinks'
 
@@ -15,6 +19,8 @@ export interface TreeActions {
   onMove: (from: string, targetDir: string) => void
   /** 컴퓨터에서 끌어다 놓은 파일을 그 폴더에 넣습니다. */
   onDropFiles: (targetDir: string, files: File[]) => void
+  /** 그 폴더에 넣을 파일을 고르는 창을 엽니다. */
+  onPickFilesFor: (dirPath: string) => void
 }
 
 interface TreeViewProps extends TreeActions {
@@ -45,7 +51,7 @@ export function TreeView({
     { key: 'refresh', label: '새로고침', tip: '폴더를 다시 읽어 바깥에서 바뀐 파일을 반영합니다',
       icon: <RefreshIcon />, run: onRefresh },
     { key: 'close', label: '폴더 닫기', tip: '이 폴더와의 연결을 끊습니다. 파일은 그대로 남습니다',
-      icon: <FolderExitIcon />, run: onCloseVault },
+      icon: <FolderCloseIcon />, run: onCloseVault },
   ]
 
   return (
@@ -69,7 +75,7 @@ export function TreeView({
         onClick={() => props.onSelectDir('')}
       >
         <span className="tree-caret" />
-        <span className="tree-icon">🗂</span>
+        <span className="tree-icon is-dir"><FolderIcon /></span>
         <span className="tree-name">{rootName}</span>
         {/* 뿌리 줄의 단추는 늘 보입니다. 다른 줄과 달리 늘 쓰는 것들입니다. */}
         <span className="tree-tools is-pinned" onClick={(event) => event.stopPropagation()}>
@@ -96,6 +102,13 @@ interface TreeRowProps extends TreeActions {
   selectedPath: string | null
   expanded: Set<string>
   onToggle: (path: string) => void
+}
+
+/** 이름 앞 아이콘의 색을 가릅니다. 상태 표시줄의 종류 이름과 같은 갈래입니다. */
+function kindOf(node: VaultNode): 'dir' | 'markdown' | 'image' | 'file' {
+  if (node.kind === 'dir') return 'dir'
+  if (isMarkdown(node.name)) return 'markdown'
+  return attachmentKind(node.name) === 'image' ? 'image' : 'file'
 }
 
 function TreeRow({ node, depth, selectedPath, expanded, onToggle, ...actions }: TreeRowProps) {
@@ -152,8 +165,12 @@ function TreeRow({ node, depth, selectedPath, expanded, onToggle, ...actions }: 
           }
         }}
       >
-        <span className="tree-caret">{isDir ? (isOpen ? '▾' : '▸') : ''}</span>
-        <span className="tree-icon">{isDir ? '📁' : isMarkdown(node.name) ? '📄' : '🖿'}</span>
+        <span className={isOpen ? 'tree-caret is-open' : 'tree-caret'}>
+          {isDir && <ChevronIcon />}
+        </span>
+        <span className={`tree-icon is-${kindOf(node)}`}>
+          {isDir ? <FolderIcon /> : kindOf(node) === 'image' ? <ImageIcon /> : <DocIcon />}
+        </span>
         <span className="tree-name">
           {isDir || !isMarkdown(node.name) ? node.name : titleOf(node.name)}
         </span>
@@ -163,37 +180,45 @@ function TreeRow({ node, depth, selectedPath, expanded, onToggle, ...actions }: 
             <>
               <button
                 type="button"
-                aria-label="새 문서"
-                data-tip={`"${node.name}" 안에 새 문서 만들기`}
-                onClick={() => actions.onNewDoc(node.path)}
-              >
-                ＋
-              </button>
-              <button
-                type="button"
                 aria-label="새 폴더"
                 data-tip={`"${node.name}" 안에 새 폴더 만들기`}
                 onClick={() => actions.onNewFolder(node.path)}
               >
-                🗀
+                <FolderPlusIcon />
+              </button>
+              <button
+                type="button"
+                aria-label="새 문서"
+                data-tip={`"${node.name}" 안에 새 문서 만들기`}
+                onClick={() => actions.onNewDoc(node.path)}
+              >
+                <DocPlusIcon />
+              </button>
+              <button
+                type="button"
+                aria-label="파일 추가"
+                data-tip={`이미지·문서 파일을 골라 "${node.name}" 안에 넣기`}
+                onClick={() => actions.onPickFilesFor(node.path)}
+              >
+                <ClipIcon />
               </button>
             </>
           )}
           <button
             type="button"
             aria-label="이름 바꾸기"
-            data-tip={isDir ? '폴더 이름 바꾸기' : '문서 이름 바꾸기'}
+            data-tip={isDir ? '폴더 이름 변경' : '파일 이름 변경'}
             onClick={() => actions.onRename(node.path)}
           >
-            ✎
+            <PencilIcon />
           </button>
           <button
             type="button"
             aria-label="삭제"
-            data-tip={isDir ? '폴더와 그 안의 내용을 모두 삭제' : '이 문서를 삭제'}
+            data-tip={isDir ? '폴더와 그 안의 내용을 모두 삭제' : '파일 삭제'}
             onClick={() => actions.onDelete(node.path)}
           >
-            🗑
+            <TrashIcon />
           </button>
         </span>
       </div>

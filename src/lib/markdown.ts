@@ -294,7 +294,7 @@ function once(key: string, load: () => Promise<void>): Promise<void> {
   const job = load().catch((error) => {
     // 실패하면 다음 렌더에서 다시 시도할 수 있게 비웁니다.
     inFlight.delete(key)
-    console.warn(`[mdwiki] ${key} 를 불러오지 못했습니다`, error)
+    console.warn(`[t-WiKi] ${key} 를 불러오지 못했습니다`, error)
   })
   inFlight.set(key, job)
   return job

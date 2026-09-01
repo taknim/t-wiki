@@ -8,7 +8,9 @@ import { InfoBar, type SelectionInfo } from './components/InfoBar'
 import { SearchPanel } from './components/SearchPanel'
 import { SyncCountdown } from './components/SyncCountdown'
 import { ViewModeSwitch } from './components/ViewModeSwitch'
-import { GitHubIcon, SettingsIcon, SyncIcon } from './components/icons'
+import {
+  GitHubIcon, SettingsIcon, SidebarCloseIcon, SidebarOpenIcon, SyncIcon,
+} from './components/icons'
 import { TextPreview } from './components/TextPreview'
 import { SettingsPanel } from './components/SettingsPanel'
 import { SyncReportSheet } from './components/SyncReportSheet'
@@ -315,6 +317,7 @@ export default function App() {
 
   // 파일 고르기 창을 어디서 열었는지 기억해 둡니다. 창은 하나를 돌려 씁니다.
   const pickerDir = useRef<string | null>(null)
+  const [sidebarOpen, setSidebarOpen] = useState(readSidebarOpen)
   const currentDir = selectedDir ?? (selectedPath ? selectedPath.split('/').slice(0, -1).join('/') : '')
 
   const filePicker = useRef<HTMLInputElement>(null)
@@ -519,7 +522,7 @@ export default function App() {
   if (vault.status === 'unsupported') {
     return (
       <div className="gate">
-        <h1>mdwiki</h1>
+        <h1>t-WiKi</h1>
         <p>
           이 브라우저는 File System Access API 를 지원하지 않습니다. Chrome, Edge 등
           Chromium 계열 데스크톱 브라우저에서 열어 주세요.
@@ -531,7 +534,7 @@ export default function App() {
   if (vault.status === 'empty' || vault.status === 'needs-permission' || vault.status === 'error') {
     return (
       <div className="gate">
-        <h1>mdwiki</h1>
+        <h1>t-WiKi</h1>
         <p>마크다운 문서를 담아둘 로컬 폴더를 지정하면 그 폴더가 곧 위키가 됩니다.</p>
         {vault.status === 'needs-permission' ? (
           <>
@@ -589,10 +592,17 @@ export default function App() {
     <div className="app">
       <header className="topbar">
         <div className="topbar-left">
-          <strong className="brand">mdwiki</strong>
+          <strong className="brand">t-WiKi</strong>
           <span className="vault-name">{vault.vaultName}</span>
         </div>
         <div className="topbar-right">
+          {sync.nextAutoSyncAt !== null && (
+            <SyncCountdown
+              nextAt={sync.nextAutoSyncAt}
+              minutes={sync.config.autoSyncMinutes}
+              running={sync.status.phase === 'running'}
+            />
+          )}
           <button
             type="button"
             className={sync.status.phase === 'error' ? 'btn btn-warned' : 'btn'}
@@ -618,13 +628,6 @@ export default function App() {
               <span className="btn-label-ghost" aria-hidden="true">GitHub 동기화</span>
             </span>
           </button>
-          {sync.nextAutoSyncAt !== null && (
-            <SyncCountdown
-              nextAt={sync.nextAutoSyncAt}
-              minutes={sync.config.autoSyncMinutes}
-              running={sync.status.phase === 'running'}
-            />
-          )}
           <button
             type="button"
             className="btn"
@@ -639,6 +642,23 @@ export default function App() {
       </header>
 
       <div className="body">
+        <button
+          type="button"
+          className={sidebarOpen ? 'sidebar-toggle' : 'sidebar-toggle is-collapsed'}
+          aria-label={sidebarOpen ? '트리 접기' : '트리 펴기'}
+          aria-expanded={sidebarOpen}
+          data-tip={sidebarOpen ? '폴더 트리 접기' : '폴더 트리 펴기'}
+          onClick={() => {
+            setSidebarOpen((open) => {
+              writeSidebarOpen(!open)
+              return !open
+            })
+          }}
+        >
+          {sidebarOpen ? <SidebarCloseIcon /> : <SidebarOpenIcon />}
+        </button>
+
+        {sidebarOpen && (
         <aside className="sidebar">
           <div className="sidebar-head">
             <input
@@ -694,12 +714,17 @@ export default function App() {
                   onDelete={(path) => void handleDelete(path)}
                   onMove={(from, dir) => void handleMove(from, dir)}
                   onDropFiles={(dir, files) => void handleAddFiles(files, dir)}
+                  onPickFilesFor={(dir) => {
+                    pickerDir.current = dir
+                    filePicker.current?.click()
+                  }}
                 />
               )
             )}
           </div>
 
         </aside>
+        )}
 
         <main className="main">
           {selection && selection.kind !== 'markdown' ? (
@@ -862,4 +887,26 @@ function rollUp(node: VaultNode): { size: number; files: number } {
     files += inner.files
   }
   return { size, files }
+}
+
+/*
+ * 옆줄 접힘은 폴더가 아니라 화면 취향이라 localStorage 에 둡니다.
+ * 첫 그림부터 제 모습으로 그려야 펼쳤다 접히는 깜빡임이 없습니다.
+ */
+const SIDEBAR_KEY = 'mdwiki:sidebar-open'
+
+function readSidebarOpen(): boolean {
+  try {
+    return localStorage.getItem(SIDEBAR_KEY) !== 'off'
+  } catch {
+    return true
+  }
+}
+
+function writeSidebarOpen(open: boolean): void {
+  try {
+    localStorage.setItem(SIDEBAR_KEY, open ? 'on' : 'off')
+  } catch {
+    // 저장이 막혀 있어도 이번에는 그대로 적용됩니다.
+  }
 }

@@ -94,26 +94,25 @@ export function SyncIcon(props: IconProps) {
   )
 }
 
-/*
- * 설정. 톱니는 16px 에서 이빨이 서로 붙어 뭉개집니다.
- * 획이 성긴 조절 손잡이 모양이 이 크기에서 훨씬 또렷합니다.
- */
+/** 설정. 톱니 좌표는 원을 여덟로 나눠 계산해 두어 이빨이 고르게 벌어집니다. */
 export function SettingsIcon(props: IconProps) {
   return (
     <Svg {...props}>
-      <path d="M2.4 5.4h11.2M2.4 10.6h11.2" />
-      <circle cx="10.2" cy="5.4" r="2.2" />
-      <circle cx="5.8" cy="10.6" r="2.2" />
+      <path d="M6.12 1.93 L9.88 1.93 L10.02 3.92 L9.45 3.69 L10.96 2.38 L13.62 5.04 L12.31 6.55 L12.08 5.98 L14.07 6.12 L14.07 9.88 L12.08 10.02 L12.31 9.45 L13.62 10.96 L10.96 13.62 L9.45 12.31 L10.02 12.08 L9.88 14.07 L6.12 14.07 L5.98 12.08 L6.55 12.31 L5.04 13.62 L2.38 10.96 L3.69 9.45 L3.92 10.02 L1.93 9.88 L1.93 6.12 L3.92 5.98 L3.69 6.55 L2.38 5.04 L5.04 2.38 L6.55 3.69 L5.98 3.92 Z" />
+      <circle cx="8" cy="8" r="2.1" />
     </Svg>
   )
 }
 
-/** 폴더와의 연결을 끊는다는 뜻으로, 폴더에서 빠져나가는 화살표를 씁니다. */
-export function FolderExitIcon(props: IconProps) {
+/*
+ * 폴더 닫기. 빠져나가는 화살표는 뜻이 흐려서, 새 폴더 아이콘과 같은 폴더 위에
+ * X 를 얹었습니다. 나란히 놓였을 때 더하기와 가위표로 뜻이 바로 갈립니다.
+ */
+export function FolderCloseIcon(props: IconProps) {
   return (
     <Svg {...props}>
-      <path d="M8.2 13H2.6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h3.1l1.3 1.6h5.4a1 1 0 0 1 1 1v1.6" />
-      <path d="M10.4 10.2h4.2M12.8 8.4l1.8 1.8-1.8 1.8" />
+      <path d="M1.6 12V4a1 1 0 0 1 1-1h3.1l1.3 1.6h6.4a1 1 0 0 1 1 1V12a1 1 0 0 1-1 1H2.6a1 1 0 0 1-1-1z" />
+      <path d="M6.4 7.5l3.2 3.2M9.6 7.5l-3.2 3.2" />
     </Svg>
   )
 }
@@ -142,6 +141,112 @@ export function ClipIcon(props: IconProps) {
   return (
     <Svg {...props}>
       <path d="M11.6 7.4l-4.3 4.3a2.4 2.4 0 0 1-3.4-3.4l5.2-5.2a1.7 1.7 0 0 1 2.4 2.4l-5 5a.85.85 0 0 1-1.2-1.2l4.6-4.6" />
+    </Svg>
+  )
+}
+
+/** 폴더가 펼쳐졌는지 접혔는지. 펼쳐지면 CSS 로 90도 돌립니다. */
+export function ChevronIcon(props: IconProps) {
+  return (
+    <svg
+      className={props.className ? `icon ${props.className}` : 'icon'}
+      viewBox="0 0 16 16"
+      width="12"
+      height="12"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path d="M6 3.5L10.5 8 6 12.5" />
+    </svg>
+  )
+}
+
+/*
+ * 이름 앞에 서는 종류 아이콘입니다. 색으로 종류를 가릅니다.
+ * 옅게 채우고 테두리를 둘러야 이 크기에서도 형태와 색이 함께 보입니다.
+ */
+function TintedSvg({ children, className }: IconProps & { children: React.ReactNode }) {
+  return (
+    <svg
+      className={className ? `icon ${className}` : 'icon'}
+      viewBox="0 0 16 16"
+      width="15"
+      height="15"
+      fill="currentColor"
+      fillOpacity="0.18"
+      stroke="currentColor"
+      strokeWidth="1.4"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      focusable="false"
+    >
+      {children}
+    </svg>
+  )
+}
+
+export function FolderIcon(props: IconProps) {
+  return (
+    <TintedSvg {...props}>
+      <path d="M1.7 12.2V4.1a.9.9 0 0 1 .9-.9h3l1.3 1.6h6.4a.9.9 0 0 1 .9.9v6.5a.9.9 0 0 1-.9.9H2.6a.9.9 0 0 1-.9-.9z" />
+    </TintedSvg>
+  )
+}
+
+export function DocIcon(props: IconProps) {
+  return (
+    <TintedSvg {...props}>
+      <path d="M3.9 2.2h4.4l3.8 3.7v7.9a.8.8 0 0 1-.8.8H3.9a.8.8 0 0 1-.8-.8V3a.8.8 0 0 1 .8-.8z" />
+      <path d="M8.3 2.3v3.7h3.7" fill="none" />
+    </TintedSvg>
+  )
+}
+
+export function ImageIcon(props: IconProps) {
+  return (
+    <TintedSvg {...props}>
+      <rect x="1.9" y="3.2" width="12.2" height="9.6" rx="1.1" />
+      <path d="M2.4 11.2l3.3-3.3 2.4 2.4 2.1-2.1 3.3 3.3" fill="none" strokeLinecap="round" />
+      <circle cx="5.7" cy="6.1" r="1" fill="none" />
+    </TintedSvg>
+  )
+}
+
+export function TrashIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M2.9 4.3h10.2M6.4 4.3V2.9a.7.7 0 0 1 .7-.7h1.8a.7.7 0 0 1 .7.7v1.4" />
+      <path d="M4.2 4.3l.6 8.4a.9.9 0 0 0 .9.8h4.6a.9.9 0 0 0 .9-.8l.6-8.4" />
+      <path d="M6.7 6.8v4M9.3 6.8v4" />
+    </Svg>
+  )
+}
+
+/*
+ * 옆줄 접기·펴기. 지금 접혀 있는지 펴져 있는지가 아니라
+ * "누르면 어떻게 되는지"를 보여 줍니다. 꺾쇠가 가는 방향이 곧 트리가 갈 방향입니다.
+ */
+export function SidebarCloseIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <rect x="1.8" y="2.8" width="12.4" height="10.4" rx="1.4" />
+      <path d="M6.4 2.8v10.4" />
+      <path d="M11.6 6.2L9.4 8l2.2 1.8" />
+    </Svg>
+  )
+}
+
+export function SidebarOpenIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <rect x="1.8" y="2.8" width="12.4" height="10.4" rx="1.4" />
+      <path d="M6.4 2.8v10.4" />
+      <path d="M9.4 6.2L11.6 8l-2.2 1.8" />
     </Svg>
   )
 }

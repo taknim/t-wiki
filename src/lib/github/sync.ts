@@ -233,7 +233,7 @@ function commitMessage(uploads: string[], deletions: string[]): string {
     ...deletions.map((path) => `- ${path}`),
   ].join('\n')
 
-  return `mdwiki: ${parts.join(', ')}\n\n${body}`
+  return `t-WiKi: ${parts.join(', ')}\n\n${body}`
 }
 
 export interface ApplyOptions {
