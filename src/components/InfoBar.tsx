@@ -4,6 +4,7 @@ import type { Heading } from '../lib/markdown'
 import { formatBytes } from '../lib/attachments'
 import { Backlinks } from './Backlinks'
 import { Toc } from './Toc'
+import { displayPath } from '../lib/paths'
 
 /** 첨부는 이미지와 그 밖의 문서로 나눠 표시합니다. */
 export type SelectionKind = 'markdown' | 'image' | 'document' | 'dir'
@@ -43,7 +44,7 @@ export function InfoBar({ info, headings, index, showToc, onOpen }: InfoBarProps
   const toggle = (next: Panel) => setPanel((current) => (current === next ? null : next))
 
   // 최상위 폴더는 경로가 비어 있으므로 폴더 이름을 씁니다.
-  const fullPath = info.path || info.name
+  const fullPath = displayPath(info.path)
 
   return (
     <div className="info-dock">

@@ -1,5 +1,5 @@
 import type { DocIndex, SearchHit } from '../types'
-import { titleOf } from './wikilinks'
+import { fileNameOf } from './paths'
 
 const CONTEXT = 40
 
@@ -37,7 +37,7 @@ export function searchDocs(query: string, index: DocIndex, limit = 50): SearchHi
 
   const hits: SearchHit[] = []
   for (const entry of index.values()) {
-    const title = titleOf(entry.path)
+    const title = fileNameOf(entry.path)
     const titleMatches = findAll(title, needle).length
     const bodyMatches = findAll(entry.content, needle)
 

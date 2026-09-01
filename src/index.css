@@ -115,6 +115,8 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .status-error { color: var(--danger); }
 
 .panel-empty { color: var(--text-muted); font-size: 13px; margin: 8px 0; }
+/* 굴림 칸 안에서는 검색란 왼쪽 끝에 맞춥니다. 10px - 굴림 칸 여백 6px = 4px */
+.sidebar-scroll .panel-empty, .sidebar-scroll .tree-empty { padding-inline-start: 4px; }
 
 /* ---------- 시작 화면 ---------- */
 
@@ -286,10 +288,15 @@ button, input, select, textarea { font: inherit; color: inherit; }
  * 뿌리 줄. 폴더 전체를 가리키므로 트리 맨 위에 한 줄로 세웁니다.
  * 단추는 늘 쓰는 것들이라 다른 줄과 달리 감추지 않습니다.
  */
-.tree-root {
+.tree-row.tree-root {
   position: sticky;
   top: 0;
   z-index: 1;
+  /*
+   * 검색란 왼쪽 끝(옆줄에서 10px)에 맞춥니다. 굴림 칸이 6px 을 먹으므로 4px 만
+   * 더 둡니다. 아래 줄들보다 앞으로 나와야 가장 위라는 것이 드러납니다.
+   */
+  padding-inline-start: 4px;
   margin-block-end: 2px;
   background: var(--bg-sunken);
   border-block-end: 1px solid var(--border);
@@ -304,7 +311,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
   justify-content: center;
   padding: 3px;
 }
-.tree-empty { color: var(--text-muted); font-size: 13px; padding: 8px; }
+.tree-empty { color: var(--text-muted); font-size: 13px; padding: 8px 0; }
 
 .tree-row {
   display: flex;

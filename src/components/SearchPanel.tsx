@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import type { DocIndex } from '../types'
 import { searchDocs } from '../lib/search'
+import { displayPath } from '../lib/paths'
 
 interface SearchPanelProps {
   query: string
@@ -20,7 +21,7 @@ export function SearchPanel({ query, index, onOpen }: SearchPanelProps) {
         <li key={hit.path}>
           <button type="button" onClick={() => onOpen(hit.path)}>
             <span className="search-title">{hit.title}</span>
-            <span className="search-path">{hit.path}</span>
+            <span className="search-path">{displayPath(hit.path)}</span>
             <span className="search-snippet">
               {hit.snippet.map((piece, position) =>
                 piece.hit ? <mark key={position}>{piece.text}</mark> : <span key={position}>{piece.text}</span>,

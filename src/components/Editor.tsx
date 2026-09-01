@@ -10,6 +10,27 @@ interface EditorProps {
   onSave: () => void
 }
 
+/*
+ * 편집기 안내 문구. 마크다운만 다루는 것이 아니므로 종류에 맞춰 다르게 말합니다.
+ * 서식 도구는 마크다운 문법을 넣으므로 그 이야기도 마크다운에서만 합니다.
+ */
+const PLACEHOLDERS: Record<string, string> = {
+  md: '마크다운으로 작성하세요. 글자를 선택하면 서식 도구가 나타납니다.',
+  csv: '쉼표로 칸을 나눠 적으면 미리보기에서 표로 보여 줍니다.',
+  tsv: '탭으로 칸을 나눠 적으면 미리보기에서 표로 보여 줍니다.',
+  json: 'JSON 으로 작성하세요. 저장할 때 들여쓰기를 맞춰 줍니다.',
+  yaml: 'YAML 로 작성하세요.',
+  yml: 'YAML 로 작성하세요.',
+  html: 'HTML 로 작성하세요. 미리보기에서 그려진 결과를 볼 수 있습니다.',
+  htm: 'HTML 로 작성하세요. 미리보기에서 그려진 결과를 볼 수 있습니다.',
+  xml: 'XML 로 작성하세요.',
+}
+
+function placeholderFor(path: string): string {
+  const extension = path.split('.').pop()?.toLowerCase() ?? ''
+  return PLACEHOLDERS[extension] ?? '내용을 입력하세요.'
+}
+
 /** ⌘/Ctrl 과 함께 눌렀을 때 바로 적용되는 서식. */
 const SHORTCUTS: Record<string, FormatId> = {
   b: 'bold',
@@ -130,7 +151,7 @@ export function Editor({ value, path, onChange, onSave }: EditorProps) {
           if (event.relatedTarget instanceof Element && event.relatedTarget.closest('.format-toolbar')) return
           setBox(null)
         }}
-        placeholder="마크다운으로 작성하세요. 글자를 선택하면 서식 도구가 나타납니다."
+        placeholder={placeholderFor(path)}
       />
       {box && <FormatToolbar box={box} onApply={runFormat} />}
     </>

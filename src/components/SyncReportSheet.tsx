@@ -1,5 +1,6 @@
 import type { SyncPlanItem } from '../types'
 import type { SyncReport } from '../hooks/useGitHubSync'
+import { displayPath } from '../lib/paths'
 
 const ACTION_LABEL: Record<SyncPlanItem['action'], string> = {
   'upload-new': '커밋(신규)',
@@ -81,7 +82,7 @@ export function SyncReportSheet({ report, onClose, onConfirm }: SyncReportSheetP
                 {changed.map((item) => (
                   <li key={item.path} className={`plan-${item.action}`}>
                     <span className="plan-action">{ACTION_LABEL[item.action]}</span>
-                    <span className="plan-path">{item.path}</span>
+                    <span className="plan-path">{displayPath(item.path)}</span>
                     <span className="plan-reason">{item.reason}</span>
                   </li>
                 ))}
@@ -118,7 +119,7 @@ export function SyncReportSheet({ report, onClose, onConfirm }: SyncReportSheetP
                     className={line.status === 'error' ? 'plan-error' : `plan-${line.action}`}
                   >
                     <span className="plan-action">{ACTION_LABEL[line.action]}</span>
-                    <span className="plan-path">{line.path}</span>
+                    <span className="plan-path">{displayPath(line.path)}</span>
                     <span className="plan-reason">{line.detail}</span>
                   </li>
                 ))}

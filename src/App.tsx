@@ -25,7 +25,7 @@ import { extractHeadings, parseFrontmatter } from './lib/markdown'
 import { readFile } from './lib/fsAccess'
 import { loadSession, saveSession } from './lib/session'
 import { reindentJson, textPreviewKind } from './lib/textPreview'
-import { titleOf } from './lib/wikilinks'
+import { displayPath, fileNameOf } from './lib/paths'
 import type { CSSProperties } from 'react'
 import type { ViewMode, VaultNode } from './types'
 
@@ -442,11 +442,10 @@ export default function App() {
 
   const handleRename = useCallback(
     async (path: string) => {
-      const isDoc = path.toLowerCase().endsWith('.md')
-      const current = isDoc ? titleOf(path) : (path.split('/').pop() ?? path)
+      const current = fileNameOf(path)
       const name = await dialogs.prompt({
         title: '이름 바꾸기',
-        label: path,
+        label: displayPath(path),
         defaultValue: current,
         confirmText: '바꾸기',
       })
@@ -467,7 +466,9 @@ export default function App() {
       const isDoc = path.toLowerCase().endsWith('.md')
       const ok = await dialogs.confirm({
         title: isDoc ? '문서를 삭제할까요?' : '폴더를 삭제할까요?',
-        label: isDoc ? path : `"${path}" 와 그 안의 모든 내용이 지워집니다. 되돌릴 수 없습니다.`,
+        label: isDoc
+          ? displayPath(path)
+          : `"${displayPath(path)}" 와 그 안의 모든 내용이 지워집니다. 되돌릴 수 없습니다.`,
         confirmText: '삭제',
         danger: true,
       })
@@ -506,7 +507,7 @@ export default function App() {
       if (resolved) return openDoc(resolved)
       const ok = await dialogs.confirm({
         title: '문서를 새로 만들까요?',
-        label: `"${target}" 문서가 아직 없습니다. ${currentDir || '최상위'} 에 만듭니다.`,
+        label: `"${target}" 문서가 아직 없습니다. ${displayPath(currentDir)} 에 만듭니다.`,
         confirmText: '만들기',
       })
       if (!ok) return
@@ -754,7 +755,6 @@ export default function App() {
             <>
               <div className="doc-head">
                 <h1>{selection.name}</h1>
-                <span className="doc-path">{selection.path || '최상위'}</span>
                 {editableText && (
                   <span className={dirty ? 'pill' : 'pill pill-ok'}>{dirty ? '저장 중…' : '저장됨'}</span>
                 )}
@@ -794,8 +794,7 @@ export default function App() {
           ) : selectedPath ? (
             <>
               <div className="doc-head">
-                <h1>{titleOf(selectedPath)}</h1>
-                <span className="doc-path">{selectedPath}</span>
+                <h1>{fileNameOf(selectedPath)}</h1>
                 <span className={dirty ? 'pill' : 'pill pill-ok'}>{dirty ? '저장 중…' : '저장됨'}</span>
                 <ViewModeSwitch mode={viewMode} onChange={setViewMode} />
               </div>

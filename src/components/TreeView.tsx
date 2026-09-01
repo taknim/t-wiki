@@ -6,7 +6,6 @@ import {
 } from './icons'
 import { attachmentKind } from '../lib/attachments'
 import { isMarkdown } from '../lib/attachments'
-import { titleOf } from '../lib/wikilinks'
 
 export interface TreeActions {
   onSelect: (path: string) => void
@@ -74,7 +73,6 @@ export function TreeView({
         className={props.selectedPath === '' ? 'tree-row tree-root is-selected' : 'tree-row tree-root'}
         onClick={() => props.onSelectDir('')}
       >
-        <span className="tree-caret" />
         <span className="tree-icon is-dir"><FolderIcon /></span>
         <span className="tree-name">{rootName}</span>
         {/* 뿌리 줄의 단추는 늘 보입니다. 다른 줄과 달리 늘 쓰는 것들입니다. */}
@@ -172,7 +170,7 @@ function TreeRow({ node, depth, selectedPath, expanded, onToggle, ...actions }: 
           {isDir ? <FolderIcon /> : kindOf(node) === 'image' ? <ImageIcon /> : <DocIcon />}
         </span>
         <span className="tree-name">
-          {isDir || !isMarkdown(node.name) ? node.name : titleOf(node.name)}
+          {node.name}
         </span>
 
         <span className="tree-tools" onClick={(event) => event.stopPropagation()}>

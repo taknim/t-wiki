@@ -1,4 +1,5 @@
 import type { DocIndex } from '../types'
+import { fileNameOf } from './paths'
 
 const WIKILINK = /\[\[([^\][|]+)(?:\|([^\]]+))?\]\]/g
 const FENCE = /^```[\s\S]*?^```/gm
@@ -68,7 +69,7 @@ export function backlinksFor(targetPath: string, index: DocIndex): Backlink[] {
       }
     }
     if (contexts.length > 0) {
-      results.push({ path: entry.path, title: titleOf(entry.path), contexts })
+      results.push({ path: entry.path, title: fileNameOf(entry.path), contexts })
     }
   }
 
