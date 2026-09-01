@@ -1089,3 +1089,17 @@ mark { background: var(--mark); color: inherit; border-radius: 2px; }
   border-radius: 8px;
   background: #fff;
 }
+
+/* ---------- 자동 동기화 남은 시간 ---------- */
+
+.sync-countdown {
+  /* 숫자가 1초마다 바뀌어도 폭이 흔들리지 않게 고정폭으로 둡니다. */
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  min-width: 4.5em;
+  text-align: center;
+}
+.sync-countdown.is-running {
+  color: var(--accent);
+  border-color: currentColor;
+}

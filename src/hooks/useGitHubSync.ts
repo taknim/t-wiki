@@ -53,6 +53,8 @@ export interface GitHubSync {
   status: SyncStatus
   report: SyncReport | null
   lastSyncAt: number | null
+  /** 다음 자동 동기화 예정 시각. 꺼져 있으면 null. */
+  nextAutoSyncAt: number | null
   update: (patch: Partial<GitHubConfig>) => void
   run: (trigger?: 'manual' | 'auto') => Promise<void>
   /** 대상이 바뀌어 멈춘 계획을 그대로 진행합니다. */
@@ -109,6 +111,7 @@ export function useGitHubSync({ root, docs, assets, onBeforeSync, onLocalChanged
   const [status, setStatus] = useState<SyncStatus>(IDLE)
   const [report, setReport] = useState<SyncReport | null>(null)
   const [lastSyncAt, setLastSyncAt] = useState<number | null>(null)
+  const [nextAutoSyncAt, setNextAutoSyncAt] = useState<number | null>(null)
 
   // 타이머에서 부를 때 오래된 값을 붙잡지 않도록 최신 상태를 ref 로도 들고 있습니다.
   // 설정만은 실행 직전에 저장소에서 다시 읽으므로 여기 두지 않습니다.
@@ -311,17 +314,36 @@ export function useGitHubSync({ root, docs, assets, onBeforeSync, onLocalChanged
   const isConfigured = isReady(config)
   const autoOn = loaded && config.autoSync && isConfigured && root !== null
 
-  // 켜져 있으면 볼트를 연 직후 한 번, 그 뒤로는 정해진 간격마다 돕니다.
+  /**
+   * 켜져 있으면 볼트를 연 직후 한 번, 그 뒤로는 정해진 간격마다 돕니다.
+   *
+   * setInterval 대신 한 번 돌 때마다 다시 잡습니다.
+   * 그래야 동기화에 걸린 시간과 무관하게 다음 예정 시각이 정확해지고,
+   * 그 값을 화면에 남은 시간으로 보여 줄 수 있습니다.
+   */
   useEffect(() => {
     if (!autoOn) return
 
     const minutes = Math.min(Math.max(config.autoSyncMinutes, 1), 1440)
-    const first = window.setTimeout(() => void runRef.current('auto'), FIRST_RUN_DELAY)
-    const repeat = window.setInterval(() => void runRef.current('auto'), minutes * 60_000)
+    let timer = 0
+    let cancelled = false
+
+    const schedule = (delay: number) => {
+      setNextAutoSyncAt(Date.now() + delay)
+      timer = window.setTimeout(() => {
+        void (async () => {
+          await runRef.current('auto')
+          if (!cancelled) schedule(minutes * 60_000)
+        })()
+      }, delay)
+    }
+
+    schedule(FIRST_RUN_DELAY)
 
     return () => {
-      window.clearTimeout(first)
-      window.clearInterval(repeat)
+      cancelled = true
+      window.clearTimeout(timer)
+      setNextAutoSyncAt(null)
     }
   }, [autoOn, config.autoSyncMinutes])
 
@@ -329,6 +351,8 @@ export function useGitHubSync({ root, docs, assets, onBeforeSync, onLocalChanged
 
   return {
     config, loaded, isConfigured, status, report, lastSyncAt,
+    // 꺼져 있으면 예정 시각도 없는 것으로 봅니다. 상태가 남아 있어도 화면에는 안 나옵니다.
+    nextAutoSyncAt: autoOn ? nextAutoSyncAt : null,
     update, run, confirmTarget, dismissReport,
   }
 }

@@ -6,6 +6,7 @@ import { AssetView } from './components/AssetView'
 import { FolderView } from './components/FolderView'
 import { InfoBar, type SelectionInfo } from './components/InfoBar'
 import { SearchPanel } from './components/SearchPanel'
+import { SyncCountdown } from './components/SyncCountdown'
 import { TextPreview } from './components/TextPreview'
 import { SettingsPanel } from './components/SettingsPanel'
 import { SyncReportSheet } from './components/SyncReportSheet'
@@ -622,13 +623,12 @@ export default function App() {
               ? `동기화 중…${sync.status.progress ? ` ${sync.status.progress.done}/${sync.status.progress.total}` : ''}`
               : 'GitHub 동기화'}
           </button>
-          {sync.config.autoSync && sync.isConfigured && (
-            <span
-              className="pill"
-              data-tip={`${sync.config.autoSyncMinutes}분마다 자동으로 동기화합니다`}
-            >
-              자동 {sync.config.autoSyncMinutes}분
-            </span>
+          {sync.nextAutoSyncAt !== null && (
+            <SyncCountdown
+              nextAt={sync.nextAutoSyncAt}
+              minutes={sync.config.autoSyncMinutes}
+              running={sync.status.phase === 'running'}
+            />
           )}
           <button
             type="button"
