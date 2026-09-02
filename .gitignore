@@ -156,3 +156,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# 시험이 남기는 화면 갈무리와 내려받은 파일
+tests/shots/
+tests/downloads/

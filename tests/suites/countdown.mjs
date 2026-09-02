@@ -1,0 +1,163 @@
+import { chromium } from 'playwright'
+import { readFileSync, mkdirSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { createGitHubMock } from '../github-mock.mjs'
+
+const HERE = dirname(fileURLToPath(import.meta.url))
+mkdirSync(join(HERE, '..', 'shots', 'countdown'), { recursive: true })
+const problems = []
+const step = (n) => console.log('\n>>> ' + n)
+const ok = (n) => console.log('  ok  ' + n)
+const fail = (n, d) => { problems.push(n); console.log('FAIL  ' + n + '\n      ' + d) }
+const expect = (n, c, d = '') => (c ? ok(n) : fail(n, d))
+
+const github = createGitHubMock()
+const browser = await chromium.launch({ channel: 'chrome' })
+const page = await browser.newPage({ viewport: { width: 1400, height: 920 } })
+const errors = []
+page.on('pageerror', (e) => errors.push('pageerror: ' + e.message))
+await page.route('https://api.github.com/**', github.handler)
+await page.addInitScript(readFileSync(join(HERE, '..', 'mock-fs.js'), 'utf8'))
+await page.addInitScript(() => {
+  window.__installMockFs()
+  const first = window.__mockRoot
+  const second = Object.create(Object.getPrototypeOf(first))
+  Object.assign(second, { kind: 'directory', name: '다른 폴더', _children: new Map() })
+  window.__vaults = { first, second }
+  window.__pick = 'first'
+  window.showDirectoryPicker = async () => window.__vaults[window.__pick]
+})
+
+const seconds = (text) => text.trim().split(':').map(Number).reduce((t, p) => t * 60 + p, 0)
+const countdown = () => page.textContent('.sync-countdown')
+const openVault = async (which) => {
+  await page.evaluate((w) => { window.__pick = w; window.__mockRoot = window.__vaults[w] }, which)
+  await page.click('button:has-text("폴더 열기")')
+  await page.waitForSelector('.tree', { timeout: 10000 })
+  await page.waitForTimeout(600)
+}
+const closeVault = async () => {
+  if (await page.locator('.sheet-close').count()) { await page.click('.sheet-close'); await page.waitForTimeout(200) }
+  await page.click('.tree-root button[aria-label="폴더 닫기"]')
+  await page.waitForSelector('button:has-text("폴더 열기")', { timeout: 8000 })
+  await page.waitForTimeout(300)
+}
+const configure = async (minutes) => {
+  await page.click('button[aria-label="설정"]')
+  await page.waitForSelector('.settings-nav')
+  await page.click('.settings-nav button:has-text("GitHub 동기화")')
+  await page.fill('#gh-token', 'pat')
+  await page.fill('#gh-owner', 'tester')
+  await page.fill('.row input[placeholder="저장소 이름"]', 'wiki')
+  await page.click('.checkbox:has-text("정해진 간격마다") input')
+  await page.fill('#gh-interval', String(minutes))
+  await page.waitForTimeout(400)
+  await page.click('.sheet-close')
+  await page.waitForSelector('.sync-countdown', { timeout: 8000 })
+}
+
+try {
+  await page.goto('http://localhost:5173', { waitUntil: 'domcontentloaded' })
+
+  step('1. 켜면 정해진 간격에서 시작한다')
+  await openVault('first')
+  await configure(5)
+  const first = await countdown()
+  console.log('  처음 표시: ' + first)
+  expect('mm:ss 꼴', /^\d{2}:\d{2}$/.test(first.trim()), first)
+  expect('간격에서 시작', seconds(first) > 4 * 60 + 50, first)
+
+  step('2. 1초마다 줄어든다')
+  const samples = [first.trim()]
+  for (let i = 0; i < 3; i += 1) {
+    await page.waitForTimeout(1100)
+    samples.push((await countdown()).trim())
+  }
+  console.log('  ' + JSON.stringify(samples))
+  const ticks = samples.map(seconds)
+  expect('값이 계속 줄어듦', ticks.every((v, i) => i === 0 || v < ticks[i - 1]), JSON.stringify(samples))
+
+  step('3. 새로고침하면 다시 간격에서 시작한다')
+  // 예전에는 새로고침하면 곧바로 도는 짧은 차례가 잡혀 00:05 부터 셌습니다.
+  await page.reload({ waitUntil: 'domcontentloaded' })
+  await openVault('first')
+  await page.waitForSelector('.sync-countdown', { timeout: 8000 })
+  await page.waitForTimeout(400)
+  const afterReload = await countdown()
+  console.log('  새로고침 뒤: ' + afterReload)
+  expect('간격에서 다시 시작', seconds(afterReload) > 4 * 60 + 45, afterReload)
+
+  step('4. 폴더를 다시 열어도 간격에서 시작한다')
+  await page.waitForTimeout(2500)
+  const beforeSwitch = await countdown()
+  await closeVault()
+  await openVault('first')
+  await page.waitForSelector('.sync-countdown', { timeout: 8000 })
+  await page.waitForTimeout(400)
+  const afterSwitch = await countdown()
+  console.log('  닫기 전 ' + beforeSwitch.trim() + ' → 다시 연 뒤 ' + afterSwitch.trim())
+  expect('앞서 세던 시간을 이어 가지 않음', seconds(afterSwitch) > seconds(beforeSwitch),
+    beforeSwitch + ' -> ' + afterSwitch)
+  expect('간격에서 다시 시작', seconds(afterSwitch) > 4 * 60 + 45, afterSwitch)
+
+  step('5. 다른 폴더로 옮기면 그 폴더 기준으로 새로 센다')
+  await closeVault()
+  await openVault('second')
+  await page.waitForTimeout(500)
+  expect('맞춰 두지 않은 폴더에는 표시가 없음',
+    (await page.locator('.sync-countdown').count()) === 0)
+  await configure(3)
+  const other = await countdown()
+  console.log('  둘째 폴더: ' + other)
+  // 남은 시간은 올림해서 보여 주므로 시작 직후에는 03:01 로 보일 수 있습니다.
+  expect('그 폴더의 간격에서 시작', seconds(other) > 2 * 60 + 50 && seconds(other) <= 3 * 60 + 2, other)
+
+  step('6. 간격이 다른 두 폴더를 오가도 서로의 시간을 물려받지 않는다')
+  /*
+   * 첫 폴더는 5분, 둘째는 3분입니다. 오갈 때마다 그 폴더의 간격에서 새로 세야 합니다.
+   * 앞 폴더에서 세던 값이 남아 있으면 여기서 걸립니다.
+   */
+  await page.waitForTimeout(2500)
+  for (const trip of [
+    { vault: 'first', minutes: 5 },
+    { vault: 'second', minutes: 3 },
+    { vault: 'first', minutes: 5 },
+  ]) {
+    await closeVault()
+    await openVault(trip.vault)
+    await page.waitForSelector('.sync-countdown', { timeout: 8000 })
+    // 뜨자마자 재 봅니다. 잠깐이라도 앞 폴더 값이 비치면 안 됩니다.
+    const shown = await countdown()
+    const want = trip.minutes * 60
+    console.log(`  ${trip.vault} (${trip.minutes}분): ${shown.trim()}`)
+    expect(`${trip.vault} 는 ${trip.minutes}분에서 시작`,
+      seconds(shown) > want - 10 && seconds(shown) <= want + 2, shown)
+    await page.waitForTimeout(2200)
+  }
+
+  step('7. 간격을 바꾸면 그 자리에서 새로 센다')
+  await page.click('button[aria-label="설정"]')
+  await page.waitForSelector('.settings-nav')
+  await page.click('.settings-nav button:has-text("GitHub 동기화")')
+  await page.fill('#gh-interval', '9')
+  await page.waitForTimeout(500)
+  await page.click('.sheet-close')
+  await page.waitForTimeout(400)
+  const changed = await countdown()
+  console.log('  9분으로 바꾼 뒤: ' + changed.trim())
+  expect('바꾼 간격에서 시작', seconds(changed) > 8 * 60 + 50, changed)
+
+  step('8. 콘솔 오류')
+  const real = errors.filter((l) => !l.includes('404') && !l.includes('Failed to load resource'))
+  if (real.length > 0) fail('콘솔', real.join('\n      '))
+  else ok('콘솔 오류 없음')
+} catch (e) {
+  fail('실행 중단', e.stack ?? e.message)
+} finally {
+  await browser.close()
+}
+
+console.log('\n' + '='.repeat(50))
+if (problems.length === 0) console.log('전부 통과')
+else { console.log('실패 ' + problems.length + '건'); problems.forEach((p) => console.log(' - ' + p)); process.exitCode = 1 }
