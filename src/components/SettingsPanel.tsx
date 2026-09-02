@@ -6,7 +6,9 @@ import {
 import type { GitHubSync } from '../hooks/useGitHubSync'
 import { GitHubSettings } from './GitHubSettings'
 import { clearSessions, isRememberEnabled, setRememberEnabled } from '../lib/session'
-import { readSaveOptions, writeSaveOptions, type SaveOptions } from '../lib/saveOptions'
+import {
+  readIncludeToken, readSaveOptions, writeIncludeToken, writeSaveOptions, type SaveOptions,
+} from '../lib/saveOptions'
 import { buildBundle, bundleFileName, parseBundle } from '../lib/settingsFile'
 import { useTheme } from './themeContext'
 
@@ -43,7 +45,7 @@ export function SettingsPanel({
   const { settings, isDark, update } = useTheme()
   const [tab, setTab] = useState<TabId>(initialTab)
   const [saveOptions, setSaveOptions] = useState<SaveOptions>(readSaveOptions)
-  const [includeToken, setIncludeToken] = useState(false)
+  const [includeToken, setIncludeToken] = useState(readIncludeToken)
   const [transfer, setTransfer] = useState<string | null>(null)
   const bundleInput = useRef<HTMLInputElement>(null)
 
@@ -81,6 +83,8 @@ export function SettingsPanel({
     setRemember(bundle.general.rememberSession)
     setRememberEnabled(bundle.general.rememberSession)
     onSidebarOpen(bundle.general.sidebarOpen)
+    setIncludeToken(bundle.general.includeToken)
+    writeIncludeToken(bundle.general.includeToken)
     const next = {
       trimWhitespace: bundle.general.trimWhitespace,
       tidyFormat: bundle.general.tidyFormat,
@@ -297,7 +301,10 @@ export function SettingsPanel({
                 <input
                   type="checkbox"
                   checked={includeToken}
-                  onChange={(event) => setIncludeToken(event.target.checked)}
+                  onChange={(event) => {
+                    setIncludeToken(event.target.checked)
+                    writeIncludeToken(event.target.checked)
+                  }}
                 />
                 액세스 토큰도 함께 내보내기
                 <span className="hint">

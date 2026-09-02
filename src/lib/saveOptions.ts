@@ -60,3 +60,28 @@ export function writeSidebarOpen(open: boolean): void {
     // 저장이 막혀 있어도 이번에는 그대로 적용됩니다.
   }
 }
+
+/*
+ * 설정을 내보낼 때 액세스 토큰까지 담을지.
+ *
+ * 다른 취향과 같이 기억해 둡니다. 켤 때마다 다시 켜야 하면 성가십니다.
+ * 대신 켜져 있다는 것이 눈에 보여야 하므로, 체크 칸과 안내를 내보내기 단추 바로 옆에 둡니다.
+ * 기본은 꺼짐입니다. 비밀이 파일에 적히는 일을 기본으로 삼을 수는 없습니다.
+ */
+const EXPORT_TOKEN = 'mdwiki:export-token'
+
+export function readIncludeToken(): boolean {
+  try {
+    return localStorage.getItem(EXPORT_TOKEN) === 'on'
+  } catch {
+    return false
+  }
+}
+
+export function writeIncludeToken(include: boolean): void {
+  try {
+    localStorage.setItem(EXPORT_TOKEN, include ? 'on' : 'off')
+  } catch {
+    // 저장이 막혀 있어도 이번에는 그대로 적용됩니다.
+  }
+}

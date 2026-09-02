@@ -104,6 +104,13 @@ try {
     clip: { x: 300, y: 90, width: 820, height: 620 } })
   await page.click('.sheet-close')
 
+  step('3-2. 토큰 포함 여부를 기억한다')
+  // 설정 창을 열 때마다 다시 켜야 하면 성가십니다.
+  await openSettings()
+  const remembered = await page.locator('.checkbox:has-text("액세스 토큰도 함께") input').isChecked()
+  expect('창을 다시 열어도 켜져 있음', remembered, String(remembered))
+  await page.click('.sheet-close')
+
   step('4. 다른 폴더에서 가져오면 그 폴더에 들어간다')
   await closeVault()
   await openVault('second')
@@ -174,16 +181,18 @@ try {
   await page.click('.sidebar-toggle')
   await page.waitForTimeout(400)
 
+  await openSettings()
+  const both = await exportTo(true)
+  await page.click('.sheet-close')
+  await page.waitForTimeout(300)
+
+  // 내보내기 갈래도 기억되는 값이므로, 내보낸 뒤에 적어 둡니다.
   const before = await page.evaluate(() =>
     Object.fromEntries(Object.keys(localStorage)
       .filter((key) => key.startsWith('mdwiki:'))
       .sort()
       .map((key) => [key, localStorage.getItem(key)])))
   console.log('  내보내기 전: ' + JSON.stringify(before))
-
-  await openSettings()
-  const both = await exportTo(true)
-  await page.click('.sheet-close')
 
   // 전부 되돌려 놓고, 들여와서 제자리로 돌아오는지 봅니다.
   await page.evaluate(() => {
