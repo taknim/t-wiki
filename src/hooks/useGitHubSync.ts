@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { AssetIndex, DocIndex, GitHubConfig, SyncLogLine, SyncPlanItem } from '../types'
 import { applyPlan, buildPlan, localShas, scanRemote } from '../lib/github/sync'
 import { vaultKeyFor } from '../lib/vaultKey'
+import type { SyncHistoryEntry } from '../lib/store'
 import {
   loadGitHubConfig,
   loadLastSyncAt,
@@ -11,6 +12,9 @@ import {
   saveSyncState,
   syncSignature,
   hasAnyBaseline,
+  loadSyncHistory,
+  appendSyncHistory,
+  clearSyncHistory,
   migrateLegacy,
   clearGitHubConfig,
 } from '../lib/store'
@@ -60,6 +64,9 @@ export interface GitHubSync {
   status: SyncStatus
   report: SyncReport | null
   lastSyncAt: number | null
+  /** 최근 동기화 기록. 무언가 오갔거나 실패한 회차만 남습니다. */
+  history: SyncHistoryEntry[]
+  clearHistory: () => Promise<void>
   /** 다음 자동 동기화 예정 시각. 꺼져 있으면 null. */
   nextAutoSyncAt: number | null
   update: (patch: Partial<GitHubConfig>) => void
@@ -130,6 +137,7 @@ export function useGitHubSync({ root, docs, assets, onBeforeSync, onLocalChanged
    * 효과가 다시 돌지 않아 앞서 세던 시간이 그대로 이어지기 때문입니다.
    */
   const [scheduleEpoch, setScheduleEpoch] = useState(0)
+  const [history, setHistory] = useState<SyncHistoryEntry[]>([])
 
   // 타이머에서 부를 때 오래된 값을 붙잡지 않도록 최신 상태를 ref 로도 들고 있습니다.
   // 설정만은 실행 직전에 저장소에서 다시 읽으므로 여기 두지 않습니다.
@@ -192,12 +200,14 @@ export function useGitHubSync({ root, docs, assets, onBeforeSync, onLocalChanged
 
       const saved = await loadGitHubConfig(key)
       const at = await loadLastSyncAt(key)
+      const past = await loadSyncHistory(key)
       if (cancelled) return
 
       vaultKeyRef.current = key
       setVaultKey(key)
       setConfig({ ...DEFAULT_GITHUB_CONFIG, ...saved })
       setLastSyncAt(at ?? null)
+      setHistory(past)
       setLoaded(true)
     })()
 
@@ -307,6 +317,14 @@ export function useGitHubSync({ root, docs, assets, onBeforeSync, onLocalChanged
         setLastSyncAt(at)
 
         const failures = result.log.filter((line) => line.status === 'error')
+        setHistory(await appendSyncHistory(key, {
+          at,
+          trigger,
+          summary: summarize(result.log),
+          commitSha: result.commitSha,
+          error: null,
+          failed: failures.length,
+        }))
         setReport({ at, trigger, plan, log: result.log, commitSha: result.commitSha, error: null })
         setStatus({
           phase: failures.length > 0 ? 'error' : 'done',
@@ -315,6 +333,9 @@ export function useGitHubSync({ root, docs, assets, onBeforeSync, onLocalChanged
         })
       } catch (cause) {
         const message = cause instanceof Error ? cause.message : String(cause)
+        setHistory(await appendSyncHistory(key, {
+          at: Date.now(), trigger, summary: '실패', commitSha: null, error: message, failed: 0,
+        }))
         setReport({ at: Date.now(), trigger, plan: [], log: [], commitSha: null, error: message })
         setStatus({ phase: 'error', message, progress: null })
       }
@@ -408,6 +429,13 @@ export function useGitHubSync({ root, docs, assets, onBeforeSync, onLocalChanged
     setStatus(IDLE)
   }, [])
 
+  const clearHistory = useCallback(async () => {
+    const key = vaultKeyRef.current
+    if (!key) return
+    await clearSyncHistory(key)
+    setHistory([])
+  }, [])
+
   const restartAutoSync = useCallback(() => setScheduleEpoch((epoch) => epoch + 1), [])
 
   const confirmTarget = useCallback(async () => {
@@ -474,7 +502,7 @@ export function useGitHubSync({ root, docs, assets, onBeforeSync, onLocalChanged
   const dismissReport = useCallback(() => setReport(null), [])
 
   return {
-    config, loaded, isConfigured, status, report, lastSyncAt,
+    config, loaded, isConfigured, status, report, lastSyncAt, history, clearHistory,
     // 꺼져 있으면 예정 시각도 없는 것으로 봅니다. 상태가 남아 있어도 화면에는 안 나옵니다.
     nextAutoSyncAt: autoOn ? nextAutoSyncAt : null,
     update, run, confirmTarget, dismissReport, reset, restartAutoSync,

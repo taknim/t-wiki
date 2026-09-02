@@ -85,6 +85,13 @@ button, input, select, textarea { font: inherit; color: inherit; }
   white-space: nowrap;
 }
 .btn:hover:not(:disabled) { background: var(--bg-sunken); }
+/* 새 창으로 여는 것은 링크라야 하지만, 모양은 단추와 같아야 합니다. */
+a.btn {
+  display: inline-flex;
+  align-items: center;
+  color: inherit;
+  text-decoration: none;
+}
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 /* 채워진 버튼은 투명도로 흐리면 흰 글자가 사라집니다. 배경을 죽이고 글자는 남깁니다. */
 .btn-primary:disabled {
@@ -1273,3 +1280,33 @@ mark { background: var(--mark); color: inherit; border-radius: 2px; }
   color: var(--accent);
   border-color: currentColor;
 }
+
+/* 최근 동기화 기록. 한 줄에 시각·방식·요약·커밋을 나란히 둡니다. */
+.sync-history { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.sync-history li {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 5px 6px;
+  border-radius: 5px;
+  font-size: 12px;
+}
+.sync-history li:nth-child(odd) { background: var(--bg-sunken); }
+.sync-history-when { color: var(--text-muted); font-family: var(--mono); white-space: nowrap; }
+.sync-history-how {
+  flex: none;
+  padding: 0 6px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+.sync-history-what { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sync-history-what.is-bad { color: var(--danger); }
+.sync-history-commit {
+  font-family: var(--mono);
+  color: var(--accent);
+  white-space: nowrap;
+  text-decoration: none;
+}
+.sync-history-commit:hover { text-decoration: underline; }
