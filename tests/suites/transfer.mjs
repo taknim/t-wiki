@@ -148,7 +148,69 @@ try {
     '안내가 보이지 않습니다')
   await page.click('.sheet-close')
 
-  step('7. 콘솔 오류')
+  step('7. 브라우저에 남는 취향이 하나도 빠지지 않는다')
+  /*
+   * 앱이 localStorage 에 적어 두는 값을 통째로 견줍니다.
+   * 새 설정을 더하면서 꾸러미에 넣는 것을 잊으면 여기서 걸립니다.
+   * 폴더에 딸린 값(기준점·손잡이)은 일부러 담지 않으므로 여기서 보지 않습니다.
+   */
+  await closeVault()
+  await openVault('first')
+  await openSettings()
+  await page.click('.settings-nav button:has-text("GitHub 동기화")')
+  await page.fill('#gh-token', '토큰2')
+  await page.fill('#gh-owner', 'tester')
+  await page.fill('.row input[placeholder="저장소 이름"]', 'wiki')
+  await page.click('.settings-nav button:has-text("모양")')
+  await page.click('.theme-card:has-text("세피아")')
+  await page.click('.settings-nav button:has-text("일반")')
+  // 이 화면에서 켜고 끌 수 있는 것을 모두 뒤집어 둡니다.
+  for (const label of ['마지막 상태로', '줄 끝 공백', '들여쓰기 다시 잡기']) {
+    await page.click(`.checkbox:has-text("${label}") input`)
+  }
+  await page.waitForTimeout(400)
+  await page.click('.sheet-close')
+  // 트리도 접어 둡니다. 이것도 취향입니다.
+  await page.click('.sidebar-toggle')
+  await page.waitForTimeout(400)
+
+  const before = await page.evaluate(() =>
+    Object.fromEntries(Object.keys(localStorage)
+      .filter((key) => key.startsWith('mdwiki:'))
+      .sort()
+      .map((key) => [key, localStorage.getItem(key)])))
+  console.log('  내보내기 전: ' + JSON.stringify(before))
+
+  await openSettings()
+  const both = await exportTo(true)
+  await page.click('.sheet-close')
+
+  // 전부 되돌려 놓고, 들여와서 제자리로 돌아오는지 봅니다.
+  await page.evaluate(() => {
+    for (const key of Object.keys(localStorage)) {
+      if (key.startsWith('mdwiki:')) localStorage.removeItem(key)
+    }
+  })
+  await page.reload({ waitUntil: 'domcontentloaded' })
+  await openVault('first')
+  await openSettings()
+  await page.setInputFiles('#settings-bundle', both.path)
+  await page.waitForTimeout(1000)
+  await page.click('.sheet-close')
+  await page.waitForTimeout(400)
+
+  const after = await page.evaluate(() =>
+    Object.fromEntries(Object.keys(localStorage)
+      .filter((key) => key.startsWith('mdwiki:'))
+      .sort()
+      .map((key) => [key, localStorage.getItem(key)])))
+  console.log('  들여온 뒤:   ' + JSON.stringify(after))
+
+  const missing = Object.keys(before).filter((key) => before[key] !== after[key])
+  expect('빠진 취향이 없음', missing.length === 0,
+    '되돌아오지 않은 값: ' + JSON.stringify(missing.map((k) => [k, before[k], after[k]])))
+
+  step('8. 콘솔 오류')
   const real = errors.filter((l) => !l.includes('404') && !l.includes('Failed to load resource'))
   if (real.length > 0) fail('콘솔', real.join('\n      '))
   else ok('콘솔 오류 없음')

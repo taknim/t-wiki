@@ -38,3 +38,25 @@ export function writeSaveOptions(next: SaveOptions): void {
     // 저장이 막혀 있어도 이번에는 그대로 적용됩니다.
   }
 }
+
+/*
+ * 트리를 접어 두었는지. 폴더가 아니라 이 브라우저의 취향이라 여기 둡니다.
+ * 첫 그림부터 제 모습으로 그려야 펼쳤다 접히는 깜빡임이 없어 localStorage 를 씁니다.
+ */
+const SIDEBAR = 'mdwiki:sidebar-open'
+
+export function readSidebarOpen(): boolean {
+  try {
+    return localStorage.getItem(SIDEBAR) !== 'off'
+  } catch {
+    return true
+  }
+}
+
+export function writeSidebarOpen(open: boolean): void {
+  try {
+    localStorage.setItem(SIDEBAR, open ? 'on' : 'off')
+  } catch {
+    // 저장이 막혀 있어도 이번에는 그대로 적용됩니다.
+  }
+}

@@ -24,6 +24,9 @@ interface SettingsPanelProps {
   initialTab?: TabId
   /** 지금 열려 있는 폴더 이름. 내보낸 파일에 적어 둡니다. */
   vaultName: string | null
+  /** 트리를 펴 두었는지. 내보내고 들여올 때 함께 다룹니다. */
+  sidebarOpen: boolean
+  onSidebarOpen: (open: boolean) => void
 }
 
 type TabId = 'general' | 'appearance' | 'sync'
@@ -35,7 +38,7 @@ const TABS: { id: TabId; name: string; hint: string }[] = [
 ]
 
 export function SettingsPanel({
-  onClose, sync, onShowReport, vaultName, initialTab = 'general',
+  onClose, sync, onShowReport, vaultName, sidebarOpen, onSidebarOpen, initialTab = 'general',
 }: SettingsPanelProps) {
   const { settings, isDark, update } = useTheme()
   const [tab, setTab] = useState<TabId>(initialTab)
@@ -49,6 +52,7 @@ export function SettingsPanel({
       vaultName: vaultName,
       appearance: settings,
       rememberSession: remember,
+      sidebarOpen,
       saveOptions,
       github: sync.isConfigured || sync.config.token ? sync.config : null,
       includeToken,
@@ -76,6 +80,7 @@ export function SettingsPanel({
     update(bundle.appearance)
     setRemember(bundle.general.rememberSession)
     setRememberEnabled(bundle.general.rememberSession)
+    onSidebarOpen(bundle.general.sidebarOpen)
     const next = {
       trimWhitespace: bundle.general.trimWhitespace,
       tidyFormat: bundle.general.tidyFormat,

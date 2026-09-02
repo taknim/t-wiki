@@ -25,7 +25,7 @@ import { extractHeadings, parseFrontmatter } from './lib/markdown'
 import { readFile } from './lib/fsAccess'
 import { loadSession, saveSession } from './lib/session'
 import { formatTidyFor, textPreviewKind, trimWhitespace } from './lib/textPreview'
-import { readSaveOptions } from './lib/saveOptions'
+import { readSaveOptions, readSidebarOpen, writeSidebarOpen } from './lib/saveOptions'
 import { displayPath, fileNameOf } from './lib/paths'
 import type { CSSProperties } from 'react'
 import type { ViewMode, VaultNode } from './types'
@@ -331,6 +331,12 @@ export default function App() {
   const pickerDir = useRef<string | null>(null)
   const searchInput = useRef<HTMLInputElement>(null)
   const [sidebarOpen, setSidebarOpen] = useState(readSidebarOpen)
+
+  /** 화면과 저장을 한 자리에서 맞춥니다. 설정을 들여올 때도 이 길로 들어옵니다. */
+  const applySidebarOpen = useCallback((open: boolean) => {
+    setSidebarOpen(open)
+    writeSidebarOpen(open)
+  }, [])
   const currentDir = selectedDir ?? (selectedPath ? selectedPath.split('/').slice(0, -1).join('/') : '')
 
   const filePicker = useRef<HTMLInputElement>(null)
@@ -701,12 +707,7 @@ export default function App() {
                 aria-label={sidebarOpen ? '트리 접기' : '트리 펴기'}
                 aria-expanded={sidebarOpen}
                 data-tip={sidebarOpen ? '폴더 트리 접기' : '폴더 트리 펴기'}
-                onClick={() => {
-                  setSidebarOpen((open) => {
-                    writeSidebarOpen(!open)
-                    return !open
-                  })
-                }}
+                onClick={() => applySidebarOpen(!sidebarOpen)}
               >
                 {sidebarOpen ? <SidebarCloseIcon /> : <SidebarOpenIcon />}
               </button>
@@ -900,6 +901,8 @@ export default function App() {
           initialTab={settingsTab}
           sync={sync}
           vaultName={vault.vaultName ?? null}
+          sidebarOpen={sidebarOpen}
+          onSidebarOpen={applySidebarOpen}
           onShowReport={() => setReportOpen(true)}
           onClose={() => setSettingsTab(null)}
         />
@@ -941,26 +944,4 @@ function rollUp(node: VaultNode): { size: number; files: number } {
     files += inner.files
   }
   return { size, files }
-}
-
-/*
- * 옆줄 접힘은 폴더가 아니라 화면 취향이라 localStorage 에 둡니다.
- * 첫 그림부터 제 모습으로 그려야 펼쳤다 접히는 깜빡임이 없습니다.
- */
-const SIDEBAR_KEY = 'mdwiki:sidebar-open'
-
-function readSidebarOpen(): boolean {
-  try {
-    return localStorage.getItem(SIDEBAR_KEY) !== 'off'
-  } catch {
-    return true
-  }
-}
-
-function writeSidebarOpen(open: boolean): void {
-  try {
-    localStorage.setItem(SIDEBAR_KEY, open ? 'on' : 'off')
-  } catch {
-    // 저장이 막혀 있어도 이번에는 그대로 적용됩니다.
-  }
 }

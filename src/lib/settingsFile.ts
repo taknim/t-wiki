@@ -20,7 +20,7 @@ export interface SettingsBundle {
   /** 어느 폴더에서 내보냈는지. 사람이 알아보라고 적어 둡니다. */
   vaultName: string | null
   appearance: ThemeSettings
-  general: { rememberSession: boolean } & SaveOptions
+  general: { rememberSession: boolean; sidebarOpen: boolean } & SaveOptions
   github: GitHubConfig | null
 }
 
@@ -28,6 +28,7 @@ export interface ExportInput {
   vaultName: string | null
   appearance: ThemeSettings
   rememberSession: boolean
+  sidebarOpen: boolean
   saveOptions: SaveOptions
   github: GitHubConfig | null
   /** 액세스 토큰까지 담을지. 파일에 그대로 적히므로 기본은 담지 않습니다. */
@@ -41,7 +42,11 @@ export function buildBundle(input: ExportInput): SettingsBundle {
     exportedAt: new Date().toISOString(),
     vaultName: input.vaultName,
     appearance: input.appearance,
-    general: { rememberSession: input.rememberSession, ...input.saveOptions },
+    general: {
+      rememberSession: input.rememberSession,
+      sidebarOpen: input.sidebarOpen,
+      ...input.saveOptions,
+    },
     github: input.github
       ? { ...input.github, token: input.includeToken ? input.github.token : '' }
       : null,
@@ -99,6 +104,7 @@ export function parseBundle(raw: string): SettingsBundle | null {
     },
     general: {
       rememberSession: bool(general.rememberSession, true),
+      sidebarOpen: bool(general.sidebarOpen, true),
       trimWhitespace: bool(general.trimWhitespace, DEFAULT_SAVE_OPTIONS.trimWhitespace),
       tidyFormat: bool(general.tidyFormat, DEFAULT_SAVE_OPTIONS.tidyFormat),
     },
