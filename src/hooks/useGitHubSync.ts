@@ -47,6 +47,10 @@ export interface SyncReport {
    * 사용자가 보고 진행 여부를 정해야 합니다.
    */
   needsConfirm?: boolean
+  /** 왜 멈춰 세웠는지. 대상이 바뀐 것과 저장소를 비우는 것은 다른 이야기입니다. */
+  confirmReason?: 'target' | 'wipe'
+  /** 저장소에서 지우려는 건수. 비우려 할 때만 있습니다. */
+  removing?: number
 }
 
 export interface GitHubSync {
@@ -234,19 +238,32 @@ export function useGitHubSync({ root, docs, assets, onBeforeSync, onLocalChanged
         const pending = plan.filter((item) => item.action !== 'skip')
         const at = Date.now()
 
+        /*
+         * 저장소를 크게 비우는 회차는 손을 멈추고 묻습니다.
+         *
+         * 어떤 까닭으로든 기준점이 실제와 어긋나면 저장소에 있던 것이 통째로
+         * "로컬에서 지워졌다" 로 읽힙니다. 그 회차는 되돌리기 어렵습니다.
+         * 몇 개를 지우는 평범한 회차는 그대로 두고, 절반 넘게 걷어내는 회차만 세웁니다.
+         */
+        const removing = plan.filter((item) => item.action === 'delete-remote').length
+        const wipesRepo = remote.files.size >= 2 && removing * 2 >= remote.files.size
+
         // 저장소·브랜치·하위 폴더를 바꾸면 문서가 올라갈 경로가 통째로 달라집니다.
         // 그대로 밀면 옛 경로와 새 경로에 같은 문서가 복제되므로,
         // 처음 보는 대상이면 무엇이 오갈지 보여 주고 확인을 받습니다.
-        if (
-          pending.length > 0 &&
-          confirmedRef.current !== signature &&
-          Object.keys(synced).length === 0 &&
-          (await hasAnyBaseline(key))
-        ) {
-          setReport({ at, trigger, plan, log: [], commitSha: null, error: null, needsConfirm: true })
+        const changedTarget = Object.keys(synced).length === 0 && (await hasAnyBaseline(key))
+
+        if (pending.length > 0 && confirmedRef.current !== signature && (changedTarget || wipesRepo)) {
+          setReport({
+            at, trigger, plan, log: [], commitSha: null, error: null, needsConfirm: true,
+            confirmReason: wipesRepo ? 'wipe' : 'target',
+            removing,
+          })
           setStatus({
             phase: 'needs-confirm',
-            message: '동기화 대상이 바뀌었습니다. 무엇이 오갈지 확인해 주세요.',
+            message: wipesRepo
+              ? `저장소에서 ${removing}건을 지우려 합니다. 무엇이 오갈지 확인해 주세요.`
+              : '동기화 대상이 바뀌었습니다. 무엇이 오갈지 확인해 주세요.',
             progress: null,
           })
           return false

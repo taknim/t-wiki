@@ -33,7 +33,13 @@ export function SyncReportSheet({ report, onClose, onConfirm }: SyncReportSheetP
     >
       <div className="sheet" role="dialog" aria-modal="true" aria-label="동기화 결과">
         <header className="sheet-head">
-          <h2>{report.needsConfirm ? '동기화 대상이 바뀌었습니다' : '동기화 결과'}</h2>
+          <h2>
+            {!report.needsConfirm
+              ? '동기화 결과'
+              : report.confirmReason === 'wipe'
+                ? '저장소에서 많이 지우려 합니다'
+                : '동기화 대상이 바뀌었습니다'}
+          </h2>
           <button
             type="button"
             className="btn sheet-close"
@@ -58,15 +64,35 @@ export function SyncReportSheet({ report, onClose, onConfirm }: SyncReportSheetP
             <div className="callout callout-warning" style={{ marginBottom: 16 }}>
               <p className="callout-title">진행하기 전에 확인해 주세요</p>
               <div className="callout-body">
-                <p>
-                  저장소·브랜치·하위 폴더가 이전과 달라, 문서가 올라갈 경로가 바뀌었습니다.
-                  아래 목록이 의도한 것인지 보고 결정해 주세요.
-                </p>
-                <p>
-                  <strong>커밋(신규)과 내려받기(신규)가 같은 문서에 대해 함께 나타난다면</strong>,
-                  같은 내용이 옛 경로와 새 경로 양쪽에 생긴다는 뜻입니다.
-                  그럴 때는 취소하고 하위 폴더 설정을 되돌리는 편이 낫습니다.
-                </p>
+                {report.confirmReason === 'wipe' ? (
+                  <>
+                    <p>
+                      이 회차는 저장소에서 <strong>{report.removing}건</strong>을 지우려 합니다.
+                      저장소에 있던 것의 절반이 넘습니다.
+                    </p>
+                    <p>
+                      지금 폴더에 없는 문서를 <strong>지운 것으로 보고</strong> 저장소에서도
+                      걷어내는 중입니다. 이 폴더가 그 저장소를 쓰던 폴더가 맞는지,
+                      바깥에서 파일을 옮기거나 지운 적이 없는지 먼저 살펴 주세요.
+                    </p>
+                    <p>
+                      되돌릴 생각이라면 취소하고, 설정에서 <strong>반대쪽에서도 지우기</strong> 를
+                      꺼 두면 저장소의 문서는 그대로 두고 이쪽으로 내려받습니다.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p>
+                      저장소·브랜치·하위 폴더가 이전과 달라, 문서가 올라갈 경로가 바뀌었습니다.
+                      아래 목록이 의도한 것인지 보고 결정해 주세요.
+                    </p>
+                    <p>
+                      <strong>커밋(신규)과 내려받기(신규)가 같은 문서에 대해 함께 나타난다면</strong>,
+                      같은 내용이 옛 경로와 새 경로 양쪽에 생긴다는 뜻입니다.
+                      그럴 때는 취소하고 하위 폴더 설정을 되돌리는 편이 낫습니다.
+                    </p>
+                  </>
+                )}
               </div>
             </div>
           )}

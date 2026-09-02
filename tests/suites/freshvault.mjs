@@ -110,7 +110,60 @@ try {
     JSON.stringify(Object.keys(github.currentFiles()).sort()) === JSON.stringify(before),
     JSON.stringify(Object.keys(github.currentFiles()).sort()))
 
-  step('5. 콘솔 오류')
+  step('5. 폴더 하나에 파일 한 개만 있어도 저장소를 비우지 않는다')
+  await closeVault()
+  await page.evaluate(() => {
+    const one = Object.create(Object.getPrototypeOf(window.__vaults.first))
+    Object.assign(one, { kind: 'directory', name: '한 개 폴더', _children: new Map() })
+    window.__vaults.one = one
+  })
+  await openVault('one')
+  await page.click('.tree-root button[aria-label="새 문서"]')
+  await page.waitForSelector('.dialog-input')
+  await page.fill('.dialog-input', '메모')
+  await page.click('.dialog button:has-text("만들기")')
+  await page.waitForTimeout(600)
+  await configure({ propagate: true })
+  const kept = Object.keys(github.currentFiles()).sort()
+  await sync()
+  const grown = Object.keys(github.currentFiles()).sort()
+  console.log('  동기화 뒤: ' + JSON.stringify(grown))
+  expect('있던 것이 하나도 지워지지 않음', kept.every((path) => grown.includes(path)),
+    JSON.stringify(kept.filter((p) => !grown.includes(p))))
+  expect('새 파일은 올라감', grown.includes('메모.md'), JSON.stringify(grown))
+
+  step('6. 저장소를 크게 비우려 하면 손을 멈추고 묻는다')
+  /*
+   * 어떤 까닭으로든 기준점이 실제와 어긋나 저장소를 통째로 비우려 할 때를 위한 그물입니다.
+   * 여기서는 맞춰 둔 폴더에서 파일을 모두 지워 그 상황을 만듭니다.
+   */
+  await closeVault()
+  await openVault('first')
+  await sync()
+  const stockedNow = Object.keys(github.currentFiles()).sort()
+  await page.evaluate(() => {
+    for (const name of [...window.__mockRoot._children.keys()]) {
+      window.__mockRoot._children.delete(name)
+    }
+  })
+  await page.click('.tree-root button[aria-label="새로고침"]')
+  await page.waitForTimeout(700)
+  await page.waitForFunction(() => !document.querySelector('.toast'), { timeout: 15000 }).catch(() => {})
+  await page.click('.topbar button:has-text("GitHub 동기화")')
+  await page.waitForFunction(() => !document.querySelector('.topbar button[disabled]'), { timeout: 30000 })
+  await page.waitForTimeout(800)
+  const stopped = Object.keys(github.currentFiles()).sort()
+  // 멈춰 세운 회차는 결과 창을 엽니다. 무엇을 지우려 했는지 거기서 보여 줍니다.
+  await page.waitForSelector('.sheet', { timeout: 8000 })
+  const notice = await page.textContent('.sheet')
+  console.log('  창 제목: ' + (await page.textContent('.sheet-head h2')).trim())
+  expect('묻기 전에는 지우지 않음',
+    JSON.stringify(stopped) === JSON.stringify(stockedNow),
+    JSON.stringify(stockedNow) + ' -> ' + JSON.stringify(stopped))
+  expect('지우려 한다고 알려 줌', /지우려 합니다/.test(notice), notice.slice(0, 200))
+  expect('되돌리는 길도 알려 줌', notice.includes('반대쪽에서도 지우기'), notice.slice(0, 200))
+
+  step('7. 콘솔 오류')
   const real = errors.filter((l) => !l.includes('404') && !l.includes('Failed to load resource'))
   if (real.length > 0) fail('콘솔', real.join('\n      '))
   else ok('콘솔 오류 없음')
