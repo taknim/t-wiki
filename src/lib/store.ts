@@ -7,7 +7,6 @@ const GITHUB_CONFIG = 'mdwiki:github-config'
 const SYNC_STATE = 'mdwiki:sync-state'
 const LAST_SYNC = 'mdwiki:last-sync-at'
 const ASSET_HASHES = 'mdwiki:asset-hashes'
-const HISTORY = 'mdwiki:sync-history'
 
 /**
  * FileSystemDirectoryHandle 은 구조화 복제가 되므로 IndexedDB 에 그대로 넣어둘 수 있습니다.
@@ -182,45 +181,4 @@ async function runMigration(): Promise<void> {
   } catch {
     // 옮기지 못해도 쓰던 흐름은 끊지 않습니다. 설정을 다시 넣으면 됩니다.
   }
-}
-
-/**
- * 최근 동기화 기록. 폴더마다 따로, 최근 것부터 몇 개만 들고 있습니다.
- *
- * 오간 파일 목록은 담지 않습니다. 한 회차에 수백 건이 오갈 수 있어 저장소가 부풀고,
- * 그 자세한 내용은 이미 커밋에 남아 있습니다. 여기에는 언제 · 무엇이 · 몇 건인지만 둡니다.
- */
-export interface SyncHistoryEntry {
-  at: number
-  trigger: 'manual' | 'auto'
-  /** "3건 커밋 · 5건 내려받음" 처럼 사람이 읽을 한 줄. */
-  summary: string
-  commitSha: string | null
-  /** 실패한 회차의 까닭. 없으면 null. */
-  error: string | null
-  /** 그 회차에서 실패한 건수. */
-  failed: number
-}
-
-/** 한 폴더에서 몇 회차까지 들고 있을지. */
-const MAX_HISTORY = 10
-
-export const loadSyncHistory = async (vault: string): Promise<SyncHistoryEntry[]> =>
-  (await readByVault<SyncHistoryEntry[]>(HISTORY))[vault] ?? []
-
-export async function appendSyncHistory(
-  vault: string,
-  entry: SyncHistoryEntry,
-): Promise<SyncHistoryEntry[]> {
-  const store = await readByVault<SyncHistoryEntry[]>(HISTORY)
-  const next = [entry, ...(store[vault] ?? [])].slice(0, MAX_HISTORY)
-  store[vault] = next
-  await set(HISTORY, store)
-  return next
-}
-
-export async function clearSyncHistory(vault: string): Promise<void> {
-  const store = await readByVault<SyncHistoryEntry[]>(HISTORY)
-  delete store[vault]
-  await set(HISTORY, store)
 }

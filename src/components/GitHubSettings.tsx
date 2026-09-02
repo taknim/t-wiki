@@ -52,14 +52,6 @@ export function GitHubSettings({ sync, onShowReport }: GitHubSettingsProps) {
 
   const repoLabel = config.owner && config.repo ? `${config.owner}/${config.repo}` : ''
 
-  /*
-   * 저장소의 커밋 목록. 하위 폴더를 정해 두었으면 그 아래 것만 걸러 보여 줍니다.
-   * 기록은 10개까지만 들고 있으므로, 더 거슬러 보려면 이쪽으로 갑니다.
-   */
-  const commitsUrl = repoLabel
-    ? `https://github.com/${repoLabel}/commits/${encodeURIComponent(config.branch)}`
-      + (config.basePath ? `/${config.basePath.split('/').map(encodeURIComponent).join('/')}` : '')
-    : ''
 
   return (
     <>
@@ -281,69 +273,6 @@ export function GitHubSettings({ sync, onShowReport }: GitHubSettingsProps) {
         </p>
       </section>
 
-      <section className="field">
-        <label>최근 동기화</label>
-        <p className="hint" style={{ marginTop: 0 }}>
-          무언가 오갔거나 실패한 회차만 최근 10개까지 남습니다.
-          살펴보고 아무것도 할 것이 없던 회차는 남기지 않습니다.
-          오간 파일 하나하나는 커밋에 적혀 있으니 그쪽에서 보세요.
-        </p>
-
-        {sync.history.length === 0 ? (
-          <p className="panel-empty">아직 기록이 없습니다.</p>
-        ) : (
-          <ul className="sync-history">
-            {sync.history.map((entry) => (
-              <li key={`${entry.at}-${entry.commitSha ?? 'none'}`}>
-                <span className="sync-history-when">
-                  {new Date(entry.at).toLocaleString('ko-KR')}
-                </span>
-                <span className="sync-history-how">
-                  {entry.trigger === 'auto' ? '자동' : '직접'}
-                </span>
-                <span className={entry.error || entry.failed > 0 ? 'sync-history-what is-bad' : 'sync-history-what'}>
-                  {entry.error ?? (entry.failed > 0 ? `${entry.summary} · ${entry.failed}건 실패` : entry.summary)}
-                </span>
-                {entry.commitSha && commitsUrl && (
-                  <a
-                    className="sync-history-commit"
-                    href={`${commitsUrl.replace(/\/commits\/.*$/, '')}/commit/${entry.commitSha}`}
-                    target="_blank"
-                    rel="noreferrer noopener"
-                    data-tip="이 회차의 커밋을 새 창에서 봅니다"
-                  >
-                    {entry.commitSha.slice(0, 7)}
-                  </a>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-
-        <div className="row" style={{ marginTop: 12 }}>
-          {commitsUrl && (
-            <a
-              className="btn"
-              href={commitsUrl}
-              target="_blank"
-              rel="noreferrer noopener"
-              data-tip="저장소의 커밋 목록을 새 창에서 엽니다. 10개보다 더 거슬러 볼 수 있습니다"
-            >
-              저장소에서 더 보기
-            </a>
-          )}
-          {sync.history.length > 0 && (
-            <button
-              type="button"
-              className="btn"
-              data-tip="이 폴더의 동기화 기록만 지웁니다. 저장소와 문서는 그대로입니다"
-              onClick={() => void sync.clearHistory()}
-            >
-              기록 지우기
-            </button>
-          )}
-        </div>
-      </section>
       <section className="field">
         <label>이 폴더의 설정</label>
         <p className="hint" style={{ marginTop: 0 }}>
