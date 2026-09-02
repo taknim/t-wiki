@@ -68,6 +68,8 @@ export interface GitHubSync {
   confirmTarget: () => Promise<void>
   /** 이 폴더의 저장소 설정을 지웁니다. */
   reset: () => Promise<void>
+  /** 잡아 둔 자동 차례를 버리고 지금 설정으로 처음부터 다시 셉니다. */
+  restartAutoSync: () => void
   dismissReport: () => void
 }
 
@@ -122,6 +124,12 @@ export function useGitHubSync({ root, docs, assets, onBeforeSync, onLocalChanged
   const [nextAutoSyncAt, setNextAutoSyncAt] = useState<number | null>(null)
   // 지금 열려 있는 폴더의 표. 설정과 기준점을 이 표 아래에 둡니다.
   const [vaultKey, setVaultKey] = useState<string | null>(null)
+  /*
+   * 자동 차례를 다시 잡게 하는 표. 올리면 아래 효과가 다시 돌아, 잡아 둔 것을 버리고
+   * 새로 셉니다. 설정을 통째로 갈아 끼울 때 씁니다. 켜짐 여부와 간격이 그대로면
+   * 효과가 다시 돌지 않아 앞서 세던 시간이 그대로 이어지기 때문입니다.
+   */
+  const [scheduleEpoch, setScheduleEpoch] = useState(0)
 
   // 타이머에서 부를 때 오래된 값을 붙잡지 않도록 최신 상태를 ref 로도 들고 있습니다.
   // 설정만은 실행 직전에 저장소에서 다시 읽으므로 여기 두지 않습니다.
@@ -400,6 +408,8 @@ export function useGitHubSync({ root, docs, assets, onBeforeSync, onLocalChanged
     setStatus(IDLE)
   }, [])
 
+  const restartAutoSync = useCallback(() => setScheduleEpoch((epoch) => epoch + 1), [])
+
   const confirmTarget = useCallback(async () => {
     const key = vaultKeyRef.current
     if (!key) return
@@ -459,7 +469,7 @@ export function useGitHubSync({ root, docs, assets, onBeforeSync, onLocalChanged
       window.clearTimeout(timer)
       setNextAutoSyncAt(null)
     }
-  }, [autoOn, config.autoSyncMinutes, vaultKey])
+  }, [autoOn, config.autoSyncMinutes, vaultKey, scheduleEpoch])
 
   const dismissReport = useCallback(() => setReport(null), [])
 
@@ -467,7 +477,7 @@ export function useGitHubSync({ root, docs, assets, onBeforeSync, onLocalChanged
     config, loaded, isConfigured, status, report, lastSyncAt,
     // 꺼져 있으면 예정 시각도 없는 것으로 봅니다. 상태가 남아 있어도 화면에는 안 나옵니다.
     nextAutoSyncAt: autoOn ? nextAutoSyncAt : null,
-    update, run, confirmTarget, dismissReport, reset,
+    update, run, confirmTarget, dismissReport, reset, restartAutoSync,
   }
 }
 

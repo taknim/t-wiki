@@ -140,6 +140,13 @@ export function SettingsPanel({
       // 토큰이 비어 있으면 여기 있던 것을 지우지 않고 그대로 둡니다.
       const { token, ...rest } = bundle.github
       sync.update(token ? bundle.github : rest)
+      /*
+       * 잡아 둔 자동 차례를 버리고 새 설정으로 처음부터 다시 셉니다.
+       * 대상이 달라졌는데 앞 설정으로 세던 시간이 그대로 이어지면,
+       * 화면에 뜬 남은 시간이 어느 저장소를 향한 것인지 알 수 없습니다.
+       * 켜짐 여부와 간격이 우연히 같아도 다시 셉니다.
+       */
+      sync.restartAutoSync()
     }
 
     setTransfer(

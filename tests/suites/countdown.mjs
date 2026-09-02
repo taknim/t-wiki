@@ -148,7 +148,52 @@ try {
   console.log('  9분으로 바꾼 뒤: ' + changed.trim())
   expect('바꾼 간격에서 시작', seconds(changed) > 8 * 60 + 50, changed)
 
-  step('8. 콘솔 오류')
+  step('8. 설정을 가져오면 자동 차례를 새로 잡는다')
+  /*
+   * 가져온 간격이 지금과 같아도 처음부터 다시 세야 합니다. 대상이 달라졌는데
+   * 앞 설정으로 세던 시간이 이어지면, 남은 시간이 어느 저장소를 향한 것인지 알 수 없습니다.
+   */
+  const { writeFileSync, mkdirSync } = await import('node:fs')
+  // 시험이 남기는 파일은 저장소에 올리지 않는 자리에 둡니다.
+  mkdirSync(join(HERE, '..', 'downloads'), { recursive: true })
+  const bundle = (minutes) => JSON.stringify({
+    app: 't-WiKi', version: 1, exportedAt: '2026-09-02T10:00:00.000Z', vaultName: '다른 곳',
+    appearance: { theme: 'default', mode: 'system', font: 'sans', size: 'medium', width: 'medium' },
+    general: { rememberSession: true, sidebarOpen: true, includeToken: true, trimWhitespace: false, tidyFormat: false },
+    github: { token: 'pat', owner: 'tester', repo: 'wiki', branch: 'main', basePath: '',
+      conflictPolicy: 'keep-both', propagateDeletes: false, autoSync: true, autoSyncMinutes: minutes },
+  })
+  const bring = async (minutes) => {
+    const file = join(HERE, '..', 'downloads', `bundle-${minutes}.json`)
+    writeFileSync(file, bundle(minutes))
+    await page.click('button[aria-label="설정"]')
+    await page.waitForSelector('.settings-nav')
+    await page.setInputFiles('#settings-bundle', file)
+    await page.waitForSelector('.dialog', { timeout: 5000 })
+    await page.click('.dialog button:has-text("적용")')
+    await page.waitForTimeout(600)
+    await page.click('.sheet-close')
+    await page.waitForTimeout(300)
+  }
+
+  // 지금은 9분으로 세는 중입니다. 얼마간 흘려보내 중간값을 만듭니다.
+  await page.waitForTimeout(2500)
+  const midway = await countdown()
+  await bring(9)   // 간격이 지금과 똑같은 파일
+  const sameAgain = await countdown()
+  console.log(`  같은 간격(9분)을 가져옴: ${midway.trim()} → ${sameAgain.trim()}`)
+  expect('같은 간격이어도 처음부터 다시 셈', seconds(sameAgain) > seconds(midway),
+    `${midway} -> ${sameAgain}`)
+  expect('9분에서 시작', seconds(sameAgain) > 8 * 60 + 45, sameAgain)
+
+  await page.waitForTimeout(2200)
+  await bring(4)   // 간격이 다른 파일
+  const changed2 = await countdown()
+  console.log('  다른 간격(4분)을 가져옴: ' + changed2.trim())
+  expect('가져온 간격에서 시작', seconds(changed2) > 3 * 60 + 45 && seconds(changed2) <= 4 * 60 + 2,
+    changed2)
+
+  step('9. 콘솔 오류')
   const real = errors.filter((l) => !l.includes('404') && !l.includes('Failed to load resource'))
   if (real.length > 0) fail('콘솔', real.join('\n      '))
   else ok('콘솔 오류 없음')
