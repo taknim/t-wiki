@@ -56,15 +56,17 @@ export function SettingsPanel({
      * 토큰이 실리는 회차는 되돌릴 수 없습니다. 파일이 한번 나가면 거두어들일 수 없으므로
      * 무엇이 담기는지 밝히고 확인을 받습니다.
      */
+    const holding = sync.isConfigured ? `, "${vaultName ?? '이 폴더'}"의 저장소 설정` : ''
     const ok = await dialogs.confirm({
       title: includeToken ? '액세스 토큰까지 내보낼까요?' : '설정을 내보낼까요?',
       label: includeToken
-        ? `내려받는 파일에 액세스 토큰이 그대로 적힙니다. 그 토큰으로 저장소를 읽고 쓸 수 있으니,`
-          + ` 메일·채팅·공유 폴더로 주고받지 마시고 옮긴 뒤에는 지워 주세요.`
-          + ` 담기는 것: 모양·저장 방식·트리 접힘${sync.isConfigured ? ` · "${vaultName ?? '이 폴더'}" 의 저장소 설정` : ''}.`
-          + ` 동기화 기준점은 담기지 않습니다.`
-        : `담기는 것: 모양·저장 방식·트리 접힘${sync.isConfigured ? ` · "${vaultName ?? '이 폴더'}" 의 저장소 설정` : ''}.`
-          + ` 액세스 토큰과 동기화 기준점은 담기지 않습니다.`,
+        ? '내려받는 파일에 액세스 토큰이 그대로 적힙니다.\n'
+          + '그 토큰으로 저장소를 읽고 쓸 수 있으니, 메일·채팅·공유 폴더로 주고받지 마시고'
+          + ' 옮긴 뒤에는 지워 주세요.\n\n'
+          + `담기는 것: 모양, 저장 방식, 트리 접힘${holding}\n`
+          + '동기화 기준점은 담기지 않습니다.'
+        : `담기는 것: 모양, 저장 방식, 트리 접힘${holding}\n`
+          + '액세스 토큰과 동기화 기준점은 담기지 않습니다.',
       confirmText: '내보내기',
       danger: includeToken,
     })
@@ -103,15 +105,18 @@ export function SettingsPanel({
      * 파일을 읽은 뒤에 묻습니다. 고르기 전에 물으면 무엇이 들었는지 모른 채
      * 답해야 합니다. 읽고 나면 어디서 온 것인지, 저장소 설정이 함께 오는지 밝힐 수 있습니다.
      */
-    const from = bundle.vaultName ? `"${bundle.vaultName}" 에서 내보낸 파일입니다. ` : ''
     const day = bundle.exportedAt ? `${bundle.exportedAt.slice(0, 10)} · ` : ''
+    const from = bundle.vaultName ? `${day}"${bundle.vaultName}"에서 내보낸 파일입니다.\n` : ''
+    const landing = bundle.github
+      ? `\n저장소 설정은 지금 열려 있는 ${vaultName ? `"${vaultName}"` : '폴더'}에만 들어갑니다.\n`
+        + (bundle.github.token
+          ? '액세스 토큰도 함께 들어옵니다.'
+          : '액세스 토큰은 들어 있지 않아 지금 것을 그대로 둡니다.')
+      : '\n저장소 설정은 들어 있지 않습니다.'
+
     const ok = await dialogs.confirm({
       title: '이 설정을 적용할까요?',
-      label: `${day}${from}지금 설정을 덮어씁니다.`
-        + (bundle.github
-          ? ` 저장소 설정은 지금 열려 있는 ${vaultName ? `"${vaultName}"` : '폴더'} 에만 들어갑니다`
-            + `${bundle.github.token ? ' (액세스 토큰 포함)' : ' (토큰은 들어 있지 않아 지금 것을 그대로 둡니다)'}.`
-          : ' 저장소 설정은 들어 있지 않습니다.'),
+      label: `${from}지금 설정을 덮어씁니다.\n${landing}`,
       confirmText: '적용',
     })
     if (!ok) return
