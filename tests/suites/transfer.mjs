@@ -53,9 +53,11 @@ const openSettings = async () => {
 const exportTo = async (withToken) => {
   const box = page.locator('.checkbox:has-text("액세스 토큰도 함께") input')
   if ((await box.isChecked()) !== withToken) await box.click()
+  await page.click('button:has-text("설정 내보내기")')
+  await page.waitForSelector('.dialog', { timeout: 5000 })
   const [download] = await Promise.all([
     page.waitForEvent('download'),
-    page.click('button:has-text("설정 내보내기")'),
+    page.click('.dialog button:has-text("내보내기")'),
   ])
   const to = join(DOWN, download.suggestedFilename())
   await download.saveAs(to)
@@ -116,7 +118,9 @@ try {
   await openVault('second')
   await openSettings()
   await page.setInputFiles('#settings-bundle', full.path)
-  await page.waitForTimeout(900)
+  await page.waitForSelector('.dialog', { timeout: 5000 })
+  await page.click('.dialog button:has-text("적용")')
+  await page.waitForTimeout(700)
   await page.click('.settings-nav button:has-text("GitHub 동기화")')
   await page.waitForTimeout(400)
   const landed = await page.evaluate(() => ({
@@ -153,6 +157,35 @@ try {
   const notice = await page.textContent('.settings-section')
   expect('설정 파일이 아니라고 알림', notice.includes('t-WiKi 설정 파일이 아닙니다'),
     '안내가 보이지 않습니다')
+  await page.click('.sheet-close')
+
+  step('6-2. 확인 창에서 물러서면 아무것도 하지 않는다')
+  await openSettings()
+  await page.click('button:has-text("설정 내보내기")')
+  await page.waitForSelector('.dialog')
+  const warn = await page.textContent('.dialog')
+  console.log('  안내: ' + warn.replace(/\s+/g, ' ').slice(0, 90))
+  expect('토큰을 담을 때는 조심하라고 알림',
+    warn.includes('액세스 토큰') && warn.includes('주고받지 마'), warn.slice(0, 120))
+  expect('무엇이 담기는지 밝힘', warn.includes('기준점은 담기지 않습니다'), warn.slice(0, 200))
+  // 물러섭니다. 파일이 내려오면 안 됩니다.
+  const cancelled = await Promise.race([
+    page.waitForEvent('download', { timeout: 2500 }).then(() => 'download'),
+    page.click('.dialog button:has-text("취소")').then(() => 'cancel'),
+  ])
+  expect('물러서면 파일이 내려오지 않음', cancelled === 'cancel', String(cancelled))
+  await page.waitForTimeout(300)
+
+  const beforeCancel = await page.inputValue('#gh-token').catch(() => null)
+  await page.setInputFiles('#settings-bundle', plain.path)
+  await page.waitForSelector('.dialog')
+  await page.click('.dialog button:has-text("취소")')
+  await page.waitForTimeout(500)
+  await page.click('.settings-nav button:has-text("GitHub 동기화")')
+  await page.waitForTimeout(300)
+  expect('물러서면 설정도 그대로',
+    (await page.inputValue('#gh-token')) === beforeCancel,
+    `${beforeCancel} -> ${await page.inputValue('#gh-token')}`)
   await page.click('.sheet-close')
 
   step('7. 브라우저에 남는 취향이 하나도 빠지지 않는다')
@@ -204,7 +237,9 @@ try {
   await openVault('first')
   await openSettings()
   await page.setInputFiles('#settings-bundle', both.path)
-  await page.waitForTimeout(1000)
+  await page.waitForSelector('.dialog', { timeout: 5000 })
+  await page.click('.dialog button:has-text("적용")')
+  await page.waitForTimeout(700)
   await page.click('.sheet-close')
   await page.waitForTimeout(400)
 
