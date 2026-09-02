@@ -66,7 +66,7 @@ try {
   console.log('  ' + JSON.stringify(boxes))
   expect('두 항목이 있음', boxes.length === 2, JSON.stringify(boxes))
   expect('둘 다 기본은 꺼짐', boxes.every((b) => !b.on), JSON.stringify(boxes))
-  await page.screenshot({ path: join(HERE, 'shots-saveopts', '01-settings.png'),
+  await page.screenshot({ path: join(HERE, '..', 'shots', 'saveopts', '01-settings.png'),
     clip: { x: 300, y: 90, width: 820, height: 620 } })
   await page.click('.sheet-close')
 

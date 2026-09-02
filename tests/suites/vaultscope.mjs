@@ -101,7 +101,7 @@ try {
   expect('토큰이 비어 있음', fields.token === '', fields.token)
   expect('소유자가 비어 있음', fields.owner === '', fields.owner)
   expect('저장소 이름이 비어 있음', fields.repo === '', fields.repo)
-  await page.screenshot({ path: join(HERE, 'shots-vaultscope', '01-new-vault.png'),
+  await page.screenshot({ path: join(HERE, '..', 'shots', 'vaultscope', '01-new-vault.png'),
     clip: { x: 300, y: 90, width: 820, height: 560 } })
   await page.click('.sheet-close')
 

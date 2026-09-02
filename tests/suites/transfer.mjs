@@ -102,7 +102,7 @@ try {
   const full = await exportTo(true)
   const fullBody = JSON.parse(readFileSync(full.path, 'utf8'))
   expect('토큰이 담김', fullBody.github.token === '비밀토큰', fullBody.github.token)
-  await page.screenshot({ path: join(HERE, 'shots-transfer', '01-settings.png'),
+  await page.screenshot({ path: join(HERE, '..', 'shots', 'transfer', '01-settings.png'),
     clip: { x: 300, y: 90, width: 820, height: 620 } })
   await page.click('.sheet-close')
 
