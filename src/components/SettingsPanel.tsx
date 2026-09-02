@@ -106,17 +106,17 @@ export function SettingsPanel({
      * 답해야 합니다. 읽고 나면 어디서 온 것인지, 저장소 설정이 함께 오는지 밝힐 수 있습니다.
      */
     const day = bundle.exportedAt ? `${bundle.exportedAt.slice(0, 10)} · ` : ''
-    const from = bundle.vaultName ? `${day}"${bundle.vaultName}"에서 내보낸 파일입니다.\n` : ''
+    const from = bundle.vaultName ? `${day}"${bundle.vaultName}" 에서 내보낸 파일로 ` : ''
     const landing = bundle.github
-      ? `\n저장소 설정은 지금 열려 있는 ${vaultName ? `"${vaultName}"` : '폴더'}에만 들어갑니다.\n`
-        + (bundle.github.token
-          ? '액세스 토큰도 함께 들어옵니다.'
-          : '액세스 토큰은 들어 있지 않아 지금 것을 그대로 둡니다.')
+      ? `\n저장소 설정은 지금 열려 있는 ${vaultName ? `"${vaultName}" 에` : '폴더에'}만 들어갑니다.`
+        + (bundle.github.token ? ' (액세스 토큰 포함)' : ' (액세스 토큰은 들어 있지 않습니다)')
+        + '\n저장소 설정이 되어 동기화가 진행되면 기존에 내용을 덮어씌우거나 내용이 삭제될 수'
+        + ' 있으니 주의하십시오.'
       : '\n저장소 설정은 들어 있지 않습니다.'
 
     const ok = await dialogs.confirm({
       title: '이 설정을 적용할까요?',
-      label: `${from}지금 설정을 덮어씁니다.\n${landing}`,
+      label: `${from}지금 설정을 덮어씁니다.${landing}`,
       confirmText: '적용',
     })
     if (!ok) return
