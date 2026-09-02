@@ -112,6 +112,7 @@ export function SettingsPanel({
         + (bundle.github.token ? ' (액세스 토큰 포함)' : ' (액세스 토큰은 들어 있지 않습니다)')
         + '\n저장소 설정이 되어 동기화가 진행되면 기존에 내용을 덮어씌우거나 내용이 삭제될 수'
         + ' 있으니 주의하십시오.'
+        + '\n자동 동기화 설정이 되어 있는 경우 동기화가 자동으로 진행될 수 있습니다.'
       : '\n저장소 설정은 들어 있지 않습니다.'
 
     const ok = await dialogs.confirm({
