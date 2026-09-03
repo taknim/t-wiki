@@ -308,6 +308,11 @@ button, input, select, textarea { font: inherit; color: inherit; }
 /* row 안에서는 남는 폭만 차지해야 옆 버튼이 아래로 밀리지 않습니다. */
 .row > .dialog-input { flex: 1 1 140px; width: auto; min-width: 0; }
 .search-input:focus, .dialog-input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+/*
+ * 옆줄 안쪽은 두 칸입니다. 즐겨찾기가 위, 트리가 아래이고 각자 굴러갑니다.
+ * 바깥에서 한꺼번에 굴리면 즐겨찾기 안쪽 굴림대와 겹쳐 두 겹이 됩니다.
+ */
+.sidebar-panes { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 .sidebar-scroll { flex: 1; overflow: auto; padding: 0 6px 16px; min-height: 0; }
 
 
@@ -315,8 +320,18 @@ button, input, select, textarea { font: inherit; color: inherit; }
  * 즐겨찾기. 트리 위에 붙박이로 둡니다. 많이 담아 두어도 트리를 밀어내지 않도록
  * 높이를 막고 그 안에서 굴러가게 합니다.
  */
-.favorites { margin: 4px 0 8px; }
+.favorites {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  /* 많이 담아 두어도 트리 자리를 다 빼앗지 않도록 여기서 멈춥니다. */
+  max-height: 30vh;
+  margin: 4px 0 8px;
+  padding-inline: 6px;
+}
 .favorites-head {
+  flex: none;
   margin: 0 0 4px;
   padding-inline-start: 4px;
   font-size: 11px;
@@ -325,11 +340,12 @@ button, input, select, textarea { font: inherit; color: inherit; }
   letter-spacing: 0.02em;
 }
 .favorites-list {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
   list-style: none;
   margin: 0;
   padding: 0 0 6px;
-  max-height: 30vh;
-  overflow: auto;
   border-block-end: 1px solid var(--border);
 }
 .favorites-list li { display: flex; align-items: center; gap: 2px; }

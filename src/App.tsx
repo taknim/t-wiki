@@ -833,8 +833,9 @@ export default function App() {
             />
           </div>
 
+          {/* 즐겨찾기와 트리는 각자 굴러갑니다. 하나로 묶으면 굴림대가 겹칩니다. */}
           {sidebarOpen && (
-          <div className="sidebar-scroll">
+          <div className="sidebar-panes">
             {!query.trim() && (
               <Favorites
                 paths={favorites}
@@ -847,6 +848,7 @@ export default function App() {
                 onRemove={toggleFavorite}
               />
             )}
+            <div className="sidebar-scroll">
             {query.trim() ? (
               <SearchPanel
                 query={query}
@@ -894,6 +896,7 @@ export default function App() {
                 />
               )
             )}
+            </div>
           </div>
           )}
 

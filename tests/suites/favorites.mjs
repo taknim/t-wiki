@@ -123,7 +123,49 @@ try {
   expect('마지막 하나를 빼면 칸이 사라짐', (await page.locator('.favorites').count()) === 0)
   expect('트리의 별도 꺼짐', (await page.locator('.tree-star').count()) === 0)
 
-  step('10. 콘솔 오류')
+  step('10. 즐겨찾기와 트리가 각자 굴러간다')
+  /*
+   * 많이 담아 두고 트리도 길게 펼쳐, 양쪽 다 넘치게 만든 뒤 굴림대를 셉니다.
+   * 바깥에서 한꺼번에 굴리면 즐겨찾기 안쪽 것과 겹쳐 두 겹이 됩니다.
+   */
+  // 양쪽 다 넘치도록 창을 낮춥니다.
+  await page.setViewportSize({ width: 1400, height: 400 })
+  for (const label of ['첨부', '회고', '회사']) {
+    await page.click(`.tree-row:has-text("${label}")`).catch(() => {})
+    await page.waitForTimeout(150)
+  }
+  const names = await page.evaluate(() =>
+    [...document.querySelectorAll('.tree-row:not(.tree-root) .tree-name')].map((n) => n.textContent))
+  for (const name of names.slice(0, 8)) {
+    await page.hover(`.tree-row:has-text("${name}")`).catch(() => {})
+    await page.click(`.tree-row:has-text("${name}") .tree-tools button[aria-label="즐겨찾기에 담기"]`)
+      .catch(() => {})
+    await page.waitForTimeout(120)
+  }
+  await page.waitForTimeout(400)
+
+  const panes = await page.evaluate(() => {
+    const scrolls = (el) => el && el.scrollHeight > el.clientHeight + 1
+    const list = document.querySelector('.favorites-list')
+    const tree = document.querySelector('.sidebar-scroll')
+    const outer = document.querySelector('.sidebar-panes')
+    return {
+      favorites: scrolls(list),
+      tree: scrolls(tree),
+      outer: scrolls(outer),
+      headVisible: Boolean(document.querySelector('.favorites-head')),
+    }
+  })
+  console.log('  ' + JSON.stringify(panes))
+  expect('즐겨찾기가 제 안에서 굴러감', panes.favorites, JSON.stringify(panes))
+  expect('트리도 제 안에서 굴러감', panes.tree, JSON.stringify(panes))
+  expect('바깥은 굴러가지 않음', !panes.outer, JSON.stringify(panes))
+  expect('제목은 붙박이로 남음', panes.headVisible, JSON.stringify(panes))
+  await page.screenshot({ path: join(HERE, '..', 'shots', 'favorites', '02-panes.png'),
+    clip: { x: 0, y: 0, width: 460, height: 400 } })
+  await page.setViewportSize({ width: 1400, height: 920 })
+
+  step('11. 콘솔 오류')
   const real = errors.filter((l) => !l.includes('404') && !l.includes('Failed to load resource'))
   if (real.length > 0) fail('콘솔', real.join('\n      '))
   else ok('콘솔 오류 없음')
