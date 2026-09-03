@@ -1,5 +1,5 @@
 import { DEFAULT_SETTINGS, FONTS, SIZES, THEMES, WIDTHS, type ThemeSettings } from './theme'
-import { DEFAULT_SAVE_OPTIONS, type SaveOptions } from './saveOptions'
+import { clampSidebarWidth, DEFAULT_SAVE_OPTIONS, DEFAULT_SIDEBAR_WIDTH, type SaveOptions } from './saveOptions'
 import { DEFAULT_GITHUB_CONFIG } from '../hooks/useGitHubSync'
 import type { GitHubConfig } from '../types'
 
@@ -20,7 +20,12 @@ export interface SettingsBundle {
   /** 어느 폴더에서 내보냈는지. 사람이 알아보라고 적어 둡니다. */
   vaultName: string | null
   appearance: ThemeSettings
-  general: { rememberSession: boolean; sidebarOpen: boolean; includeToken: boolean } & SaveOptions
+  general: {
+    rememberSession: boolean
+    sidebarOpen: boolean
+    sidebarWidth: number
+    includeToken: boolean
+  } & SaveOptions
   github: GitHubConfig | null
 }
 
@@ -29,6 +34,7 @@ export interface ExportInput {
   appearance: ThemeSettings
   rememberSession: boolean
   sidebarOpen: boolean
+  sidebarWidth: number
   saveOptions: SaveOptions
   github: GitHubConfig | null
   /** 액세스 토큰까지 담을지. 파일에 그대로 적히므로 기본은 담지 않습니다. */
@@ -45,6 +51,7 @@ export function buildBundle(input: ExportInput): SettingsBundle {
     general: {
       rememberSession: input.rememberSession,
       sidebarOpen: input.sidebarOpen,
+      sidebarWidth: input.sidebarWidth,
       includeToken: input.includeToken,
       ...input.saveOptions,
     },
@@ -106,6 +113,10 @@ export function parseBundle(raw: string): SettingsBundle | null {
     general: {
       rememberSession: bool(general.rememberSession, true),
       sidebarOpen: bool(general.sidebarOpen, true),
+      // 다른 기기는 창이 더 좁을 수 있습니다. 그쪽 잣대로 다시 재 둡니다.
+      sidebarWidth: typeof general.sidebarWidth === 'number'
+        ? clampSidebarWidth(general.sidebarWidth)
+        : DEFAULT_SIDEBAR_WIDTH,
       includeToken: bool(general.includeToken, false),
       trimWhitespace: bool(general.trimWhitespace, DEFAULT_SAVE_OPTIONS.trimWhitespace),
       tidyFormat: bool(general.tidyFormat, DEFAULT_SAVE_OPTIONS.tidyFormat),

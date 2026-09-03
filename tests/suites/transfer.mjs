@@ -210,6 +210,15 @@ try {
   }
   await page.waitForTimeout(400)
   await page.click('.sheet-close')
+
+  // 트리 너비도 바꿔 둡니다. 이것도 기억되는 취향입니다.
+  const handle = await page.locator('.sidebar-resizer').boundingBox()
+  await page.mouse.move(handle.x + handle.width / 2, handle.y + 200)
+  await page.mouse.down()
+  await page.mouse.move(handle.x - 90, handle.y + 200, { steps: 8 })
+  await page.mouse.up()
+  await page.waitForTimeout(400)
+
   // 트리도 접어 둡니다. 이것도 취향입니다.
   await page.click('.sidebar-toggle')
   await page.waitForTimeout(400)

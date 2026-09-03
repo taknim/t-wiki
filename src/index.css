@@ -1,5 +1,5 @@
 :root {
-  /* 트리 너비. 이름과 단추가 함께 서므로 넉넉하게 둡니다. */
+  /* 트리 너비. 화면에서 끌어 바꿀 수 있고, 그 값이 옆줄에 직접 실립니다. */
   --sidebar-w: 432px;
   /* 접었을 때 남기는 폭. 펴기 단추가 설 자리입니다. */
   --sidebar-rail-w: 52px;
@@ -266,6 +266,35 @@ button, input, select, textarea { font: inherit; color: inherit; }
  * 없애 버리면 단추가 본문 위로 넘어가 상태 표시줄에 덮입니다.
  */
 .sidebar.is-rail { width: var(--sidebar-rail-w); }
+
+/*
+ * 너비 손잡이. 옆줄 오른쪽 모서리에 걸쳐 둡니다.
+ * 보이는 선은 1px 이지만 잡히는 자리는 그보다 넓어야 겨누기 쉽습니다.
+ */
+.sidebar-resizer {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-end: -3px;
+  width: 7px;
+  z-index: 2;
+  cursor: col-resize;
+  touch-action: none;
+}
+.sidebar-resizer::after {
+  content: '';
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 3px;
+  width: 1px;
+  background: transparent;
+  transition: background 120ms ease;
+}
+.sidebar-resizer:hover::after,
+.sidebar-resizer:focus-visible::after { background: var(--accent); width: 2px; }
+.sidebar-resizer:focus-visible { outline: none; }
+@media (prefers-reduced-motion: reduce) {
+  .sidebar-resizer::after { transition: none; }
+}
 
 .sidebar-head { padding: 10px; display: flex; flex-direction: column; gap: 8px; }
 .search-input, .dialog-input {

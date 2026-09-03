@@ -30,6 +30,9 @@ interface SettingsPanelProps {
   /** 트리를 펴 두었는지. 내보내고 들여올 때 함께 다룹니다. */
   sidebarOpen: boolean
   onSidebarOpen: (open: boolean) => void
+  /** 트리 너비. 내보내고 들여올 때 함께 다룹니다. */
+  sidebarWidth: number
+  onSidebarWidth: (width: number) => void
 }
 
 type TabId = 'general' | 'appearance' | 'sync'
@@ -41,7 +44,9 @@ const TABS: { id: TabId; name: string; hint: string }[] = [
 ]
 
 export function SettingsPanel({
-  onClose, sync, onShowReport, vaultName, sidebarOpen, onSidebarOpen, initialTab = 'general',
+  onClose, sync, onShowReport, vaultName,
+  sidebarOpen, onSidebarOpen, sidebarWidth, onSidebarWidth,
+  initialTab = 'general',
 }: SettingsPanelProps) {
   const { settings, isDark, update } = useTheme()
   const dialogs = useDialogs()
@@ -77,6 +82,7 @@ export function SettingsPanel({
       appearance: settings,
       rememberSession: remember,
       sidebarOpen,
+      sidebarWidth,
       saveOptions,
       github: sync.isConfigured || sync.config.token ? sync.config : null,
       includeToken,
@@ -126,6 +132,7 @@ export function SettingsPanel({
     setRemember(bundle.general.rememberSession)
     setRememberEnabled(bundle.general.rememberSession)
     onSidebarOpen(bundle.general.sidebarOpen)
+    onSidebarWidth(bundle.general.sidebarWidth)
     setIncludeToken(bundle.general.includeToken)
     writeIncludeToken(bundle.general.includeToken)
     const next = {

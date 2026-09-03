@@ -25,7 +25,10 @@ import { extractHeadings, parseFrontmatter } from './lib/markdown'
 import { readFile } from './lib/fsAccess'
 import { loadSession, saveSession } from './lib/session'
 import { formatTidyFor, textPreviewKind, trimWhitespace } from './lib/textPreview'
-import { readSaveOptions, readSidebarOpen, writeSidebarOpen } from './lib/saveOptions'
+import {
+  clampSidebarWidth, DEFAULT_SIDEBAR_WIDTH, maxSidebarWidth, MIN_SIDEBAR_WIDTH,
+  readSaveOptions, readSidebarOpen, readSidebarWidth, writeSidebarOpen, writeSidebarWidth,
+} from './lib/saveOptions'
 import { displayPath, fileNameOf } from './lib/paths'
 import type { CSSProperties } from 'react'
 import type { ViewMode, VaultNode } from './types'
@@ -337,6 +340,45 @@ export default function App() {
     setSidebarOpen(open)
     writeSidebarOpen(open)
   }, [])
+
+  const [sidebarWidth, setSidebarWidth] = useState(readSidebarWidth)
+  const dragging = useRef(false)
+
+  /*
+   * 끄는 동안에는 화면만 바꾸고, 손을 뗄 때 한 번 저장합니다.
+   * 움직일 때마다 저장하면 한 번 끄는 사이에 수백 번을 쓰게 됩니다.
+   */
+  const applySidebarWidth = useCallback((width: number, save = true) => {
+    const next = clampSidebarWidth(width)
+    setSidebarWidth(next)
+    if (save) writeSidebarWidth(next)
+  }, [])
+
+  const startResize = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    event.preventDefault()
+    dragging.current = true
+    const handle = event.currentTarget
+    handle.setPointerCapture(event.pointerId)
+    // 끄는 동안 글자가 딸려 잡히지 않게 합니다.
+    document.body.style.userSelect = 'none'
+    document.body.style.cursor = 'col-resize'
+  }, [])
+
+  const moveResize = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    if (!dragging.current) return
+    // 옆줄 왼쪽 끝에서 지금 손가락까지가 곧 너비입니다.
+    const left = event.currentTarget.parentElement?.getBoundingClientRect().left ?? 0
+    applySidebarWidth(event.clientX - left, false)
+  }, [applySidebarWidth])
+
+  const endResize = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    if (!dragging.current) return
+    dragging.current = false
+    event.currentTarget.releasePointerCapture(event.pointerId)
+    document.body.style.userSelect = ''
+    document.body.style.cursor = ''
+    writeSidebarWidth(sidebarWidth)
+  }, [sidebarWidth])
   const currentDir = selectedDir ?? (selectedPath ? selectedPath.split('/').slice(0, -1).join('/') : '')
 
   const filePicker = useRef<HTMLInputElement>(null)
@@ -662,7 +704,10 @@ export default function App() {
       </header>
 
       <div className="body">
-        <aside className={sidebarOpen ? 'sidebar' : 'sidebar is-rail'}>
+        <aside
+          className={sidebarOpen ? 'sidebar' : 'sidebar is-rail'}
+          style={{ '--sidebar-w': `${sidebarWidth}px` } as CSSProperties}
+        >
           {/* 접으면 검색란은 접히고 이 줄에는 펴기 단추만 남습니다. */}
           <div className="sidebar-head">
             <div className="sidebar-search">
@@ -779,6 +824,37 @@ export default function App() {
               )
             )}
           </div>
+          )}
+
+          {sidebarOpen && (
+            /*
+             * 너비 손잡이. 자판으로도 옮길 수 있어야 하므로 나눔 막대로 알립니다.
+             * 두 번 누르면 처음 폭으로 돌아갑니다.
+             */
+            <div
+              className="sidebar-resizer"
+              role="separator"
+              aria-orientation="vertical"
+              aria-label="폴더 트리 너비"
+              aria-valuenow={sidebarWidth}
+              aria-valuemin={MIN_SIDEBAR_WIDTH}
+              aria-valuemax={maxSidebarWidth()}
+              tabIndex={0}
+              data-tip="끌어서 너비를 조절합니다. 두 번 누르면 처음 폭으로 돌아갑니다"
+              onPointerDown={startResize}
+              onPointerMove={moveResize}
+              onPointerUp={endResize}
+              onPointerCancel={endResize}
+              onDoubleClick={() => applySidebarWidth(DEFAULT_SIDEBAR_WIDTH)}
+              onKeyDown={(event) => {
+                const step = event.shiftKey ? 48 : 16
+                if (event.key === 'ArrowLeft') applySidebarWidth(sidebarWidth - step)
+                else if (event.key === 'ArrowRight') applySidebarWidth(sidebarWidth + step)
+                else if (event.key === 'Home') applySidebarWidth(DEFAULT_SIDEBAR_WIDTH)
+                else return
+                event.preventDefault()
+              }}
+            />
           )}
         </aside>
 
@@ -903,6 +979,8 @@ export default function App() {
           vaultName={vault.vaultName ?? null}
           sidebarOpen={sidebarOpen}
           onSidebarOpen={applySidebarOpen}
+          sidebarWidth={sidebarWidth}
+          onSidebarWidth={(width) => applySidebarWidth(width)}
           onShowReport={() => setReportOpen(true)}
           onClose={() => setSettingsTab(null)}
         />

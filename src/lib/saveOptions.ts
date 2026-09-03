@@ -85,3 +85,41 @@ export function writeIncludeToken(include: boolean): void {
     // 저장이 막혀 있어도 이번에는 그대로 적용됩니다.
   }
 }
+
+/*
+ * 트리 너비. 사람마다 문서 이름 길이가 달라 알맞은 폭이 다릅니다.
+ *
+ * 너무 좁으면 이름이 잘리고 너무 넓으면 본문이 없어지므로 양끝을 막아 둡니다.
+ * 창보다 넓어지는 일도 막습니다. 창을 줄여 놓고 온 다음 판에서도 본문이 남아야 합니다.
+ */
+const SIDEBAR_WIDTH = 'mdwiki:sidebar-width'
+
+export const DEFAULT_SIDEBAR_WIDTH = 432
+export const MIN_SIDEBAR_WIDTH = 240
+
+export function maxSidebarWidth(): number {
+  const room = typeof window === 'undefined' ? 1200 : window.innerWidth
+  return Math.max(MIN_SIDEBAR_WIDTH, Math.min(720, Math.round(room * 0.6)))
+}
+
+export function clampSidebarWidth(width: number): number {
+  if (!Number.isFinite(width)) return DEFAULT_SIDEBAR_WIDTH
+  return Math.min(Math.max(Math.round(width), MIN_SIDEBAR_WIDTH), maxSidebarWidth())
+}
+
+export function readSidebarWidth(): number {
+  try {
+    const saved = Number(localStorage.getItem(SIDEBAR_WIDTH))
+    return saved ? clampSidebarWidth(saved) : DEFAULT_SIDEBAR_WIDTH
+  } catch {
+    return DEFAULT_SIDEBAR_WIDTH
+  }
+}
+
+export function writeSidebarWidth(width: number): void {
+  try {
+    localStorage.setItem(SIDEBAR_WIDTH, String(clampSidebarWidth(width)))
+  } catch {
+    // 저장이 막혀 있어도 이번에는 그대로 적용됩니다.
+  }
+}
