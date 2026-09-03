@@ -6,6 +6,7 @@ import { AssetView } from './components/AssetView'
 import { FolderView } from './components/FolderView'
 import { InfoBar, type SelectionInfo } from './components/InfoBar'
 import { SearchPanel } from './components/SearchPanel'
+import { Favorites } from './components/Favorites'
 import { SyncCountdown } from './components/SyncCountdown'
 import { ViewModeSwitch } from './components/ViewModeSwitch'
 import {
@@ -30,6 +31,8 @@ import {
   readSaveOptions, readSidebarOpen, readSidebarWidth, writeSidebarOpen, writeSidebarWidth,
 } from './lib/saveOptions'
 import { displayPath, fileNameOf } from './lib/paths'
+import { loadFavorites, saveFavorites } from './lib/store'
+import { vaultKeyFor } from './lib/vaultKey'
 import type { CSSProperties } from 'react'
 import type { ViewMode, VaultNode } from './types'
 
@@ -341,6 +344,51 @@ export default function App() {
     writeSidebarOpen(open)
   }, [])
 
+  /*
+   * 즐겨찾기. 폴더마다 따로 두므로 폴더가 바뀌면 다시 읽어 옵니다.
+   * 표를 못 얻으면(폴더를 가려낼 수 없으면) 담아 두지 않습니다.
+   * 남의 폴더 즐겨찾기를 여기에 붙여 봐야 가리키는 곳이 없습니다.
+   */
+  const [favorites, setFavorites] = useState<string[]>([])
+  const favoriteKey = useRef<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      if (!vault.root) {
+        favoriteKey.current = null
+        if (!cancelled) setFavorites([])
+        return
+      }
+      const key = await vaultKeyFor(vault.root)
+      const saved = key ? await loadFavorites(key) : []
+      if (cancelled) return
+      favoriteKey.current = key
+      setFavorites(saved)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [vault.root])
+
+  /** 화면과 저장을 한 자리에서 맞춥니다. 이름을 바꾸거나 옮길 때도 이 길로 들어옵니다. */
+  const applyFavorites = useCallback((next: string[]) => {
+    setFavorites(next)
+    const key = favoriteKey.current
+    if (key) void saveFavorites(key, next)
+  }, [])
+
+  const toggleFavorite = useCallback((path: string) => {
+    setFavorites((previous) => {
+      const next = previous.includes(path)
+        ? previous.filter((one) => one !== path)
+        : [...previous, path]
+      const key = favoriteKey.current
+      if (key) void saveFavorites(key, next)
+      return next
+    })
+  }, [])
+
   const [sidebarWidth, setSidebarWidth] = useState(readSidebarWidth)
   const dragging = useRef(false)
 
@@ -514,11 +562,12 @@ export default function App() {
         await commit()
         const next = await vault.rename(path, name)
         if (selectedPath === path) setSelectedPath(next)
+        applyFavorites(movedFavorites(favorites, path, next))
       } catch (cause) {
         report(cause)
       }
     },
-    [commit, dialogs, report, selectedPath, vault],
+    [applyFavorites, commit, dialogs, favorites, report, selectedPath, vault],
   )
 
   const handleDelete = useCallback(
@@ -535,6 +584,13 @@ export default function App() {
       if (!ok) return
       try {
         await vault.remove(path)
+        // 지워진 것과 그 아래 것들을 즐겨찾기에서도 뺍니다.
+        setFavorites((previous) => {
+          const next = previous.filter((one) => one !== path && !one.startsWith(`${path}/`))
+          const key = favoriteKey.current
+          if (key && next.length !== previous.length) void saveFavorites(key, next)
+          return next
+        })
         if (selectedPath === path || selectedPath?.startsWith(`${path}/`)) {
           setSelectedPath(null)
           setDraft('')
@@ -555,11 +611,12 @@ export default function App() {
         await commit()
         const next = await vault.move(from, targetDir)
         if (selectedPath === from) setSelectedPath(next)
+        applyFavorites(movedFavorites(favorites, from, next))
       } catch (cause) {
         report(cause)
       }
     },
-    [commit, report, selectedPath, vault],
+    [applyFavorites, commit, favorites, report, selectedPath, vault],
   )
 
   const handleOpenLink = useCallback(
@@ -778,6 +835,18 @@ export default function App() {
 
           {sidebarOpen && (
           <div className="sidebar-scroll">
+            {!query.trim() && (
+              <Favorites
+                paths={favorites}
+                root={vault.tree}
+                onOpen={(path) => void (isMarkdown(path) ? openDoc(path) : openAsset(path))}
+                onOpenDir={(path) => {
+                  setSelectedDir(path)
+                  setSelectedPath(null)
+                }}
+                onRemove={toggleFavorite}
+              />
+            )}
             {query.trim() ? (
               <SearchPanel
                 query={query}
@@ -816,6 +885,8 @@ export default function App() {
                   onDelete={(path) => void handleDelete(path)}
                   onMove={(from, dir) => void handleMove(from, dir)}
                   onDropFiles={(dir, files) => void handleAddFiles(files, dir)}
+                  favorites={favorites}
+                  onToggleFavorite={toggleFavorite}
                   onPickFilesFor={(dir) => {
                     pickerDir.current = dir
                     filePicker.current?.click()
@@ -1022,4 +1093,15 @@ function rollUp(node: VaultNode): { size: number; files: number } {
     files += inner.files
   }
   return { size, files }
+}
+
+/**
+ * 이름을 바꾸거나 옮겼을 때 즐겨찾기를 따라 옮깁니다.
+ * 폴더를 옮기면 그 안에 있던 것들의 경로도 함께 바뀝니다.
+ */
+function movedFavorites(paths: string[], from: string, to: string): string[] {
+  return paths.map((one) => {
+    if (one === from) return to
+    return one.startsWith(`${from}/`) ? to + one.slice(from.length) : one
+  })
 }

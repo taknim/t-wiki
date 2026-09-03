@@ -2,7 +2,7 @@ import { useState } from 'react'
 import type { VaultNode } from '../types'
 import {
   ChevronIcon, ClipIcon, DocIcon, DocPlusIcon, FolderCloseIcon, FolderIcon, FolderPlusIcon,
-  ImageIcon, PencilIcon, RefreshIcon, TrashIcon,
+  ImageIcon, PencilIcon, RefreshIcon, StarIcon, TrashIcon,
 } from './icons'
 import { attachmentKind } from '../lib/attachments'
 import { isMarkdown } from '../lib/attachments'
@@ -20,6 +20,10 @@ export interface TreeActions {
   onDropFiles: (targetDir: string, files: File[]) => void
   /** 그 폴더에 넣을 파일을 고르는 창을 엽니다. */
   onPickFilesFor: (dirPath: string) => void
+  /** 즐겨찾기에 담거나 뺍니다. */
+  onToggleFavorite: (path: string) => void
+  /** 지금 즐겨찾기에 담긴 경로들. */
+  favorites: string[]
 }
 
 interface TreeViewProps extends TreeActions {
@@ -115,6 +119,7 @@ function TreeRow({ node, depth, selectedPath, expanded, onToggle, ...actions }: 
   const isOpen = expanded.has(node.path)
   const isSelected = selectedPath === node.path
 
+  const isFavorite = actions.favorites.includes(node.path)
   const parentDir = node.path.split('/').slice(0, -1).join('/')
   const dropDir = isDir ? node.path : parentDir
 
@@ -166,6 +171,7 @@ function TreeRow({ node, depth, selectedPath, expanded, onToggle, ...actions }: 
         <span className={isOpen ? 'tree-caret is-open' : 'tree-caret'}>
           {isDir && <ChevronIcon />}
         </span>
+        {isFavorite && <StarIcon className="tree-star" filled />}
         <span className={`tree-icon is-${kindOf(node)}`}>
           {isDir ? <FolderIcon /> : kindOf(node) === 'image' ? <ImageIcon /> : <DocIcon />}
         </span>
@@ -202,6 +208,16 @@ function TreeRow({ node, depth, selectedPath, expanded, onToggle, ...actions }: 
               </button>
             </>
           )}
+          <button
+            type="button"
+            className={isFavorite ? 'is-on' : ''}
+            aria-label={isFavorite ? '즐겨찾기에서 빼기' : '즐겨찾기에 담기'}
+            aria-pressed={isFavorite}
+            data-tip={isFavorite ? '즐겨찾기에서 뺍니다' : '즐겨찾기에 담아 위쪽에 둡니다'}
+            onClick={() => actions.onToggleFavorite(node.path)}
+          >
+            <StarIcon filled={isFavorite} />
+          </button>
           <button
             type="button"
             aria-label="이름 바꾸기"

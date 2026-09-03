@@ -7,6 +7,7 @@ const GITHUB_CONFIG = 'mdwiki:github-config'
 const SYNC_STATE = 'mdwiki:sync-state'
 const LAST_SYNC = 'mdwiki:last-sync-at'
 const ASSET_HASHES = 'mdwiki:asset-hashes'
+const FAVORITES = 'mdwiki:favorites'
 
 /**
  * FileSystemDirectoryHandle 은 구조화 복제가 되므로 IndexedDB 에 그대로 넣어둘 수 있습니다.
@@ -181,4 +182,19 @@ async function runMigration(): Promise<void> {
   } catch {
     // 옮기지 못해도 쓰던 흐름은 끊지 않습니다. 설정을 다시 넣으면 됩니다.
   }
+}
+
+/**
+ * 즐겨찾기. 폴더마다 따로 둡니다.
+ *
+ * 경로를 그대로 적어 둡니다. 폴더가 커지면 이름이 겹치기 마련이라 이름으로는
+ * 가릴 수 없습니다. 이름을 바꾸거나 옮기면 그때 이 목록도 함께 고쳐 줍니다.
+ */
+export const loadFavorites = async (vault: string): Promise<string[]> =>
+  (await readByVault<string[]>(FAVORITES))[vault] ?? []
+
+export async function saveFavorites(vault: string, paths: string[]): Promise<void> {
+  const store = await readByVault<string[]>(FAVORITES)
+  store[vault] = paths
+  await set(FAVORITES, store)
 }

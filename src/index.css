@@ -311,6 +311,60 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .sidebar-scroll { flex: 1; overflow: auto; padding: 0 6px 16px; min-height: 0; }
 
 
+/*
+ * 즐겨찾기. 트리 위에 붙박이로 둡니다. 많이 담아 두어도 트리를 밀어내지 않도록
+ * 높이를 막고 그 안에서 굴러가게 합니다.
+ */
+.favorites { margin: 4px 0 8px; }
+.favorites-head {
+  margin: 0 0 4px;
+  padding-inline-start: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: 0.02em;
+}
+.favorites-list {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 6px;
+  max-height: 30vh;
+  overflow: auto;
+  border-block-end: 1px solid var(--border);
+}
+.favorites-list li { display: flex; align-items: center; gap: 2px; }
+.favorites-item {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 6px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  cursor: pointer;
+  text-align: start;
+  color: inherit;
+}
+.favorites-item:hover { background: var(--bg-raised); }
+.favorites-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.favorites-drop {
+  flex: none;
+  display: inline-flex;
+  padding: 3px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--warn);
+  cursor: pointer;
+}
+.favorites-drop:hover { background: var(--bg-raised); }
+
+/* 담아 둔 줄은 트리에서도 별로 알아봅니다. */
+.tree-star { flex: none; color: var(--warn); }
+.tree-tools button.is-on { color: var(--warn); }
+
 .tree { min-height: 100%; }
 
 /*

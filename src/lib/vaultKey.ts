@@ -31,6 +31,15 @@ async function findIndex(refs: VaultRef[], root: FileSystemDirectoryHandle): Pro
   return -1
 }
 
+/*
+ * 표를 매기는 일은 한 줄로 세웁니다.
+ *
+ * 읽고 · 없으면 만들고 · 쓰는 세 걸음 사이에 다른 부름이 끼어들면, 둘 다 "처음 보는
+ * 폴더" 로 읽고 각자 새 표를 냅니다. 그러면 같은 폴더에 표가 둘 생기고, 한쪽이 담아 둔
+ * 것을 다른 쪽이 못 찾습니다. 실제로 동기화와 즐겨찾기가 같은 순간에 물어보다 그랬습니다.
+ */
+let queue: Promise<unknown> = Promise.resolve()
+
 /**
  * 이 폴더의 표. 처음 보는 폴더면 새로 매겨 둡니다.
  *
@@ -38,7 +47,14 @@ async function findIndex(refs: VaultRef[], root: FileSystemDirectoryHandle): Pro
  * 가려내지 못하는데 표를 새로 매기면, 이미 표가 있는 폴더에 표가 하나 더 생깁니다.
  * 그러면 같은 폴더가 둘로 갈려 맞춰 둔 설정이 사라진 것처럼 보입니다.
  */
-export async function vaultKeyFor(root: FileSystemDirectoryHandle): Promise<string | null> {
+export function vaultKeyFor(root: FileSystemDirectoryHandle): Promise<string | null> {
+  const next = queue.then(() => resolveKey(root))
+  // 앞의 것이 넘어져도 줄은 이어집니다.
+  queue = next.catch(() => undefined)
+  return next
+}
+
+async function resolveKey(root: FileSystemDirectoryHandle): Promise<string | null> {
   // 견줄 수단이 없으면 이 폴더가 어느 폴더인지 알 길이 없습니다.
   if (typeof root.isSameEntry !== 'function') return null
 
