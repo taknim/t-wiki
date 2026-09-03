@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { AssetIndex, DocIndex, VaultNode } from '../types'
 import {
-  attachmentKind, extensionOf, isAttachment, isMarkdown, MAX_ATTACHMENT_BYTES,
+  attachmentKind, extensionOf, isAttachment, isMarkdown, isSyncable, MAX_ATTACHMENT_BYTES,
 } from '../lib/attachments'
 import { clearAssetCache } from '../lib/assets'
 import * as fs from '../lib/fsAccess'
@@ -216,13 +216,14 @@ export function useVault(): Vault {
       setAssets((previous) => {
         const next = new Map(previous)
         const entry = next.get(path)
-        if (entry) {
-          next.set(path, {
-            ...entry,
-            size: new TextEncoder().encode(content).length,
-            lastModified,
-          })
-        }
+        const size = new TextEncoder().encode(content).length
+        /*
+         * 없던 파일이면 새로 답니다. 예전에는 있는 것만 고쳐, 여기서 처음 만든 파일이
+         * 목록에 없어 다음 동기화에서 통째로 빠졌습니다.
+         */
+        next.set(path, entry
+          ? { ...entry, size, lastModified }
+          : { path, size, lastModified, syncable: isSyncable(path, size) })
         return next
       })
     },

@@ -80,9 +80,10 @@ try {
   expect('폴더도 열림', (await page.textContent('.info-path')).trim() === '/회사',
     await page.textContent('.info-path'))
 
-  step('5. 새로고침해도 남는다')
-  await page.reload({ waitUntil: 'domcontentloaded' })
+  step('5. 폴더를 닫았다 다시 열어도 남는다')
+  await closeVault()
   await openVault('first')
+  await page.waitForTimeout(400)
   const kept = await listed()
   console.log('  ' + JSON.stringify(kept))
   expect('그대로 있음', kept.length === 2, JSON.stringify(kept))
@@ -185,13 +186,53 @@ try {
   step('12. 새로고침해도 접힌 채로 있다')
   await page.reload({ waitUntil: 'domcontentloaded' })
   await openVault('first')
+  // 이 시험대의 목 폴더는 새로고침하면 새로 생깁니다. 볼 것이 있어야 하니 하나 담습니다.
+  await star('개발 환경')
   await page.waitForTimeout(400)
   expect('접힌 채로 열림', (await page.locator('.favorites-list').count()) === 0)
+  expect('이름은 보임', (await page.locator('.favorites-head').count()) === 1)
   await page.click('.favorites-head')
   await page.waitForTimeout(400)
   expect('다시 펼 수 있음', (await page.locator('.favorites-list').count()) === 1)
 
-  step('13. 콘솔 오류')
+  step('13. 폴더 안 파일에 적히고 트리에는 안 보인다')
+  const onDisk = await page.evaluate(async () => {
+    const names = [...window.__mockRoot._children.keys()]
+    let body = null
+    try {
+      const handle = await window.__mockRoot.getFileHandle('_t-wiki.favorites.json')
+      body = await (await handle.getFile()).text()
+    } catch { /* 없으면 null */ }
+    return { names, body }
+  })
+  console.log('  폴더 안: ' + JSON.stringify(onDisk.names))
+  console.log('  파일 내용: ' + String(onDisk.body).replace(/\s+/g, ' '))
+  expect('파일이 만들어짐', onDisk.names.includes('_t-wiki.favorites.json'),
+    JSON.stringify(onDisk.names))
+  expect('담아 둔 것이 적혀 있음', Array.isArray(JSON.parse(onDisk.body ?? 'null')),
+    String(onDisk.body))
+  expect('트리에는 보이지 않음',
+    (await page.locator('.tree-row:has-text("_t-wiki.favorites")').count()) === 0)
+
+  step('14. 브라우저에 아무것도 없어도 폴더 안 파일에서 읽어 온다')
+  /*
+   * 브라우저 저장소를 비워 딴 기기에서 온 것처럼 만듭니다. 새로고침은 하지 않습니다.
+   * 이 시험대의 목 폴더는 새로고침하면 새로 생겨, 정작 봐야 할 파일이 사라집니다.
+   */
+  await page.evaluate(async () => {
+    await new Promise((done) => {
+      const req = indexedDB.deleteDatabase('keyval-store')
+      req.onsuccess = () => done(); req.onerror = () => done(); req.onblocked = () => done()
+    })
+  })
+  await closeVault()
+  await openVault('first')
+  await page.waitForTimeout(600)
+  const carried = await listed()
+  console.log('  ' + JSON.stringify(carried))
+  expect('파일에서 읽어 옴', carried.length > 0, JSON.stringify(carried))
+
+  step('15. 콘솔 오류')
   const real = errors.filter((l) => !l.includes('404') && !l.includes('Failed to load resource'))
   if (real.length > 0) fail('콘솔', real.join('\n      '))
   else ok('콘솔 오류 없음')

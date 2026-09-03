@@ -118,7 +118,27 @@ try {
   expect('A 에서도 지워지지 않음', before.every((path) => finalFiles.includes(path)),
     JSON.stringify(before.filter((p) => !finalFiles.includes(p))))
 
-  step('6. 콘솔 오류')
+  step('6. 즐겨찾기가 저장소를 타고 넘어간다')
+  // A 에서 담아 두고 올리면, B 가 내려받아 그대로 보여야 합니다.
+  await a.page.hover('.tree-row:has-text("개발 환경")')
+  await a.page.click('.tree-row:has-text("개발 환경") .tree-tools button[aria-label="즐겨찾기에 담기"]')
+  await a.page.waitForTimeout(500)
+  await sync(a.page)
+  const uploaded = files()
+  console.log('  저장소: ' + JSON.stringify(uploaded))
+  expect('즐겨찾기 파일이 올라감', uploaded.includes('_t-wiki.favorites.json'),
+    JSON.stringify(uploaded))
+
+  await sync(b.page)
+  await b.page.waitForTimeout(700)
+  const carried = await b.page.evaluate(() =>
+    [...document.querySelectorAll('.favorites-name')].map((n) => n.textContent))
+  console.log('  B 화면의 즐겨찾기: ' + JSON.stringify(carried))
+  expect('B 에서도 보임', carried.includes('개발 환경.md'), JSON.stringify(carried))
+  expect('B 트리에는 그 파일이 안 보임',
+    (await b.page.locator('.tree-row:has-text("_t-wiki.favorites")').count()) === 0)
+
+  step('7. 콘솔 오류')
   const real = errors.filter((l) => !l.includes('404') && !l.includes('Failed to load resource'))
   if (real.length > 0) fail('콘솔', real.join('\n      '))
   else ok('콘솔 오류 없음')

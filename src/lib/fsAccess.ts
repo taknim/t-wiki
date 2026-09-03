@@ -1,5 +1,6 @@
 import type { AssetIndex, DocIndex, VaultNode } from '../types'
 import { isAttachment, isMarkdown, isSyncable } from './attachments'
+import { isAppFile } from './paths'
 
 /** 볼트 안에서 무시할 이름들. 점으로 시작하는 항목은 전부 별도로 걸러냅니다. */
 const IGNORED = new Set(['node_modules', 'Icon\r'])
@@ -96,7 +97,8 @@ async function walk(
     })
 
     // 아는 형식만 트리에 보여 줍니다. 그래야 목록이 잡동사니로 넘치지 않습니다.
-    if (isAttachment(name)) {
+    // 앱이 두는 살림 파일은 목록에서 빼되, 위 assets 에는 남아 동기화는 됩니다.
+    if (isAttachment(name) && !isAppFile(path)) {
       children.push({ kind: 'file', name, path, lastModified: file.lastModified, size: file.size })
     }
   }

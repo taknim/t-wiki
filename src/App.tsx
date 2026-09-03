@@ -31,8 +31,9 @@ import {
   readFavoritesOpen, readSaveOptions, readSidebarOpen, readSidebarWidth,
   writeFavoritesOpen, writeSidebarOpen, writeSidebarWidth,
 } from './lib/saveOptions'
-import { displayPath, fileNameOf } from './lib/paths'
-import { loadFavorites, saveFavorites } from './lib/store'
+import { displayPath, FAVORITES_FILE, fileNameOf } from './lib/paths'
+import { loadFavorites } from './lib/store'
+import { favoritesFileBody, readFavoritesFile } from './lib/favorites'
 import { vaultKeyFor } from './lib/vaultKey'
 import type { CSSProperties } from 'react'
 import type { ViewMode, VaultNode } from './types'
@@ -147,7 +148,11 @@ export default function App() {
     docs: vault.index,
     assets: vault.assets,
     onBeforeSync: commit,
-    onLocalChanged: vault.refresh,
+    onLocalChanged: async () => {
+      await vault.refresh()
+      // 저장소에서 즐겨찾기 파일이 내려왔을 수 있습니다.
+      if (vault.root) setFavorites(await loadFavoritesFor(vault.root))
+    },
   })
 
   // 동기화가 끝나면 결과를 알려 주고, 문제가 있을 때만 자세한 창을 엽니다.
@@ -351,44 +356,50 @@ export default function App() {
    * 남의 폴더 즐겨찾기를 여기에 붙여 봐야 가리키는 곳이 없습니다.
    */
   const [favorites, setFavorites] = useState<string[]>([])
-  const favoriteKey = useRef<string | null>(null)
+
+  /*
+   * 즐겨찾기는 폴더 안 파일에 적어 둡니다. 그래야 동기화를 타고 다른 기기로도 갑니다.
+   * 폴더별로 갈리는 것은 그대로입니다. 파일이 그 폴더 안에 있으니까요.
+   */
+  const loadFavoritesFor = useCallback(async (root: FileSystemDirectoryHandle) => {
+    const fromFile = await readFavoritesFile(root)
+    if (fromFile) return fromFile
+
+    // 파일이 아직 없으면, 브라우저에만 두던 시절의 것을 한 번 넘겨받습니다.
+    const key = await vaultKeyFor(root)
+    return key ? await loadFavorites(key) : []
+  }, [])
 
   useEffect(() => {
     let cancelled = false
     void (async () => {
       if (!vault.root) {
-        favoriteKey.current = null
         if (!cancelled) setFavorites([])
         return
       }
-      const key = await vaultKeyFor(vault.root)
-      const saved = key ? await loadFavorites(key) : []
-      if (cancelled) return
-      favoriteKey.current = key
-      setFavorites(saved)
+      const saved = await loadFavoritesFor(vault.root)
+      if (!cancelled) setFavorites(saved)
     })()
     return () => {
       cancelled = true
     }
-  }, [vault.root])
+  }, [vault.root, loadFavoritesFor])
 
-  /** 화면과 저장을 한 자리에서 맞춥니다. 이름을 바꾸거나 옮길 때도 이 길로 들어옵니다. */
+  /** 화면과 파일을 한 자리에서 맞춥니다. 이름을 바꾸거나 옮길 때도 이 길로 들어옵니다. */
   const applyFavorites = useCallback((next: string[]) => {
     setFavorites(next)
-    const key = favoriteKey.current
-    if (key) void saveFavorites(key, next)
-  }, [])
+    void vault.saveText(FAVORITES_FILE, favoritesFileBody(next)).catch(report)
+  }, [report, vault])
 
   const toggleFavorite = useCallback((path: string) => {
     setFavorites((previous) => {
       const next = previous.includes(path)
         ? previous.filter((one) => one !== path)
         : [...previous, path]
-      const key = favoriteKey.current
-      if (key) void saveFavorites(key, next)
+      void vault.saveText(FAVORITES_FILE, favoritesFileBody(next)).catch(report)
       return next
     })
-  }, [])
+  }, [report, vault])
 
   const [favoritesOpen, setFavoritesOpen] = useState(readFavoritesOpen)
 
@@ -595,8 +606,9 @@ export default function App() {
         // 지워진 것과 그 아래 것들을 즐겨찾기에서도 뺍니다.
         setFavorites((previous) => {
           const next = previous.filter((one) => one !== path && !one.startsWith(`${path}/`))
-          const key = favoriteKey.current
-          if (key && next.length !== previous.length) void saveFavorites(key, next)
+          if (next.length !== previous.length) {
+            void vault.saveText(FAVORITES_FILE, favoritesFileBody(next)).catch(report)
+          }
           return next
         })
         if (selectedPath === path || selectedPath?.startsWith(`${path}/`)) {
