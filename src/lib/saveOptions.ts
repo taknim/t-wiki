@@ -123,3 +123,22 @@ export function writeSidebarWidth(width: number): void {
     // 저장이 막혀 있어도 이번에는 그대로 적용됩니다.
   }
 }
+
+/** 즐겨찾기 칸을 펴 두었는지. 접으면 이름만 남습니다. */
+const FAVORITES_OPEN = 'mdwiki:favorites-open'
+
+export function readFavoritesOpen(): boolean {
+  try {
+    return localStorage.getItem(FAVORITES_OPEN) !== 'off'
+  } catch {
+    return true
+  }
+}
+
+export function writeFavoritesOpen(open: boolean): void {
+  try {
+    localStorage.setItem(FAVORITES_OPEN, open ? 'on' : 'off')
+  } catch {
+    // 저장이 막혀 있어도 이번에는 그대로 적용됩니다.
+  }
+}

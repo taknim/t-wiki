@@ -165,7 +165,33 @@ try {
     clip: { x: 0, y: 0, width: 460, height: 400 } })
   await page.setViewportSize({ width: 1400, height: 920 })
 
-  step('11. 콘솔 오류')
+  step('11. 접으면 이름만 남는다')
+  await page.click('.favorites-head')
+  await page.waitForTimeout(400)
+  const closed = await page.evaluate(() => ({
+    head: Boolean(document.querySelector('.favorites-head')),
+    list: document.querySelectorAll('.favorites-list').length,
+    expanded: document.querySelector('.favorites-head')?.getAttribute('aria-expanded'),
+    height: Math.round(document.querySelector('.favorites').getBoundingClientRect().height),
+  }))
+  console.log('  ' + JSON.stringify(closed))
+  expect('이름은 남음', closed.head, JSON.stringify(closed))
+  expect('목록은 사라짐', closed.list === 0, JSON.stringify(closed))
+  expect('접힘이 표시됨', closed.expanded === 'false', String(closed.expanded))
+  expect('높이가 이름만큼으로 줄어듦', closed.height < 60, String(closed.height))
+  await page.screenshot({ path: join(HERE, '..', 'shots', 'favorites', '03-closed.png'),
+    clip: { x: 0, y: 40, width: 460, height: 260 } })
+
+  step('12. 새로고침해도 접힌 채로 있다')
+  await page.reload({ waitUntil: 'domcontentloaded' })
+  await openVault('first')
+  await page.waitForTimeout(400)
+  expect('접힌 채로 열림', (await page.locator('.favorites-list').count()) === 0)
+  await page.click('.favorites-head')
+  await page.waitForTimeout(400)
+  expect('다시 펼 수 있음', (await page.locator('.favorites-list').count()) === 1)
+
+  step('13. 콘솔 오류')
   const real = errors.filter((l) => !l.includes('404') && !l.includes('Failed to load resource'))
   if (real.length > 0) fail('콘솔', real.join('\n      '))
   else ok('콘솔 오류 없음')

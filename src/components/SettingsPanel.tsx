@@ -33,6 +33,9 @@ interface SettingsPanelProps {
   /** 트리 너비. 내보내고 들여올 때 함께 다룹니다. */
   sidebarWidth: number
   onSidebarWidth: (width: number) => void
+  /** 즐겨찾기 칸을 펴 두었는지. 내보내고 들여올 때 함께 다룹니다. */
+  favoritesOpen: boolean
+  onFavoritesOpen: (open: boolean) => void
 }
 
 type TabId = 'general' | 'appearance' | 'sync'
@@ -45,7 +48,7 @@ const TABS: { id: TabId; name: string; hint: string }[] = [
 
 export function SettingsPanel({
   onClose, sync, onShowReport, vaultName,
-  sidebarOpen, onSidebarOpen, sidebarWidth, onSidebarWidth,
+  sidebarOpen, onSidebarOpen, sidebarWidth, onSidebarWidth, favoritesOpen, onFavoritesOpen,
   initialTab = 'general',
 }: SettingsPanelProps) {
   const { settings, isDark, update } = useTheme()
@@ -83,6 +86,7 @@ export function SettingsPanel({
       rememberSession: remember,
       sidebarOpen,
       sidebarWidth,
+      favoritesOpen,
       saveOptions,
       github: sync.isConfigured || sync.config.token ? sync.config : null,
       includeToken,
@@ -133,6 +137,7 @@ export function SettingsPanel({
     setRememberEnabled(bundle.general.rememberSession)
     onSidebarOpen(bundle.general.sidebarOpen)
     onSidebarWidth(bundle.general.sidebarWidth)
+    onFavoritesOpen(bundle.general.favoritesOpen)
     setIncludeToken(bundle.general.includeToken)
     writeIncludeToken(bundle.general.includeToken)
     const next = {

@@ -211,6 +211,13 @@ try {
   await page.waitForTimeout(400)
   await page.click('.sheet-close')
 
+  // 즐겨찾기 칸도 접어 둡니다. 이것도 기억되는 취향입니다.
+  await page.hover('.tree-row:has-text("개발 환경")')
+  await page.click('.tree-row:has-text("개발 환경") .tree-tools button[aria-label="즐겨찾기에 담기"]')
+  await page.waitForTimeout(300)
+  await page.click('.favorites-head')
+  await page.waitForTimeout(300)
+
   // 트리 너비도 바꿔 둡니다. 이것도 기억되는 취향입니다.
   const handle = await page.locator('.sidebar-resizer').boundingBox()
   await page.mouse.move(handle.x + handle.width / 2, handle.y + 200)

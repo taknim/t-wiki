@@ -24,6 +24,7 @@ export interface SettingsBundle {
     rememberSession: boolean
     sidebarOpen: boolean
     sidebarWidth: number
+    favoritesOpen: boolean
     includeToken: boolean
   } & SaveOptions
   github: GitHubConfig | null
@@ -35,6 +36,7 @@ export interface ExportInput {
   rememberSession: boolean
   sidebarOpen: boolean
   sidebarWidth: number
+  favoritesOpen: boolean
   saveOptions: SaveOptions
   github: GitHubConfig | null
   /** 액세스 토큰까지 담을지. 파일에 그대로 적히므로 기본은 담지 않습니다. */
@@ -52,6 +54,7 @@ export function buildBundle(input: ExportInput): SettingsBundle {
       rememberSession: input.rememberSession,
       sidebarOpen: input.sidebarOpen,
       sidebarWidth: input.sidebarWidth,
+      favoritesOpen: input.favoritesOpen,
       includeToken: input.includeToken,
       ...input.saveOptions,
     },
@@ -117,6 +120,7 @@ export function parseBundle(raw: string): SettingsBundle | null {
       sidebarWidth: typeof general.sidebarWidth === 'number'
         ? clampSidebarWidth(general.sidebarWidth)
         : DEFAULT_SIDEBAR_WIDTH,
+      favoritesOpen: bool(general.favoritesOpen, true),
       includeToken: bool(general.includeToken, false),
       trimWhitespace: bool(general.trimWhitespace, DEFAULT_SAVE_OPTIONS.trimWhitespace),
       tidyFormat: bool(general.tidyFormat, DEFAULT_SAVE_OPTIONS.tidyFormat),

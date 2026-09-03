@@ -28,7 +28,8 @@ import { loadSession, saveSession } from './lib/session'
 import { formatTidyFor, textPreviewKind, trimWhitespace } from './lib/textPreview'
 import {
   clampSidebarWidth, DEFAULT_SIDEBAR_WIDTH, maxSidebarWidth, MIN_SIDEBAR_WIDTH,
-  readSaveOptions, readSidebarOpen, readSidebarWidth, writeSidebarOpen, writeSidebarWidth,
+  readFavoritesOpen, readSaveOptions, readSidebarOpen, readSidebarWidth,
+  writeFavoritesOpen, writeSidebarOpen, writeSidebarWidth,
 } from './lib/saveOptions'
 import { displayPath, fileNameOf } from './lib/paths'
 import { loadFavorites, saveFavorites } from './lib/store'
@@ -387,6 +388,13 @@ export default function App() {
       if (key) void saveFavorites(key, next)
       return next
     })
+  }, [])
+
+  const [favoritesOpen, setFavoritesOpen] = useState(readFavoritesOpen)
+
+  const applyFavoritesOpen = useCallback((open: boolean) => {
+    setFavoritesOpen(open)
+    writeFavoritesOpen(open)
   }, [])
 
   const [sidebarWidth, setSidebarWidth] = useState(readSidebarWidth)
@@ -846,6 +854,8 @@ export default function App() {
                   setSelectedPath(null)
                 }}
                 onRemove={toggleFavorite}
+                open={favoritesOpen}
+                onToggleOpen={() => applyFavoritesOpen(!favoritesOpen)}
               />
             )}
             <div className="sidebar-scroll">
@@ -1055,6 +1065,8 @@ export default function App() {
           onSidebarOpen={applySidebarOpen}
           sidebarWidth={sidebarWidth}
           onSidebarWidth={(width) => applySidebarWidth(width)}
+          favoritesOpen={favoritesOpen}
+          onFavoritesOpen={applyFavoritesOpen}
           onShowReport={() => setReportOpen(true)}
           onClose={() => setSettingsTab(null)}
         />
