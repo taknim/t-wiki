@@ -25,6 +25,7 @@ export interface SettingsBundle {
     sidebarOpen: boolean
     sidebarWidth: number
     favoritesOpen: boolean
+    imagePreview: boolean
     includeToken: boolean
   } & SaveOptions
   github: GitHubConfig | null
@@ -37,6 +38,7 @@ export interface ExportInput {
   sidebarOpen: boolean
   sidebarWidth: number
   favoritesOpen: boolean
+  imagePreview: boolean
   saveOptions: SaveOptions
   github: GitHubConfig | null
   /** 액세스 토큰까지 담을지. 파일에 그대로 적히므로 기본은 담지 않습니다. */
@@ -55,6 +57,7 @@ export function buildBundle(input: ExportInput): SettingsBundle {
       sidebarOpen: input.sidebarOpen,
       sidebarWidth: input.sidebarWidth,
       favoritesOpen: input.favoritesOpen,
+      imagePreview: input.imagePreview,
       includeToken: input.includeToken,
       ...input.saveOptions,
     },
@@ -121,6 +124,8 @@ export function parseBundle(raw: string): SettingsBundle | null {
         ? clampSidebarWidth(general.sidebarWidth)
         : DEFAULT_SIDEBAR_WIDTH,
       favoritesOpen: bool(general.favoritesOpen, true),
+      // 이 값을 모르던 판에서 온 파일이면 켜진 것으로 봅니다. 기본이 그쪽입니다.
+      imagePreview: bool(general.imagePreview, true),
       includeToken: bool(general.includeToken, false),
       trimWhitespace: bool(general.trimWhitespace, DEFAULT_SAVE_OPTIONS.trimWhitespace),
       tidyFormat: bool(general.tidyFormat, DEFAULT_SAVE_OPTIONS.tidyFormat),

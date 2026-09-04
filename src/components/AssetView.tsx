@@ -8,6 +8,8 @@ interface AssetViewProps {
   root: FileSystemDirectoryHandle
   path: string
   size: number
+  /** 이미지를 그려 볼지. 꺼 두면 파일을 읽지도 않고 안내만 내놓습니다. */
+  imagePreview: boolean
 }
 
 /** 텍스트 미리보기에서 한 번에 읽을 최대 길이. 큰 로그 파일로 화면이 멎지 않게 합니다. */
@@ -17,7 +19,7 @@ const TEXT_PREVIEW_LIMIT = 200_000
  * 마크다운이 아닌 파일은 고쳐 쓸 수 없으므로 보여 주기만 합니다.
  * 이미지와 PDF 는 그대로 띄우고, 텍스트 계열은 내용을 읽어 보여 줍니다.
  */
-export function AssetView({ root, path, size }: AssetViewProps) {
+export function AssetView({ root, path, size, imagePreview }: AssetViewProps) {
   const [url, setUrl] = useState<string | null>(null)
   const [text, setText] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -34,7 +36,18 @@ export function AssetView({ root, path, size }: AssetViewProps) {
     setError(null)
   }
 
+  // 꺼 두었으면 이미지는 읽지 않습니다. 안 보여 줄 것을 메모리에 올릴 까닭이 없습니다.
+  const skipped = kind === 'image' && !imagePreview
+
+  // 보다가 껐을 때도 같은 자리에서 비웁니다. 주소 자체는 effect 정리가 거두어 갑니다.
+  const [wasSkipped, setWasSkipped] = useState(skipped)
+  if (wasSkipped !== skipped) {
+    setWasSkipped(skipped)
+    if (skipped) setUrl(null)
+  }
+
   useEffect(() => {
+    if (skipped) return
     let cancelled = false
 
     void (async () => {
@@ -64,7 +77,7 @@ export function AssetView({ root, path, size }: AssetViewProps) {
         objectUrl.current = null
       }
     }
-  }, [root, path, kind])
+  }, [root, path, kind, skipped])
 
   const name = path.split('/').pop() ?? path
   const tooBig = isAttachment(path) && size > MAX_ATTACHMENT_BYTES
@@ -79,7 +92,15 @@ export function AssetView({ root, path, size }: AssetViewProps) {
 
       {error && <p className="status status-error">{error}</p>}
 
-      {kind === 'image' && url && <img className="asset-image" src={url} alt={name} />}
+      {skipped && (
+        <p className="asset-note">
+          이미지 미리보기를 꺼 두셨습니다.
+          보시려면 <strong>설정 → 일반 → 이미지 미리보기</strong>를 켜 주세요.
+          파일은 그대로 폴더에 있습니다.
+        </p>
+      )}
+
+      {kind === 'image' && !skipped && url && <img className="asset-image" src={url} alt={name} />}
 
       {kind === 'pdf' && url && <iframe className="asset-frame" src={url} title={name} />}
 

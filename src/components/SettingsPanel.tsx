@@ -36,12 +36,15 @@ interface SettingsPanelProps {
   /** 즐겨찾기 칸을 펴 두었는지. 내보내고 들여올 때 함께 다룹니다. */
   favoritesOpen: boolean
   onFavoritesOpen: (open: boolean) => void
+  /** 고른 이미지를 그려 볼지. 본문이 바로 따라오도록 값은 App 이 들고 있습니다. */
+  imagePreview: boolean
+  onImagePreview: (on: boolean) => void
 }
 
 type TabId = 'general' | 'appearance' | 'sync'
 
 const TABS: { id: TabId; name: string; hint: string }[] = [
-  { id: 'general', name: '일반', hint: '저장 방식과 마지막 화면 상태 기억으로 이동' },
+  { id: 'general', name: '일반', hint: '마지막 화면 상태·이미지 미리보기·저장 방식으로 이동' },
   { id: 'appearance', name: '모양', hint: '테마와 글꼴로 이동' },
   { id: 'sync', name: 'GitHub 동기화', hint: '저장소와 자동 동기화 설정으로 이동' },
 ]
@@ -49,6 +52,7 @@ const TABS: { id: TabId; name: string; hint: string }[] = [
 export function SettingsPanel({
   onClose, sync, onShowReport, vaultName,
   sidebarOpen, onSidebarOpen, sidebarWidth, onSidebarWidth, favoritesOpen, onFavoritesOpen,
+  imagePreview, onImagePreview,
   initialTab = 'general',
 }: SettingsPanelProps) {
   const { settings, isDark, update } = useTheme()
@@ -87,6 +91,7 @@ export function SettingsPanel({
       sidebarOpen,
       sidebarWidth,
       favoritesOpen,
+      imagePreview,
       saveOptions,
       github: sync.isConfigured || sync.config.token ? sync.config : null,
       includeToken,
@@ -138,6 +143,7 @@ export function SettingsPanel({
     onSidebarOpen(bundle.general.sidebarOpen)
     onSidebarWidth(bundle.general.sidebarWidth)
     onFavoritesOpen(bundle.general.favoritesOpen)
+    onImagePreview(bundle.general.imagePreview)
     setIncludeToken(bundle.general.includeToken)
     writeIncludeToken(bundle.general.includeToken)
     const next = {
@@ -311,6 +317,23 @@ export function SettingsPanel({
                 최근 연 폴더 10개까지 기억하고, 그보다 오래된 것은 버립니다.
                 이 기록은 이 브라우저에만 남고 저장소로 올라가지 않습니다.
               </p>
+            </section>
+
+            <section className="field">
+              <label>이미지 미리보기</label>
+              <label className="checkbox">
+                <input
+                  type="checkbox"
+                  checked={imagePreview}
+                  onChange={(event) => onImagePreview(event.target.checked)}
+                />
+                고른 이미지를 화면에 그리기
+                <span className="hint">
+                  트리에서 이미지를 고르면 그림을 띄웁니다.
+                  끄면 파일을 읽지 않고 안내만 내놓습니다. 큰 그림이 많은 폴더에서 쓸모가 있습니다.
+                  어느 쪽이든 파일은 그대로 폴더에 있고, 문서 안에 넣은 그림은 미리보기에 그대로 나옵니다.
+                </span>
+              </label>
             </section>
 
             <section className="field">

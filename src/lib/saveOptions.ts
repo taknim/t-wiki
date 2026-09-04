@@ -124,6 +124,31 @@ export function writeSidebarWidth(width: number): void {
   }
 }
 
+/*
+ * 고른 이미지를 그려 볼지.
+ *
+ * 이 브라우저의 취향이라 여기 둡니다. 화면을 그리는 길목에서 곧바로 읽어야
+ * 꺼 두고도 이미지가 한 번 떴다 사라지는 일이 없어 localStorage 를 씁니다.
+ * 기본은 켜짐입니다. 아무것도 건드리지 않은 사람에게는 보이는 쪽이 맞습니다.
+ */
+const IMAGE_PREVIEW = 'mdwiki:image-preview'
+
+export function readImagePreview(): boolean {
+  try {
+    return localStorage.getItem(IMAGE_PREVIEW) !== 'off'
+  } catch {
+    return true
+  }
+}
+
+export function writeImagePreview(on: boolean): void {
+  try {
+    localStorage.setItem(IMAGE_PREVIEW, on ? 'on' : 'off')
+  } catch {
+    // 저장이 막혀 있어도 이번에는 그대로 적용됩니다.
+  }
+}
+
 /** 즐겨찾기 칸을 펴 두었는지. 접으면 이름만 남습니다. */
 const FAVORITES_OPEN = 'mdwiki:favorites-open'
 

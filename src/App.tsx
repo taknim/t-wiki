@@ -28,8 +28,8 @@ import { DEFAULT_VIEW_MODE, loadSession, saveSession } from './lib/session'
 import { formatTidyFor, textPreviewKind, trimWhitespace } from './lib/textPreview'
 import {
   clampSidebarWidth, DEFAULT_SIDEBAR_WIDTH, maxSidebarWidth, MIN_SIDEBAR_WIDTH,
-  readFavoritesOpen, readSaveOptions, readSidebarOpen, readSidebarWidth,
-  writeFavoritesOpen, writeSidebarOpen, writeSidebarWidth,
+  readFavoritesOpen, readImagePreview, readSaveOptions, readSidebarOpen, readSidebarWidth,
+  writeFavoritesOpen, writeImagePreview, writeSidebarOpen, writeSidebarWidth,
 } from './lib/saveOptions'
 import { displayPath, FAVORITES_FILE, fileNameOf } from './lib/paths'
 import { loadFavorites } from './lib/store'
@@ -352,6 +352,18 @@ export default function App() {
   const applySidebarOpen = useCallback((open: boolean) => {
     setSidebarOpen(open)
     writeSidebarOpen(open)
+  }, [])
+
+  /*
+   * 고른 이미지를 그려 볼지. 설정 창이 아니라 여기서 들고 있습니다.
+   * 켜고 끄는 곳은 설정이지만 그림을 그리는 곳은 본문이라, 한쪽만 알면 창을 닫기
+   * 전까지 화면이 따라오지 않습니다.
+   */
+  const [imagePreview, setImagePreview] = useState(readImagePreview)
+
+  const applyImagePreview = useCallback((on: boolean) => {
+    setImagePreview(on)
+    writeImagePreview(on)
   }, [])
 
   /*
@@ -991,7 +1003,12 @@ export default function App() {
                   )}
                 </div>
               ) : selection.kind !== 'dir' && vault.root ? (
-                <AssetView root={vault.root} path={selection.path} size={selection.size} />
+                <AssetView
+                  root={vault.root}
+                  path={selection.path}
+                  size={selection.size}
+                  imagePreview={imagePreview}
+                />
               ) : (
                 <FolderView
                   onDropFiles={(files) => void handleAddFiles(files, selection.path)}
@@ -1083,6 +1100,8 @@ export default function App() {
           onSidebarWidth={(width) => applySidebarWidth(width)}
           favoritesOpen={favoritesOpen}
           onFavoritesOpen={applyFavoritesOpen}
+          imagePreview={imagePreview}
+          onImagePreview={applyImagePreview}
           onShowReport={() => setReportOpen(true)}
           onClose={() => setSettingsTab(null)}
         />
