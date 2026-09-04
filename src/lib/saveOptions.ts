@@ -1,3 +1,5 @@
+import type { SidebarTab } from '../types'
+
 /**
  * 저장할 때 문서에 손을 댈지 말지.
  *
@@ -149,20 +151,28 @@ export function writeImagePreview(on: boolean): void {
   }
 }
 
-/** 즐겨찾기 칸을 펴 두었는지. 접으면 이름만 남습니다. */
-const FAVORITES_OPEN = 'mdwiki:favorites-open'
+/*
+ * 옆줄에 즐겨찾기와 폴더 중 어느 탭을 펴 두었는지.
+ *
+ * 기본은 폴더입니다. 처음 온 사람에게는 담아 둔 즐겨찾기가 없습니다.
+ * 첫 그림부터 제 탭으로 그려야 폴더가 보였다 즐겨찾기로 바뀌는 깜빡임이 없어
+ * localStorage 를 씁니다.
+ */
+const SIDEBAR_TAB = 'mdwiki:sidebar-tab'
 
-export function readFavoritesOpen(): boolean {
+export const DEFAULT_SIDEBAR_TAB: SidebarTab = 'tree'
+
+export function readSidebarTab(): SidebarTab {
   try {
-    return localStorage.getItem(FAVORITES_OPEN) !== 'off'
+    return localStorage.getItem(SIDEBAR_TAB) === 'favorites' ? 'favorites' : DEFAULT_SIDEBAR_TAB
   } catch {
-    return true
+    return DEFAULT_SIDEBAR_TAB
   }
 }
 
-export function writeFavoritesOpen(open: boolean): void {
+export function writeSidebarTab(tab: SidebarTab): void {
   try {
-    localStorage.setItem(FAVORITES_OPEN, open ? 'on' : 'off')
+    localStorage.setItem(SIDEBAR_TAB, tab)
   } catch {
     // 저장이 막혀 있어도 이번에는 그대로 적용됩니다.
   }

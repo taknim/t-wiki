@@ -131,10 +131,15 @@ try {
 
   await sync(b.page)
   await b.page.waitForTimeout(700)
+  // 즐겨찾기는 제 탭에서만 보입니다.
+  await b.page.click('.sidebar-tablist button:has-text("즐겨찾기")')
+  await b.page.waitForTimeout(300)
   const carried = await b.page.evaluate(() =>
     [...document.querySelectorAll('.favorites-name')].map((n) => n.textContent))
   console.log('  B 화면의 즐겨찾기: ' + JSON.stringify(carried))
   expect('B 에서도 보임', carried.includes('개발 환경.md'), JSON.stringify(carried))
+  await b.page.click('.sidebar-tablist button:has-text("폴더")')
+  await b.page.waitForTimeout(300)
   expect('B 트리에는 그 파일이 안 보임',
     (await b.page.locator('.tree-row:has-text("_t-wiki.favorites")').count()) === 0)
 

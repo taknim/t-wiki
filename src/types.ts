@@ -92,3 +92,6 @@ export interface SyncLogLine {
 
 /** 문서를 원문만, 나란히, 결과만 중 어떻게 보여 줄지. */
 export type ViewMode = 'edit' | 'split' | 'preview'
+
+/** 옆줄에 즐겨찾기와 폴더 트리 중 어느 쪽을 펴 두었는지. */
+export type SidebarTab = 'favorites' | 'tree'

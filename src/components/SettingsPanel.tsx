@@ -10,6 +10,7 @@ import {
   readIncludeToken, readSaveOptions, writeIncludeToken, writeSaveOptions, type SaveOptions,
 } from '../lib/saveOptions'
 import { buildBundle, bundleFileName, parseBundle } from '../lib/settingsFile'
+import type { SidebarTab } from '../types'
 import { useTheme } from './themeContext'
 import { useDialogs } from './dialogContext'
 
@@ -33,9 +34,9 @@ interface SettingsPanelProps {
   /** 트리 너비. 내보내고 들여올 때 함께 다룹니다. */
   sidebarWidth: number
   onSidebarWidth: (width: number) => void
-  /** 즐겨찾기 칸을 펴 두었는지. 내보내고 들여올 때 함께 다룹니다. */
-  favoritesOpen: boolean
-  onFavoritesOpen: (open: boolean) => void
+  /** 옆줄에 어느 탭을 펴 두었는지. 내보내고 들여올 때 함께 다룹니다. */
+  sidebarTab: SidebarTab
+  onSidebarTab: (tab: SidebarTab) => void
   /** 고른 이미지를 그려 볼지. 본문이 바로 따라오도록 값은 App 이 들고 있습니다. */
   imagePreview: boolean
   onImagePreview: (on: boolean) => void
@@ -51,7 +52,7 @@ const TABS: { id: TabId; name: string; hint: string }[] = [
 
 export function SettingsPanel({
   onClose, sync, onShowReport, vaultName,
-  sidebarOpen, onSidebarOpen, sidebarWidth, onSidebarWidth, favoritesOpen, onFavoritesOpen,
+  sidebarOpen, onSidebarOpen, sidebarWidth, onSidebarWidth, sidebarTab, onSidebarTab,
   imagePreview, onImagePreview,
   initialTab = 'general',
 }: SettingsPanelProps) {
@@ -90,7 +91,7 @@ export function SettingsPanel({
       rememberSession: remember,
       sidebarOpen,
       sidebarWidth,
-      favoritesOpen,
+      sidebarTab,
       imagePreview,
       saveOptions,
       github: sync.isConfigured || sync.config.token ? sync.config : null,
@@ -142,7 +143,7 @@ export function SettingsPanel({
     setRememberEnabled(bundle.general.rememberSession)
     onSidebarOpen(bundle.general.sidebarOpen)
     onSidebarWidth(bundle.general.sidebarWidth)
-    onFavoritesOpen(bundle.general.favoritesOpen)
+    onSidebarTab(bundle.general.sidebarTab)
     onImagePreview(bundle.general.imagePreview)
     setIncludeToken(bundle.general.includeToken)
     writeIncludeToken(bundle.general.includeToken)

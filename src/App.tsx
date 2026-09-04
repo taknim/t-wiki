@@ -10,7 +10,7 @@ import { Favorites } from './components/Favorites'
 import { SyncCountdown } from './components/SyncCountdown'
 import { ViewModeSwitch } from './components/ViewModeSwitch'
 import {
-  GitHubIcon, SettingsIcon, SidebarCloseIcon, SidebarOpenIcon, SyncIcon, XIcon,
+  FolderIcon, GitHubIcon, SettingsIcon, SidebarCloseIcon, SidebarOpenIcon, StarIcon, SyncIcon, XIcon,
 } from './components/icons'
 import { TextPreview } from './components/TextPreview'
 import { SettingsPanel } from './components/SettingsPanel'
@@ -28,18 +28,24 @@ import { DEFAULT_VIEW_MODE, loadSession, saveSession } from './lib/session'
 import { formatTidyFor, textPreviewKind, trimWhitespace } from './lib/textPreview'
 import {
   clampSidebarWidth, DEFAULT_SIDEBAR_WIDTH, maxSidebarWidth, MIN_SIDEBAR_WIDTH,
-  readFavoritesOpen, readImagePreview, readSaveOptions, readSidebarOpen, readSidebarWidth,
-  writeFavoritesOpen, writeImagePreview, writeSidebarOpen, writeSidebarWidth,
+  readImagePreview, readSaveOptions, readSidebarOpen, readSidebarTab, readSidebarWidth,
+  writeImagePreview, writeSidebarOpen, writeSidebarTab, writeSidebarWidth,
 } from './lib/saveOptions'
 import { displayPath, FAVORITES_FILE, fileNameOf } from './lib/paths'
 import { loadFavorites } from './lib/store'
 import { favoritesFileBody, readFavoritesFile } from './lib/favorites'
 import { vaultKeyFor } from './lib/vaultKey'
 import type { CSSProperties } from 'react'
-import type { ViewMode, VaultNode } from './types'
+import type { SidebarTab, ViewMode, VaultNode } from './types'
 
 
 const AUTOSAVE_DELAY = 800
+
+/** 옆줄의 두 탭. 접힌 옆줄의 단추도 같은 목록으로 그립니다. */
+const SIDEBAR_TABS: { id: SidebarTab; name: string; hint: string }[] = [
+  { id: 'favorites', name: '즐겨찾기', hint: '담아 둔 문서·첨부·폴더만 봅니다' },
+  { id: 'tree', name: '폴더', hint: '폴더 트리와 문서 검색을 봅니다' },
+]
 
 export default function App() {
   const vault = useVault()
@@ -417,11 +423,15 @@ export default function App() {
     })
   }, [report, vault])
 
-  const [favoritesOpen, setFavoritesOpen] = useState(readFavoritesOpen)
+  /*
+   * 옆줄에 즐겨찾기와 폴더 중 어느 쪽을 펴 두었는지.
+   * 한 번에 하나만 보이므로, 접힌 옆줄의 단추로 탭을 고르면 펴면서 그 탭으로 갑니다.
+   */
+  const [sidebarTab, setSidebarTab] = useState<SidebarTab>(readSidebarTab)
 
-  const applyFavoritesOpen = useCallback((open: boolean) => {
-    setFavoritesOpen(open)
-    writeFavoritesOpen(open)
+  const applySidebarTab = useCallback((tab: SidebarTab) => {
+    setSidebarTab(tab)
+    writeSidebarTab(tab)
   }, [])
 
   const [sidebarWidth, setSidebarWidth] = useState(readSidebarWidth)
@@ -801,10 +811,66 @@ export default function App() {
           className={sidebarOpen ? 'sidebar' : 'sidebar is-rail'}
           style={{ '--sidebar-w': `${sidebarWidth}px` } as CSSProperties}
         >
-          {/* 접으면 검색란은 접히고 이 줄에는 펴기 단추만 남습니다. */}
+          {/*
+            * 머리 칸. 위에 탭 줄, 아래에 검색란입니다.
+            * 접으면 탭 줄은 펴기 단추만 남고, 그 아래에 탭 두 개가 세로로 섭니다.
+            * 접힌 채로도 어느 쪽을 볼지 고를 수 있어야 펴는 걸음이 하나로 끝납니다.
+            */}
           <div className="sidebar-head">
-            <div className="sidebar-search">
+            <div className="sidebar-tabs">
               {sidebarOpen && (
+                <div className="sidebar-tablist" role="tablist" aria-label="옆줄 내용">
+                  {SIDEBAR_TABS.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      role="tab"
+                      aria-selected={sidebarTab === item.id}
+                      className={sidebarTab === item.id ? 'is-active' : ''}
+                      data-tip={item.hint}
+                      onClick={() => applySidebarTab(item.id)}
+                    >
+                      {item.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <button
+                type="button"
+                className="sidebar-toggle"
+                aria-label={sidebarOpen ? '옆줄 접기' : '옆줄 펴기'}
+                aria-expanded={sidebarOpen}
+                data-tip={sidebarOpen ? '옆줄 접기' : '옆줄 펴기'}
+                onClick={() => applySidebarOpen(!sidebarOpen)}
+              >
+                {sidebarOpen ? <SidebarCloseIcon /> : <SidebarOpenIcon />}
+              </button>
+            </div>
+
+            {/* 접혔을 때만 서는 탭. 누르면 펴면서 그 탭으로 갑니다. */}
+            {!sidebarOpen && (
+              <div className="sidebar-rail-tabs">
+                {SIDEBAR_TABS.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    className={sidebarTab === item.id ? 'is-active' : ''}
+                    aria-label={item.name}
+                    data-tip={`${item.name} 탭을 펴서 봅니다`}
+                    onClick={() => {
+                      applySidebarTab(item.id)
+                      applySidebarOpen(true)
+                    }}
+                  >
+                    {item.id === 'favorites' ? <StarIcon filled /> : <FolderIcon />}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* 검색은 폴더 탭의 일입니다. 즐겨찾기는 목록이 짧아 눈으로 찾습니다. */}
+            {sidebarOpen && sidebarTab === 'tree' && (
+              <div className="sidebar-search">
                 <div className="search-field">
                   <input
                     ref={searchInput}
@@ -838,18 +904,8 @@ export default function App() {
                     </button>
                   )}
                 </div>
-              )}
-              <button
-                type="button"
-                className="sidebar-toggle"
-                aria-label={sidebarOpen ? '트리 접기' : '트리 펴기'}
-                aria-expanded={sidebarOpen}
-                data-tip={sidebarOpen ? '폴더 트리 접기' : '폴더 트리 펴기'}
-                onClick={() => applySidebarOpen(!sidebarOpen)}
-              >
-                {sidebarOpen ? <SidebarCloseIcon /> : <SidebarOpenIcon />}
-              </button>
-            </div>
+              </div>
+            )}
 
             {/* 파일 고르기 창은 브라우저가 띄웁니다. 목록에 있는 형식만 걸러 보여 줍니다. */}
             <input
@@ -869,10 +925,11 @@ export default function App() {
             />
           </div>
 
-          {/* 즐겨찾기와 트리는 각자 굴러갑니다. 하나로 묶으면 굴림대가 겹칩니다. */}
+          {/* 고른 탭 하나만 그립니다. 둘을 함께 두면 좁은 칸을 나눠 쓰게 됩니다. */}
           {sidebarOpen && (
           <div className="sidebar-panes">
-            {!query.trim() && (
+            <div className="sidebar-scroll">
+            {sidebarTab === 'favorites' ? (
               <Favorites
                 paths={favorites}
                 root={vault.tree}
@@ -882,12 +939,8 @@ export default function App() {
                   setSelectedPath(null)
                 }}
                 onRemove={toggleFavorite}
-                open={favoritesOpen}
-                onToggleOpen={() => applyFavoritesOpen(!favoritesOpen)}
               />
-            )}
-            <div className="sidebar-scroll">
-            {query.trim() ? (
+            ) : query.trim() ? (
               <SearchPanel
                 query={query}
                 index={vault.index}
@@ -1098,8 +1151,8 @@ export default function App() {
           onSidebarOpen={applySidebarOpen}
           sidebarWidth={sidebarWidth}
           onSidebarWidth={(width) => applySidebarWidth(width)}
-          favoritesOpen={favoritesOpen}
-          onFavoritesOpen={applyFavoritesOpen}
+          sidebarTab={sidebarTab}
+          onSidebarTab={applySidebarTab}
           imagePreview={imagePreview}
           onImagePreview={applyImagePreview}
           onShowReport={() => setReportOpen(true)}

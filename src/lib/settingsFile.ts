@@ -1,7 +1,10 @@
 import { DEFAULT_SETTINGS, FONTS, SIZES, THEMES, WIDTHS, type ThemeSettings } from './theme'
-import { clampSidebarWidth, DEFAULT_SAVE_OPTIONS, DEFAULT_SIDEBAR_WIDTH, type SaveOptions } from './saveOptions'
+import {
+  clampSidebarWidth, DEFAULT_SAVE_OPTIONS, DEFAULT_SIDEBAR_TAB, DEFAULT_SIDEBAR_WIDTH,
+  type SaveOptions,
+} from './saveOptions'
 import { DEFAULT_GITHUB_CONFIG } from '../hooks/useGitHubSync'
-import type { GitHubConfig } from '../types'
+import type { GitHubConfig, SidebarTab } from '../types'
 
 /**
  * 설정을 파일 하나로 주고받습니다.
@@ -24,7 +27,7 @@ export interface SettingsBundle {
     rememberSession: boolean
     sidebarOpen: boolean
     sidebarWidth: number
-    favoritesOpen: boolean
+    sidebarTab: SidebarTab
     imagePreview: boolean
     includeToken: boolean
   } & SaveOptions
@@ -37,7 +40,7 @@ export interface ExportInput {
   rememberSession: boolean
   sidebarOpen: boolean
   sidebarWidth: number
-  favoritesOpen: boolean
+  sidebarTab: SidebarTab
   imagePreview: boolean
   saveOptions: SaveOptions
   github: GitHubConfig | null
@@ -56,7 +59,7 @@ export function buildBundle(input: ExportInput): SettingsBundle {
       rememberSession: input.rememberSession,
       sidebarOpen: input.sidebarOpen,
       sidebarWidth: input.sidebarWidth,
-      favoritesOpen: input.favoritesOpen,
+      sidebarTab: input.sidebarTab,
       imagePreview: input.imagePreview,
       includeToken: input.includeToken,
       ...input.saveOptions,
@@ -123,7 +126,7 @@ export function parseBundle(raw: string): SettingsBundle | null {
       sidebarWidth: typeof general.sidebarWidth === 'number'
         ? clampSidebarWidth(general.sidebarWidth)
         : DEFAULT_SIDEBAR_WIDTH,
-      favoritesOpen: bool(general.favoritesOpen, true),
+      sidebarTab: general.sidebarTab === 'favorites' ? 'favorites' : DEFAULT_SIDEBAR_TAB,
       // 이 값을 모르던 판에서 온 파일이면 켜진 것으로 봅니다. 기본이 그쪽입니다.
       imagePreview: bool(general.imagePreview, true),
       includeToken: bool(general.includeToken, false),

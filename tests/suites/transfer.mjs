@@ -211,11 +211,11 @@ try {
   await page.waitForTimeout(400)
   await page.click('.sheet-close')
 
-  // 즐겨찾기 칸도 접어 둡니다. 이것도 기억되는 취향입니다.
+  // 옆줄을 즐겨찾기 탭으로 돌려 둡니다. 어느 탭을 보고 있었는지도 기억되는 취향입니다.
   await page.hover('.tree-row:has-text("개발 환경")')
   await page.click('.tree-row:has-text("개발 환경") .tree-tools button[aria-label="즐겨찾기에 담기"]')
   await page.waitForTimeout(300)
-  await page.click('.favorites-head')
+  await page.click('.sidebar-tablist button:has-text("즐겨찾기")')
   await page.waitForTimeout(300)
 
   // 트리 너비도 바꿔 둡니다. 이것도 기억되는 취향입니다.
