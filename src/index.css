@@ -393,7 +393,27 @@ button, input, select, textarea { font: inherit; color: inherit; }
   color: inherit;
 }
 .favorites-item:hover { background: var(--bg-raised); }
+/* 이름 아래에 경로가 한 줄 더 붙으므로 세로로 쌓습니다. */
+.favorites-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
 .favorites-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/*
+ * 어느 것인지 가리라고 두는 줄이라 이름보다 물러서 있어야 합니다.
+ * 길면 뒤를 자르고, 전체는 툴팁에서 봅니다.
+ */
+.favorites-path {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  line-height: 1.35;
+  color: var(--text-muted);
+}
 .favorites-drop {
   flex: none;
   display: inline-flex;
