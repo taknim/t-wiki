@@ -1,12 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { AssetIndex, DocIndex, GitHubConfig, SyncLogLine, SyncPlanItem } from '../types'
+import type {
+  AssetIndex, DocIndex, GitHubConfig, LastCommit, SyncLogLine, SyncPlanItem,
+} from '../types'
 import { applyPlan, buildPlan, localShas, scanRemote } from '../lib/github/sync'
 import { vaultKeyFor } from '../lib/vaultKey'
 import {
   loadGitHubConfig,
+  loadLastCommit,
   loadLastSyncAt,
   loadSyncState,
   saveGitHubConfig,
+  saveLastCommit,
   saveLastSyncAt,
   saveSyncState,
   syncSignature,
@@ -60,6 +64,8 @@ export interface GitHubSync {
   status: SyncStatus
   report: SyncReport | null
   lastSyncAt: number | null
+  /** 마지막으로 올린 커밋. 아직 아무것도 올리지 않았으면 null 입니다. */
+  lastCommit: LastCommit | null
   /** 다음 자동 동기화 예정 시각. 꺼져 있으면 null. */
   nextAutoSyncAt: number | null
   update: (patch: Partial<GitHubConfig>) => void
@@ -121,6 +127,7 @@ export function useGitHubSync({ root, docs, assets, onBeforeSync, onLocalChanged
   const [status, setStatus] = useState<SyncStatus>(IDLE)
   const [report, setReport] = useState<SyncReport | null>(null)
   const [lastSyncAt, setLastSyncAt] = useState<number | null>(null)
+  const [lastCommit, setLastCommit] = useState<LastCommit | null>(null)
   const [nextAutoSyncAt, setNextAutoSyncAt] = useState<number | null>(null)
   // 지금 열려 있는 폴더의 표. 설정과 기준점을 이 표 아래에 둡니다.
   const [vaultKey, setVaultKey] = useState<string | null>(null)
@@ -173,6 +180,7 @@ export function useGitHubSync({ root, docs, assets, onBeforeSync, onLocalChanged
         setVaultKey(null)
         setConfig(DEFAULT_GITHUB_CONFIG)
         setLastSyncAt(null)
+        setLastCommit(null)
         setLoaded(false)
         return
       }
@@ -186,18 +194,21 @@ export function useGitHubSync({ root, docs, assets, onBeforeSync, onLocalChanged
         setVaultKey(null)
         setConfig(DEFAULT_GITHUB_CONFIG)
         setLastSyncAt(null)
+        setLastCommit(null)
         setLoaded(false)
         return
       }
 
       const saved = await loadGitHubConfig(key)
       const at = await loadLastSyncAt(key)
+      const commit = await loadLastCommit(key)
       if (cancelled) return
 
       vaultKeyRef.current = key
       setVaultKey(key)
       setConfig({ ...DEFAULT_GITHUB_CONFIG, ...saved })
       setLastSyncAt(at ?? null)
+      setLastCommit(commit ?? null)
       setLoaded(true)
     })()
 
@@ -305,6 +316,13 @@ export function useGitHubSync({ root, docs, assets, onBeforeSync, onLocalChanged
 
         await saveLastSyncAt(key, at)
         setLastSyncAt(at)
+
+        // 올릴 것이 없었으면 커밋도 없습니다. 그때는 지난 커밋을 그대로 둡니다.
+        if (result.commitSha) {
+          const commit = { sha: result.commitSha, at }
+          await saveLastCommit(key, commit)
+          setLastCommit(commit)
+        }
 
         const failures = result.log.filter((line) => line.status === 'error')
         setReport({ at, trigger, plan, log: result.log, commitSha: result.commitSha, error: null })
@@ -474,7 +492,7 @@ export function useGitHubSync({ root, docs, assets, onBeforeSync, onLocalChanged
   const dismissReport = useCallback(() => setReport(null), [])
 
   return {
-    config, loaded, isConfigured, status, report, lastSyncAt,
+    config, loaded, isConfigured, status, report, lastSyncAt, lastCommit,
     // 꺼져 있으면 예정 시각도 없는 것으로 봅니다. 상태가 남아 있어도 화면에는 안 나옵니다.
     nextAutoSyncAt: autoOn ? nextAutoSyncAt : null,
     update, run, confirmTarget, dismissReport, reset, restartAutoSync,

@@ -1,11 +1,12 @@
 import { del, get, set } from 'idb-keyval'
 import { vaultKeyFor } from './vaultKey'
-import type { GitHubConfig, SyncState } from '../types'
+import type { GitHubConfig, LastCommit, SyncState } from '../types'
 
 const VAULT_HANDLE = 'mdwiki:vault-handle'
 const GITHUB_CONFIG = 'mdwiki:github-config'
 const SYNC_STATE = 'mdwiki:sync-state'
 const LAST_SYNC = 'mdwiki:last-sync-at'
+const LAST_COMMIT = 'mdwiki:last-commit'
 const ASSET_HASHES = 'mdwiki:asset-hashes'
 const FAVORITES = 'mdwiki:favorites'
 
@@ -137,6 +138,22 @@ export async function saveLastSyncAt(vault: string, at: number): Promise<void> {
 
 export const loadLastSyncAt = async (vault: string): Promise<number | undefined> =>
   (await readByVault<number>(LAST_SYNC))[vault]
+
+/**
+ * 마지막으로 저장소에 올린 커밋.
+ *
+ * 동기화 시각과 따로 둡니다. 올릴 것이 없어도 동기화는 도는데, 그때마다 시각은
+ * 새로 적히지만 커밋은 생기지 않습니다. 한 자리에 묶으면 그런 동기화가 지난 커밋을
+ * 지워 버립니다. 커밋이 언제 것인지 알아야 시각과 견줄 수 있으므로 시각도 함께 적습니다.
+ */
+export const loadLastCommit = async (vault: string): Promise<LastCommit | undefined> =>
+  (await readByVault<LastCommit>(LAST_COMMIT))[vault]
+
+export async function saveLastCommit(vault: string, commit: LastCommit): Promise<void> {
+  const store = await readByVault<LastCommit>(LAST_COMMIT)
+  store[vault] = commit
+  await set(LAST_COMMIT, store)
+}
 
 /**
  * 폴더별로 가르기 전에 쓰던 한 벌짜리 값을 제 주인에게 옮겨 담습니다.

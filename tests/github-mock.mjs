@@ -132,6 +132,8 @@ export function createGitHubMock() {
       return out
     },
     get commitCount() { return commits.size },
+    /** 지금 가지 끝에 있는 커밋 이름. 화면에 보이는 커밋 이름과 견주는 데 씁니다. */
+    get headSha() { return head },
     failOnce(status, message) { failNext = { status, message } },
     setSlow(ms) { slow = ms },
   }

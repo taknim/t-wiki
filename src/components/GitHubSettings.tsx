@@ -11,6 +11,19 @@ interface GitHubSettingsProps {
 export function GitHubSettings({ sync, onShowReport }: GitHubSettingsProps) {
   const { config, update, reset } = sync
   const [confirming, setConfirming] = useState(false)
+
+  /*
+   * 마지막으로 올린 커밋으로 가는 길.
+   *
+   * 저장소를 아직 안 골랐거나 이 폴더의 설정을 지운 뒤라면 주소를 지을 수 없습니다.
+   * 그때는 링크를 아예 내보내지 않습니다. 어디로도 가지 못하는 링크를 두느니 낫습니다.
+   */
+  const owner = config.owner.trim()
+  const repo = config.repo.trim()
+  const commitUrl =
+    sync.lastCommit && owner && repo
+      ? `https://github.com/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/commit/${sync.lastCommit.sha}`
+      : null
   const [viewer, setViewer] = useState<string | null>(null)
   const [repos, setRepos] = useState<api.RepoInfo[] | null>(null)
   const [branches, setBranches] = useState<string[] | null>(null)
@@ -270,6 +283,20 @@ export function GitHubSettings({ sync, onShowReport }: GitHubSettingsProps) {
         <p className="hint" style={{ marginBottom: 0 }}>
           마지막 동기화:{' '}
           {sync.lastSyncAt ? new Date(sync.lastSyncAt).toLocaleString('ko-KR') : '아직 없습니다'}
+          {commitUrl && sync.lastCommit && (
+            <>
+              {' · '}
+              <a
+                className="commit-link"
+                href={commitUrl}
+                target="_blank"
+                rel="noreferrer noopener"
+                data-tip={`${sync.lastCommit.sha.slice(0, 7)} 커밋을 GitHub 에서 새 탭으로 엽니다`}
+              >
+                {sync.lastCommit.sha.slice(0, 7)}
+              </a>
+            </>
+          )}
         </p>
       </section>
 

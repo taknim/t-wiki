@@ -48,6 +48,13 @@ export type SyncState = Record<string, string>
 
 export type ConflictPolicy = 'keep-both' | 'local-wins' | 'remote-wins'
 
+/** 마지막으로 저장소에 올린 커밋. 설정 창에서 그 커밋으로 가는 길을 냅니다. */
+export interface LastCommit {
+  sha: string
+  /** 그 커밋을 올린 때. 마지막 동기화 시각과 다를 수 있습니다. */
+  at: number
+}
+
 export interface GitHubConfig {
   /** fine-grained personal access token. 브라우저 IndexedDB 에만 보관됩니다. */
   token: string

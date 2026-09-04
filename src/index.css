@@ -112,6 +112,16 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .hint { margin: 4px 0 0; font-size: 12px; color: var(--text-muted); line-height: 1.5; }
 
 .status { margin: 8px 0 0; font-size: 13px; color: var(--text-muted); }
+
+/* 마지막 동기화 시각 옆에 서는 커밋 이름. 등폭이라야 16진수가 눈에 들어옵니다. */
+.commit-link {
+  font-family: var(--mono);
+  color: var(--accent);
+  text-decoration: none;
+  border-bottom: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+}
+.commit-link:hover { border-bottom-color: var(--accent); }
+.commit-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
 .status-error { color: var(--danger); }
 
 .panel-empty { color: var(--text-muted); font-size: 13px; margin: 8px 0; }
