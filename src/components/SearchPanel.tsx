@@ -1,18 +1,32 @@
 import { useMemo, useRef } from 'react'
-import type { DocIndex } from '../types'
-import { searchDocs } from '../lib/search'
+import { highlight, searchVault, type SearchSource } from '../lib/search'
+import { Highlight } from './Highlight'
+import { attachmentKind, isMarkdown } from '../lib/attachments'
+import { DocIcon, FolderIcon, ImageIcon } from './icons'
 import { displayPath } from '../lib/paths'
 
 interface SearchPanelProps {
   query: string
-  index: DocIndex
+  source: SearchSource
+  /** 텍스트 첨부를 아직 읽는 중인지. 다 읽으면 결과가 늘어납니다. */
+  loading: boolean
   onOpen: (path: string) => void
+  onOpenDir: (path: string) => void
   /** 맨 위에서 더 올라가면 검색란으로 돌려보냅니다. */
   onLeaveTop: () => void
 }
 
-export function SearchPanel({ query, index, onOpen, onLeaveTop }: SearchPanelProps) {
-  const hits = useMemo(() => searchDocs(query, index), [query, index])
+function iconFor(path: string, kind: 'dir' | 'file') {
+  if (kind === 'dir') return { node: <FolderIcon />, tone: 'dir' }
+  if (isMarkdown(path)) return { node: <DocIcon />, tone: 'markdown' }
+  if (attachmentKind(path) === 'image') return { node: <ImageIcon />, tone: 'image' }
+  return { node: <DocIcon />, tone: 'file' }
+}
+
+export function SearchPanel({
+  query, source, loading, onOpen, onOpenDir, onLeaveTop,
+}: SearchPanelProps) {
+  const hits = useMemo(() => searchVault(query, source), [query, source])
   const listRef = useRef<HTMLUListElement>(null)
 
   /*
@@ -36,23 +50,43 @@ export function SearchPanel({ query, index, onOpen, onLeaveTop }: SearchPanelPro
   }
 
   if (query.trim().length === 0) return null
-  if (hits.length === 0) return <p className="panel-empty">일치하는 문서가 없습니다.</p>
+  if (hits.length === 0) {
+    return (
+      <p className="panel-empty">
+        {loading ? '첨부 본문을 읽는 중입니다…' : '일치하는 것이 없습니다.'}
+      </p>
+    )
+  }
 
   return (
-    <ul className="search-results" ref={listRef}>
-      {hits.map((hit, at) => (
-        <li key={hit.path}>
-          <button type="button" onClick={() => onOpen(hit.path)} onKeyDown={(event) => walk(event, at)}>
-            <span className="search-title">{hit.title}</span>
-            <span className="search-path">{displayPath(hit.path)}</span>
-            <span className="search-snippet">
-              {hit.snippet.map((piece, position) =>
-                piece.hit ? <mark key={position}>{piece.text}</mark> : <span key={position}>{piece.text}</span>,
-              )}
-            </span>
-          </button>
-        </li>
-      ))}
-    </ul>
+    <>
+      <ul className="search-results" ref={listRef}>
+        {hits.map((hit, at) => {
+          const icon = iconFor(hit.path, hit.kind)
+          return (
+            <li key={hit.path}>
+              <button
+                type="button"
+                onClick={() => (hit.kind === 'dir' ? onOpenDir(hit.path) : onOpen(hit.path))}
+                onKeyDown={(event) => walk(event, at)}
+              >
+                <span className="search-head">
+                  <span className={`tree-icon is-${icon.tone}`}>{icon.node}</span>
+                  <span className="search-title">
+                    <Highlight pieces={highlight(hit.title, query)} />
+                  </span>
+                </span>
+                <span className="search-path">{displayPath(hit.path)}</span>
+                <span className="search-snippet">
+                  <Highlight pieces={hit.snippet} />
+                </span>
+              </button>
+            </li>
+          )
+        })}
+      </ul>
+      {/* 첨부를 다 읽으면 결과가 더 나올 수 있습니다. 기다리는 줄인지 알려 줍니다. */}
+      {loading && <p className="panel-empty">첨부 본문을 읽는 중입니다…</p>}
+    </>
   )
 }

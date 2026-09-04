@@ -541,8 +541,17 @@ button, input, select, textarea { font: inherit; color: inherit; }
   outline-offset: -2px;
   background: var(--bg-raised);
 }
-.search-title { font-weight: 600; }
-.search-path { font-size: 11px; color: var(--text-muted); font-family: var(--mono); }
+/* 아이콘과 이름은 한 줄에 섭니다. 무엇을 찾았는지는 아이콘이 먼저 말해 줍니다. */
+.search-head { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.search-title { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.search-path {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: var(--mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .search-snippet { font-size: 12px; color: var(--text-muted); }
 mark { background: var(--mark); color: inherit; border-radius: 2px; }
 

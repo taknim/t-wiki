@@ -17,6 +17,7 @@ import { SettingsPanel } from './components/SettingsPanel'
 import { SyncReportSheet } from './components/SyncReportSheet'
 import { TreeView } from './components/TreeView'
 import { useGitHubSync } from './hooks/useGitHubSync'
+import { useTextIndex } from './hooks/useTextIndex'
 import { useVault } from './hooks/useVault'
 import {
   ACCEPT_ATTRIBUTE, attachmentKind, formatBytes, isEditableText, isMarkdown,
@@ -59,6 +60,8 @@ export default function App() {
   const [viewMode, setViewMode] = useState<ViewMode>(DEFAULT_VIEW_MODE)
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set())
   const [query, setQuery] = useState('')
+  // 즐겨찾기 탭의 찾기. 폴더 탭의 검색과는 하는 일이 달라 따로 둡니다.
+  const [favoriteQuery, setFavoriteQuery] = useState('')
   const [settingsTab, setSettingsTab] = useState<'general' | 'appearance' | 'sync' | null>(null)
   const [reportOpen, setReportOpen] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
@@ -428,6 +431,18 @@ export default function App() {
    * 한 번에 하나만 보이므로, 접힌 옆줄의 단추로 탭을 고르면 펴면서 그 탭으로 갑니다.
    */
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>(readSidebarTab)
+
+  /*
+   * 검색 재료. 텍스트 첨부 본문은 검색을 시작할 때 읽어 옵니다.
+   * 마크다운과 달리 폴더를 열 때 미리 읽어 두면 여는 일이 느려집니다.
+   */
+  const { texts, loading: textsLoading } = useTextIndex(
+    vault.root, vault.assets, query.trim().length > 0,
+  )
+  const searchSource = useMemo(
+    () => ({ docs: vault.index, texts, tree: vault.tree }),
+    [vault.index, texts, vault.tree],
+  )
 
   const applySidebarTab = useCallback((tab: SidebarTab) => {
     setSidebarTab(tab)
@@ -868,16 +883,23 @@ export default function App() {
               </div>
             )}
 
-            {/* 검색은 폴더 탭의 일입니다. 즐겨찾기는 목록이 짧아 눈으로 찾습니다. */}
-            {sidebarOpen && sidebarTab === 'tree' && (
+            {/*
+              * 검색란은 두 탭이 나눠 씁니다. 생김새는 같지만 하는 일이 달라
+              * 친 글자도 따로 들고 있습니다. 폴더 탭에서는 이름과 본문을 뒤지고,
+              * 즐겨찾기 탭에서는 담아 둔 것을 이름으로 거릅니다.
+              */}
+            {sidebarOpen && (
               <div className="sidebar-search">
                 <div className="search-field">
                   <input
                     ref={searchInput}
                     className="search-input"
-                    value={query}
-                    placeholder="문서 검색"
-                    onChange={(event) => setQuery(event.target.value)}
+                    value={sidebarTab === 'tree' ? query : favoriteQuery}
+                    placeholder={sidebarTab === 'tree' ? '문서 검색' : '즐겨찾기에서 찾기'}
+                    onChange={(event) => {
+                      if (sidebarTab === 'tree') setQuery(event.target.value)
+                      else setFavoriteQuery(event.target.value)
+                    }}
                     onKeyDown={(event) => {
                       // 아래 방향키로 결과 목록으로 내려갑니다.
                       if (event.key !== 'ArrowDown') return
@@ -888,14 +910,15 @@ export default function App() {
                     }}
                   />
                   {/* 한 글자라도 있으면 지울 수 있게 합니다. */}
-                  {query.length > 0 && (
+                  {(sidebarTab === 'tree' ? query : favoriteQuery).length > 0 && (
                     <button
                       type="button"
                       className="search-clear"
                       aria-label="검색어 지우기"
                       data-tip="검색어 지우기"
                       onClick={() => {
-                        setQuery('')
+                        if (sidebarTab === 'tree') setQuery('')
+                        else setFavoriteQuery('')
                         // 지운 뒤 바로 다시 칠 수 있도록 자리를 돌려 줍니다.
                         searchInput.current?.focus()
                       }}
@@ -932,6 +955,7 @@ export default function App() {
             {sidebarTab === 'favorites' ? (
               <Favorites
                 paths={favorites}
+                query={favoriteQuery}
                 root={vault.tree}
                 onOpen={(path) => void (isMarkdown(path) ? openDoc(path) : openAsset(path))}
                 onOpenDir={(path) => {
@@ -943,8 +967,13 @@ export default function App() {
             ) : query.trim() ? (
               <SearchPanel
                 query={query}
-                index={vault.index}
-                onOpen={(path) => void openDoc(path)}
+                source={searchSource}
+                loading={textsLoading}
+                onOpen={(path) => void (isMarkdown(path) ? openDoc(path) : openAsset(path))}
+                onOpenDir={(path) => {
+                  setSelectedDir(path)
+                  setSelectedPath(null)
+                }}
                 onLeaveTop={() => {
                   const box = searchInput.current
                   if (!box) return

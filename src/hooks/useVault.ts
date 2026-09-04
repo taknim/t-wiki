@@ -4,6 +4,7 @@ import {
   attachmentKind, extensionOf, isAttachment, isMarkdown, isSyncable, MAX_ATTACHMENT_BYTES,
 } from '../lib/attachments'
 import { clearAssetCache } from '../lib/assets'
+import { clearTextIndex } from '../lib/textIndex'
 import * as fs from '../lib/fsAccess'
 import { clearVaultHandle, loadVaultHandle, saveVaultHandle } from '../lib/store'
 
@@ -172,6 +173,7 @@ export function useVault(): Vault {
   const close = useCallback(async () => {
     await clearVaultHandle()
     clearAssetCache()
+    clearTextIndex()
     attachRoot(null)
     setTree(null)
     setIndex(new Map())

@@ -33,6 +33,8 @@ export type AssetIndex = Map<string, AssetEntry>
 
 export interface SearchHit {
   path: string
+  /** 폴더인지 파일인지. 아이콘과 여는 방식이 갈립니다. */
+  kind: 'dir' | 'file'
   title: string
   /** 매치 주변 발췌. <mark> 를 쓰지 않고 조각으로 나눠 React 에서 직접 렌더합니다. */
   snippet: { text: string; hit: boolean }[]

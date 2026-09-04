@@ -66,6 +66,7 @@ const pane = () => page.evaluate(() => ({
   favorites: document.querySelectorAll('.favorites-list li').length,
   tree: document.querySelectorAll('.tree-row').length,
   search: document.querySelectorAll('.search-input').length,
+  placeholder: document.querySelector('.search-input')?.getAttribute('placeholder') ?? null,
   empty: document.querySelector('.panel-empty')?.textContent ?? null,
 }))
 
@@ -165,7 +166,7 @@ try {
   step('10. 탭을 고르면 그 쪽만 보인다')
   /*
    * 한 화면에 둘을 같이 두지 않습니다. 좁은 칸을 나눠 쓰면 양쪽 다 몇 줄씩만 보입니다.
-   * 검색은 폴더 탭의 일입니다. 즐겨찾기는 목록이 짧아 눈으로 찾습니다.
+   * 찾는 칸은 두 탭에 다 있지만 하는 일이 다릅니다. 그쪽은 search 묶음에서 봅니다.
    */
   await star('회사')
   await star('회고')
@@ -174,7 +175,7 @@ try {
   console.log('  즐겨찾기 탭: ' + JSON.stringify(onFav))
   expect('즐겨찾기가 보임', onFav.favorites > 0, JSON.stringify(onFav))
   expect('트리는 안 보임', onFav.tree === 0, JSON.stringify(onFav))
-  expect('검색란도 없음', onFav.search === 0, JSON.stringify(onFav))
+  expect('찾는 칸은 즐겨찾기용', onFav.placeholder === '즐겨찾기에서 찾기', JSON.stringify(onFav))
   await page.screenshot({ path: join(HERE, '..', 'shots', 'favorites', '02-tab-favorites.png'),
     clip: { x: 0, y: 40, width: 470, height: 360 } })
 
@@ -183,7 +184,7 @@ try {
   console.log('  폴더 탭:     ' + JSON.stringify(onTree))
   expect('트리가 보임', onTree.tree > 0, JSON.stringify(onTree))
   expect('즐겨찾기는 안 보임', onTree.favorites === 0, JSON.stringify(onTree))
-  expect('검색란이 있음', onTree.search === 1, JSON.stringify(onTree))
+  expect('찾는 칸은 문서 검색용', onTree.placeholder === '문서 검색', JSON.stringify(onTree))
 
   step('11. 많이 담아도 제 칸 안에서 굴러간다')
   await page.setViewportSize({ width: 1400, height: 400 })

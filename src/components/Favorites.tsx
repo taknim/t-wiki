@@ -2,9 +2,13 @@ import type { VaultNode } from '../types'
 import { attachmentKind, isMarkdown } from '../lib/attachments'
 import { DocIcon, FolderIcon, ImageIcon, StarIcon } from './icons'
 import { displayPath } from '../lib/paths'
+import { highlight, nameMatches } from '../lib/search'
+import { Highlight } from './Highlight'
 
 interface FavoritesProps {
   paths: string[]
+  /** 즐겨찾기 탭의 찾는 말. 이름으로만 거릅니다. */
+  query: string
   /** 폴더인지 가리려면 트리가 필요합니다. 색인에는 폴더가 없습니다. */
   root: VaultNode | null
   onOpen: (path: string) => void
@@ -44,22 +48,30 @@ function iconFor(path: string, kind: 'dir' | 'file') {
  * 열리지 않습니다. 담아 둔 것이 없으면 왜 비었는지 적어 둡니다. 탭을 골라서 온
  * 자리라, 아무 말 없이 빈 칸만 있으면 고장으로 보입니다.
  */
-export function Favorites({ paths, root, onOpen, onOpenDir, onRemove }: FavoritesProps) {
+export function Favorites({ paths, query, root, onOpen, onOpenDir, onRemove }: FavoritesProps) {
   const alive = paths
     .map((path) => ({ path, kind: findKind(root, path) }))
     .filter((entry): entry is { path: string; kind: 'dir' | 'file' } => entry.kind !== null)
 
-  if (alive.length === 0) {
+  /*
+   * 여기서는 이름으로만 거릅니다. 담아 둔 것은 몇십 개 안 되고, 그중에서 하나를
+   * 집어내는 일이라 본문까지 뒤질 까닭이 없습니다.
+   */
+  const shown = alive.filter((entry) => nameMatches(query, entry.path))
+
+  if (shown.length === 0) {
     return (
       <p className="panel-empty">
-        담아 둔 것이 없습니다. 폴더 탭에서 줄 오른쪽 별을 누르면 여기에 모입니다.
+        {alive.length === 0
+          ? '담아 둔 것이 없습니다. 폴더 탭에서 줄 오른쪽 별을 누르면 여기에 모입니다.'
+          : '담아 둔 것 중에 그런 이름은 없습니다.'}
       </p>
     )
   }
 
   return (
     <ul className="favorites-list">
-      {alive.map(({ path, kind }) => {
+      {shown.map(({ path, kind }) => {
         const icon = iconFor(path, kind)
         const name = path.split('/').pop() ?? path
         return (
@@ -71,7 +83,9 @@ export function Favorites({ paths, root, onOpen, onOpenDir, onRemove }: Favorite
             >
               <span className={`tree-icon is-${icon.tone}`}>{icon.node}</span>
               <span className="favorites-text">
-                <span className="favorites-name">{name}</span>
+                <span className="favorites-name">
+                  <Highlight pieces={highlight(name, query)} />
+                </span>
                 {/* 이름만으로는 어느 것인지 가릴 수 없어 어디에 있는 것인지 함께 적습니다. */}
                 <span className="favorites-path">{displayPath(path)}</span>
               </span>
