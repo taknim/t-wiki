@@ -232,7 +232,7 @@ try {
   console.log('  ' + JSON.stringify(carried))
   expect('파일에서 읽어 옴', carried.length > 0, JSON.stringify(carried))
 
-  step('15. 이름 아래에 어디에 있는 것인지 붙는다')
+  step('15. 담긴 것마다 이름 아래에 어디에 있는 것인지 붙는다')
   // 폴더가 펴져 있는지는 앞 걸음에 따라 다릅니다. 아이가 보일 때까지 두드립니다.
   for (let tries = 0; tries < 3; tries += 1) {
     if (await page.locator('.tree-row:has-text("온보딩")').count()) break
@@ -247,6 +247,8 @@ try {
       return {
         name: name?.textContent ?? null,
         path: path?.textContent ?? null,
+        // 툴팁은 걷어냈습니다. 두 줄에 이미 다 적혀 있습니다.
+        tip: li.querySelector('.favorites-item')?.getAttribute('data-tip') ?? null,
         // 눈에 덜 띄어야 이름을 가리지 않습니다. 색이 갈리는지만 봅니다.
         dimmer: path
           ? getComputedStyle(path).color !== getComputedStyle(name).color
@@ -258,7 +260,20 @@ try {
   expect('폴더 안 문서는 경로가 붙음', nested?.path === '/회사/온보딩.md', JSON.stringify(nested))
   expect('이름보다 흐림', nested?.dimmer === true, JSON.stringify(nested))
   const top = rows.find((row) => row.name === '개발 환경.md')
-  expect('최상위 것은 이름과 같아 붙지 않음', top != null && top.path === null, JSON.stringify(top))
+  expect('최상위 것에도 붙음', top?.path === '/개발 환경.md', JSON.stringify(top))
+  expect('하나도 빠지지 않음', rows.every((row) => row.path), JSON.stringify(rows))
+  expect('툴팁은 걷어냄', rows.every((row) => row.tip === null), JSON.stringify(rows))
+
+  // 폴더도 담아 봅니다. 파일만 되고 폴더는 빠지는 일이 없어야 합니다.
+  await star('회고')
+  const withDir = await page.evaluate(() =>
+    [...document.querySelectorAll('.favorites-list li')].map((li) => ({
+      name: li.querySelector('.favorites-name')?.textContent ?? null,
+      path: li.querySelector('.favorites-path')?.textContent ?? null,
+    })))
+  console.log('  ' + JSON.stringify(withDir))
+  const dir = withDir.find((row) => row.name === '회고')
+  expect('폴더에도 붙음', dir?.path === '/회고', JSON.stringify(dir))
   await page.screenshot({ path: join(HERE, '..', 'shots', 'favorites', '04-path.png'),
     clip: { x: 0, y: 40, width: 460, height: 320 } })
 

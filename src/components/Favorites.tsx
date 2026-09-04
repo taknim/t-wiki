@@ -75,24 +75,18 @@ export function Favorites({
         {alive.map(({ path, kind }) => {
           const icon = iconFor(path, kind)
           const name = path.split('/').pop() ?? path
-          /*
-           * 이름만으로는 어느 것인지 가릴 수 없어 아래에 경로를 덧붙입니다.
-           * 최상위에 있는 것은 경로가 곧 이름이라 덧붙이지 않습니다. 같은 말을
-           * 두 줄에 걸쳐 적어 봐야 눈만 어지럽습니다.
-           */
-          const where = path.includes('/') ? displayPath(path) : null
           return (
             <li key={path}>
               <button
                 type="button"
                 className="favorites-item"
-                data-tip={displayPath(path)}
                 onClick={() => (kind === 'dir' ? onOpenDir(path) : onOpen(path))}
               >
                 <span className={`tree-icon is-${icon.tone}`}>{icon.node}</span>
                 <span className="favorites-text">
                   <span className="favorites-name">{name}</span>
-                  {where && <span className="favorites-path">{where}</span>}
+                  {/* 이름만으로는 어느 것인지 가릴 수 없어 어디에 있는 것인지 함께 적습니다. */}
+                  <span className="favorites-path">{displayPath(path)}</span>
                 </span>
               </button>
               <button

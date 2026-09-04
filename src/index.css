@@ -404,7 +404,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .favorites-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /*
  * 어느 것인지 가리라고 두는 줄이라 이름보다 물러서 있어야 합니다.
- * 길면 뒤를 자르고, 전체는 툴팁에서 봅니다.
+ * 길면 뒤를 자릅니다. 트리 너비를 넓히면 더 보입니다.
  */
 .favorites-path {
   overflow: hidden;
