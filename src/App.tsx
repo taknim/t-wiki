@@ -24,7 +24,7 @@ import {
 } from './lib/attachments'
 import { extractHeadings, parseFrontmatter } from './lib/markdown'
 import { readFile } from './lib/fsAccess'
-import { loadSession, saveSession } from './lib/session'
+import { DEFAULT_VIEW_MODE, loadSession, saveSession } from './lib/session'
 import { formatTidyFor, textPreviewKind, trimWhitespace } from './lib/textPreview'
 import {
   clampSidebarWidth, DEFAULT_SIDEBAR_WIDTH, maxSidebarWidth, MIN_SIDEBAR_WIDTH,
@@ -50,7 +50,7 @@ export default function App() {
   const [selectedDir, setSelectedDir] = useState<string | null>(null)
   const [draft, setDraft] = useState('')
   const [dirty, setDirty] = useState(false)
-  const [viewMode, setViewMode] = useState<ViewMode>('split')
+  const [viewMode, setViewMode] = useState<ViewMode>(DEFAULT_VIEW_MODE)
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set())
   const [query, setQuery] = useState('')
   const [settingsTab, setSettingsTab] = useState<'general' | 'appearance' | 'sync' | null>(null)
@@ -185,7 +185,9 @@ export default function App() {
 
     // 닫기 전에 지금 화면 상태를 남겨 둡니다. 다음에 같은 폴더를 열면 이대로 복원됩니다.
     if (vault.root) {
-      await saveSession(vault.root, { expanded: [...expanded], selectedPath, selectedDir })
+      await saveSession(vault.root, {
+        expanded: [...expanded], selectedPath, selectedDir, viewMode,
+      })
     }
     restoredFor.current = null
     await vault.close()
@@ -196,7 +198,8 @@ export default function App() {
     setSelectedDir(null)
     setDraft('')
     setDirty(false)
-  }, [commit, vault, expanded, selectedPath, selectedDir])
+    setViewMode(DEFAULT_VIEW_MODE)
+  }, [commit, vault, expanded, selectedPath, selectedDir, viewMode])
 
   const startSync = useCallback(() => {
     // 설정이 덜 됐으면 실행 대신 설정 창을 열어 줍니다.
@@ -298,6 +301,7 @@ export default function App() {
       if (!saved || cancelled) return
 
       setExpanded(new Set(saved.expanded))
+      setViewMode(saved.viewMode)
 
       if (saved.selectedDir !== null) {
         setSelectedDir(saved.selectedDir)
@@ -327,8 +331,8 @@ export default function App() {
   useEffect(() => {
     const root = vault.root
     if (vault.status !== 'ready' || !root || restoredFor.current !== root) return
-    void saveSession(root, { expanded: [...expanded], selectedPath, selectedDir })
-  }, [vault.status, vault.root, expanded, selectedPath, selectedDir])
+    void saveSession(root, { expanded: [...expanded], selectedPath, selectedDir, viewMode })
+  }, [vault.status, vault.root, expanded, selectedPath, selectedDir, viewMode])
 
   const toggleFolder = useCallback((path: string) => {
     setExpanded((previous) => {
