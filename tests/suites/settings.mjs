@@ -191,7 +191,42 @@ try {
   await page.waitForTimeout(500)
   expect('한 번 더 누르면 설정도 닫힘', !(await isOpen()), '아직 열려 있습니다')
 
-  step('10. 닫기 단추는 끌기에 잡히지 않는다')
+  step('10. 마지막 묶음 아래에 빈 칸이 남지 않는다')
+  /*
+   * 마지막 묶음도 메뉴로 뛰면 맨 위까지 올라와야 합니다. 그렇다고 한 화면만큼을
+   * 여백으로 붙여 두면, 이미 긴 묶음 아래에 아무것도 없는 칸만 남습니다.
+   */
+  await open()
+  await page.click('.settings-nav button:has-text("GitHub 동기화")')
+  await page.waitForTimeout(1200)
+  const jumped = await page.evaluate(() => {
+    const pane = document.querySelector('.settings-content')
+    const head = [...document.querySelectorAll('.settings-heading')]
+      .find((n) => n.textContent.includes('GitHub'))
+    return Math.round(head.getBoundingClientRect().top - pane.getBoundingClientRect().top)
+  })
+  console.log('  머리가 위에서 ' + jumped + 'px')
+  expect('메뉴로 뛰면 머리가 위에 붙음', jumped >= 0 && jumped < 60, String(jumped))
+
+  const tail = await page.evaluate(() => {
+    const pane = document.querySelector('.settings-content')
+    pane.scrollTop = pane.scrollHeight
+    /*
+     * 묶음이 아니라 그 안의 마지막 줄에서 잽니다. 여백을 묶음 안쪽에 붙여 두면
+     * 묶음의 아래 끝은 화면 끝에 닿아 있어, 빈 칸이 있어도 없는 것으로 보입니다.
+     */
+    const last = document.querySelector('.settings-section:last-child > :last-child')
+    return Math.round(pane.getBoundingClientRect().bottom - last.getBoundingClientRect().bottom)
+  })
+  console.log('  끝까지 내린 뒤 아래 빈 칸: ' + tail + 'px')
+  // 칸 바깥 여백(18) 과 마지막 줄의 아래 간격(20) 만 남아야 합니다. 한 화면이 남으면 안 됩니다.
+  expect('바닥에 빈 칸이 남지 않음', tail <= 48, String(tail))
+  await page.screenshot({ path: join(HERE, '..', 'shots', 'settings', '04-bottom.png'),
+    clip: { x: 280, y: 120, width: 840, height: 660 } })
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(400)
+
+  step('11. 닫기 단추는 끌기에 잡히지 않는다')
   await open()
   await page.click('.sheet-close')
   await page.waitForTimeout(400)
