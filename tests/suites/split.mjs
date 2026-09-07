@@ -77,7 +77,55 @@ try {
   await page.screenshot({ path: join(HERE, '..', 'shots', 'split', '02-dragged.png'),
     clip: { x: 430, y: 60, width: 970, height: 320 } })
 
-  step('3. 어느 쪽도 아주 사라지지는 않는다')
+  step('3. 잡고 있는 동안 지금 몫을 숫자로 보여 준다')
+  /*
+   * 눈대중으로 반반을 맞추기는 어렵습니다. 잡은 동안에는 숫자로 알려 주고,
+   * 놓고 나면 치웁니다. 늘 떠 있으면 글 위에 앉아 읽는 것을 방해합니다.
+   */
+  const badgeShown = () => page.evaluate(() =>
+    getComputedStyle(document.querySelector('.split-badge')).display !== 'none')
+  expect('잡기 전에는 안 보임', !(await badgeShown()))
+  const box = await page.locator('.split-resizer').boundingBox()
+  await page.mouse.move(box.x + 3, box.y + 200)
+  await page.mouse.down()
+  await page.mouse.move(box.x + 3 - 100, box.y + 200, { steps: 8 })
+  await page.waitForTimeout(300)
+  const shown = await page.evaluate(() => {
+    const badge = document.querySelector('.split-badge')
+    const body = document.querySelector('.doc-body')
+    const editor = document.querySelector('.editor')
+    return {
+      text: badge?.textContent ?? null,
+      // 숫자를 겨누다 손잡이를 놓치면 안 됩니다.
+      clickThrough: badge ? getComputedStyle(badge).pointerEvents === 'none' : null,
+      real: Math.round((editor.getBoundingClientRect().width / body.getBoundingClientRect().width) * 100),
+    }
+  })
+  console.log('  ' + JSON.stringify(shown))
+  expect('숫자가 뜸', /^\d+ : \d+$/.test(shown.text ?? ''), String(shown.text))
+  const [left, right] = (shown.text ?? '0 : 0').split(' : ').map(Number)
+  expect('둘을 더하면 100', left + right === 100, String(shown.text))
+  expect('화면에 그려진 몫과 같음', Math.abs(left - shown.real) <= 1,
+    `${shown.text} vs 화면 ${shown.real}`)
+  expect('숫자는 손잡이를 가리지 않음', shown.clickThrough, String(shown.clickThrough))
+  await page.screenshot({ path: join(HERE, '..', 'shots', 'split', '03-badge.png'),
+    clip: { x: 430, y: 60, width: 970, height: 520 } })
+  await page.mouse.up()
+  await page.waitForTimeout(300)
+  expect('놓으면 사라짐', !(await badgeShown()))
+
+  // 자판으로 옮길 때도 보여야 합니다. 그때는 눈대중할 거리조차 없습니다.
+  await page.keyboard.press('Tab')
+  await page.waitForTimeout(200)
+  await page.focus('.split-resizer')
+  await page.keyboard.press('ArrowRight')
+  await page.waitForTimeout(300)
+  expect('자판으로 자리를 잡으면 보임', await badgeShown())
+  await page.click('.editor')
+  await page.waitForTimeout(300)
+  expect('딴 곳을 누르면 사라짐', !(await badgeShown()))
+
+  step('4. 어느 쪽도 아주 사라지지는 않는다')
   await dragBy(-3000)
   const squeezed = await panes()
   console.log('  왼쪽 끝: ' + JSON.stringify(squeezed))
@@ -89,7 +137,7 @@ try {
   expect('미리보기가 남음', stretched.preview > 100, JSON.stringify(stretched))
   expect('80% 에서 멈춤', stretched.saved === '80', String(stretched.saved))
 
-  step('4. 두 번 누르면 반반으로 돌아간다')
+  step('5. 두 번 누르면 반반으로 돌아간다')
   await page.dblclick('.split-resizer')
   await page.waitForTimeout(400)
   const reset = await panes()
@@ -97,7 +145,7 @@ try {
   expect('반반', reset.saved === '50', String(reset.saved))
   expect('두 칸이 비슷함', Math.abs(reset.editor - reset.preview) <= 8, JSON.stringify(reset))
 
-  step('5. 자판으로도 옮긴다')
+  step('6. 자판으로도 옮긴다')
   await page.focus('.split-resizer')
   await page.keyboard.press('ArrowLeft')
   await page.waitForTimeout(300)
@@ -110,7 +158,7 @@ try {
   const bigStep = await panes()
   expect('Shift 는 8%', bigStep.saved === '56', String(bigStep.saved))
 
-  step('6. 새로고침해도 그 몫으로 열린다')
+  step('7. 새로고침해도 그 몫으로 열린다')
   await page.reload({ waitUntil: 'domcontentloaded' })
   await openVault()
   await openDoc('개발 환경')
@@ -119,7 +167,7 @@ try {
   expect('기억한 몫', kept.saved === '56', String(kept.saved))
   expect('원문이 더 넓음', kept.editor > kept.preview, JSON.stringify(kept))
 
-  step('7. 나란히가 아니면 손잡이가 없다')
+  step('8. 나란히가 아니면 손잡이가 없다')
   await setMode('편집')
   expect('편집에는 없음', (await page.locator('.split-resizer').count()) === 0)
   await setMode('미리보기')
@@ -127,7 +175,7 @@ try {
   await setMode('나란히')
   expect('나란히로 돌아오면 다시 있음', (await page.locator('.split-resizer').count()) === 1)
 
-  step('8. 글 첨부에서도 같은 몫으로 나뉜다')
+  step('9. 글 첨부에서도 같은 몫으로 나뉜다')
   /*
    * 마크다운과 글 첨부는 그리는 자리가 다릅니다. 한쪽만 고치면 문서를 옮길 때마다
    * 몫이 달라져 눈이 어지럽습니다.

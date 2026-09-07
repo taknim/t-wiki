@@ -606,6 +606,32 @@ mark { background: var(--mark); color: inherit; border-radius: 2px; }
 }
 .split-resizer:hover::after,
 .split-resizer:focus-visible::after { background: var(--accent); width: 2px; }
+/*
+ * 잡고 있는 동안 보여 주는 지금 몫. 손잡이 위에 얹혀 글을 가리지 않게 작게 둡니다.
+ *
+ * 손으로 잡은 동안과 자판으로 자리를 잡았을 때만 나옵니다. 마우스로 눌러 옮기고
+ * 놓은 뒤에는 자리가 남아 있어도 감춥니다. 볼일이 끝났는데 숫자만 남습니다.
+ */
+.split-badge {
+  display: none;
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-start: 50%;
+  transform: translate(-50%, -50%);
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.4;
+  white-space: nowrap;
+  /* 숫자를 겨누다 손잡이를 놓치면 안 됩니다. */
+  pointer-events: none;
+  z-index: 2;
+}
+.split-resizer.is-held .split-badge,
+.split-resizer:focus-visible .split-badge { display: block; }
 .split-resizer:focus-visible { outline: none; }
 @media (prefers-reduced-motion: reduce) {
   .split-resizer::after { transition: none; }
