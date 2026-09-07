@@ -1,6 +1,7 @@
 import type { SyncPlanItem } from '../types'
 import type { SyncReport } from '../hooks/useGitHubSync'
 import { displayPath } from '../lib/paths'
+import { useEscapeClose } from '../hooks/useEscapeClose'
 
 const ACTION_LABEL: Record<SyncPlanItem['action'], string> = {
   'upload-new': '커밋(신규)',
@@ -20,6 +21,9 @@ interface SyncReportSheetProps {
 }
 
 export function SyncReportSheet({ report, onClose, onConfirm }: SyncReportSheetProps) {
+  // 설정 창 위에 떠 있을 때가 많습니다. Esc 는 위에 있는 이쪽부터 닫습니다.
+  useEscapeClose(onClose)
+
   const failures = report.log.filter((line) => line.status === 'error')
   const changed = report.plan.filter((item) => item.action !== 'skip')
 

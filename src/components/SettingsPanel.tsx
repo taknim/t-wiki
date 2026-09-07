@@ -12,6 +12,7 @@ import {
 import { removeEntry } from '../lib/fsAccess'
 import { buildBundle, bundleFileName, parseBundle } from '../lib/settingsFile'
 import type { SidebarTab } from '../types'
+import { useEscapeClose } from '../hooks/useEscapeClose'
 import { useTheme } from './themeContext'
 import { useDialogs } from './dialogContext'
 
@@ -375,21 +376,8 @@ export function SettingsPanel({
     }
   }
 
-  /*
-   * Esc 로 닫습니다.
-   *
-   * 확인 창이 위에 떠 있으면 그쪽이 먼저입니다. 뒤에 있는 설정 창이 닫히면
-   * 무엇에 답하는 물음인지 알 수 없게 됩니다.
-   */
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return
-      if (document.querySelector('.dialog')) return
-      onClose()
-    }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [onClose])
+  // Esc 로 닫습니다. 위에 동기화 결과나 확인 창이 떠 있으면 그쪽이 먼저입니다.
+  useEscapeClose(onClose)
 
   return (
     <div

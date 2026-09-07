@@ -2,6 +2,7 @@ import { chromium } from 'playwright'
 import { readFileSync, mkdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { createGitHubMock } from '../github-mock.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 mkdirSync(join(HERE, '..', 'shots', 'settings'), { recursive: true })
@@ -11,10 +12,12 @@ const ok = (n) => console.log('  ok  ' + n)
 const fail = (n, d) => { problems.push(n); console.log('FAIL  ' + n + '\n      ' + d) }
 const expect = (n, c, d = '') => (c ? ok(n) : fail(n, d))
 
+const github = createGitHubMock()
 const browser = await chromium.launch({ channel: 'chrome' })
 const page = await browser.newPage({ viewport: { width: 1400, height: 920 } })
 const errors = []
 page.on('pageerror', (e) => errors.push('pageerror: ' + e.message))
+await page.route('https://api.github.com/**', github.handler)
 await page.addInitScript(readFileSync(join(HERE, '..', 'mock-fs.js'), 'utf8'))
 await page.addInitScript(() => window.__installMockFs())
 
@@ -122,28 +125,73 @@ try {
   await page.waitForTimeout(400)
   expect('닫힘', !(await isOpen()), '아직 열려 있습니다')
 
-  step('8. 확인 창이 떠 있으면 Esc 가 설정을 닫지 않는다')
+  step('8. 겹쳐 뜬 창은 위에 있는 것부터 닫힌다')
   /*
-   * 뒤에 있는 설정 창이 먼저 닫히면 무엇에 답하는 물음인지 알 수 없게 됩니다.
+   * 아래 것이 먼저 닫히면 위에 남은 창이 무엇에 딸린 것인지 알 수 없게 됩니다.
+   * 확인 창이든 동기화 결과든, Esc 는 늘 맨 위 하나만 닫아야 합니다.
    */
   await open()
   await page.click('button:has-text("설정 내보내기")')
   await page.waitForSelector('.dialog', { timeout: 5000 })
   await page.keyboard.press('Escape')
   await page.waitForTimeout(400)
-  const both = await page.evaluate(() => ({
+  const afterEsc = await page.evaluate(() => ({
     dialog: document.querySelectorAll('.dialog').length,
     settings: document.querySelectorAll('.settings-nav').length,
   }))
-  console.log('  ' + JSON.stringify(both))
-  expect('설정 창은 그대로', both.settings === 1, JSON.stringify(both))
-  await page.click('.dialog button:has-text("취소")')
-  await page.waitForTimeout(300)
+  console.log('  확인 창: ' + JSON.stringify(afterEsc))
+  expect('확인 창이 닫힘', afterEsc.dialog === 0, JSON.stringify(afterEsc))
+  expect('설정 창은 그대로', afterEsc.settings === 1, JSON.stringify(afterEsc))
   await page.keyboard.press('Escape')
   await page.waitForTimeout(400)
-  expect('확인 창을 치운 뒤에는 닫힘', !(await isOpen()), '아직 열려 있습니다')
+  expect('한 번 더 누르면 설정도 닫힘', !(await isOpen()), '아직 열려 있습니다')
 
-  step('9. 닫기 단추는 끌기에 잡히지 않는다')
+  step('9. 동기화 결과가 떠 있으면 그쪽이 먼저 닫힌다')
+  await open()
+  await page.click('.settings-nav button:has-text("GitHub 동기화")')
+  await page.fill('#gh-token', 'pat')
+  await page.fill('#gh-owner', 'tester')
+  await page.fill('.row input[placeholder="저장소 이름"]', 'wiki')
+  await page.waitForTimeout(400)
+  await page.click('button:has-text("지금 동기화")')
+  await page.waitForFunction(() => {
+    const button = [...document.querySelectorAll('button')]
+      .find((n) => /지금 동기화|동기화 중/.test(n.textContent))
+    return button && !button.disabled && button.textContent.includes('지금 동기화')
+  }, { timeout: 25000 })
+  await page.waitForTimeout(800)
+  // 결과 창이 저절로 떴다면 닫고 다시 엽니다. 설정 위에 겹친 모습을 봐야 합니다.
+  if (await page.locator('.sheet:has-text("동기화 결과")').count()) {
+    await page.click('.sheet:has-text("동기화 결과") .sheet-close')
+    await page.waitForTimeout(400)
+  }
+  await page.click('button:has-text("지난 결과 보기")')
+  await page.waitForSelector('.sheet:has-text("동기화 결과")', { timeout: 8000 })
+  await page.waitForTimeout(400)
+  const stacked = await page.evaluate(() => ({
+    sheets: document.querySelectorAll('.sheet').length,
+    settings: document.querySelectorAll('.settings-nav').length,
+  }))
+  console.log('  겹친 채: ' + JSON.stringify(stacked))
+  expect('둘이 겹쳐 있음', stacked.sheets === 2 && stacked.settings === 1, JSON.stringify(stacked))
+  await page.screenshot({ path: join(HERE, '..', 'shots', 'settings', '03-stacked.png'),
+    clip: { x: 0, y: 0, width: 1400, height: 620 } })
+
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(500)
+  const afterFirst = await page.evaluate(() => ({
+    report: document.querySelectorAll('.sheet').length,
+    settings: document.querySelectorAll('.settings-nav').length,
+  }))
+  console.log('  한 번 누른 뒤: ' + JSON.stringify(afterFirst))
+  expect('결과 창이 먼저 닫힘', afterFirst.report === 1, JSON.stringify(afterFirst))
+  expect('설정 창은 남아 있음', afterFirst.settings === 1, JSON.stringify(afterFirst))
+
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(500)
+  expect('한 번 더 누르면 설정도 닫힘', !(await isOpen()), '아직 열려 있습니다')
+
+  step('10. 닫기 단추는 끌기에 잡히지 않는다')
   await open()
   await page.click('.sheet-close')
   await page.waitForTimeout(400)

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { DialogContext, type DialogApi } from './dialogContext'
+import { useEscapeClose } from '../hooks/useEscapeClose'
 
 interface PromptRequest {
   kind: 'prompt'
@@ -69,6 +70,12 @@ export function DialogProvider({ children }: { children: ReactNode }) {
     },
     [request],
   )
+
+  /*
+   * 확인 창은 늘 그려 두고 값으로만 여닫으므로, 뜨는 그때 Esc 줄에 들어갑니다.
+   * 취소 단추도 (Esc) 라고 적어 두었으니 실제로도 그렇게 되어야 합니다.
+   */
+  useEscapeClose(useCallback(() => close(null), [close]), request !== null)
 
   const submit = useCallback(() => {
     if (!request) return
