@@ -102,9 +102,10 @@ try {
     }
   })
   console.log('  ' + JSON.stringify(shown))
-  expect('숫자가 뜸', /^\d+ : \d+$/.test(shown.text ?? ''), String(shown.text))
-  const [left, right] = (shown.text ?? '0 : 0').split(' : ').map(Number)
+  expect('숫자가 뜸', /^\d+% : \d+%$/.test(shown.text ?? ''), String(shown.text))
+  const [left, right] = (shown.text ?? '0% : 0%').split(' : ').map(parseFloat)
   expect('둘을 더하면 100', left + right === 100, String(shown.text))
+  expect('몫이라는 것이 드러남', (shown.text ?? '').includes('%'), String(shown.text))
   expect('화면에 그려진 몫과 같음', Math.abs(left - shown.real) <= 1,
     `${shown.text} vs 화면 ${shown.real}`)
   expect('숫자는 손잡이를 가리지 않음', shown.clickThrough, String(shown.clickThrough))

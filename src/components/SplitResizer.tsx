@@ -79,7 +79,7 @@ export function SplitResizer({ ratio, onRatio }: SplitResizerProps) {
         * 잡은 자리의 몫. 왼쪽(원문) : 오른쪽(미리보기) 입니다.
         * 손잡이는 7px 이라 글자가 들어갈 자리가 없어, 가운데에 띄워 얹습니다.
         */}
-      <span className="split-badge">{ratio} : {100 - ratio}</span>
+      <span className="split-badge">{ratio}% : {100 - ratio}%</span>
     </div>
   )
 }
