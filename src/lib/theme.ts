@@ -3,7 +3,7 @@ export type ThemeId =
   | 'rose' | 'forest' | 'grape' | 'nord' | 'solarized' | 'dracula'
 export type ModeSetting = 'system' | 'light' | 'dark'
 export type FontId = 'sans' | 'serif' | 'mono'
-export type SizeId = 'small' | 'medium' | 'large'
+export type SizeId = 'smallest' | 'small' | 'medium' | 'large' | 'largest'
 export type LeadingId = 'tightest' | 'tight' | 'normal' | 'loose' | 'loosest'
 export type WidthId = 'narrow' | 'medium' | 'wide'
 
@@ -322,9 +322,18 @@ export const FONTS: { id: FontId; name: string; stack: string }[] = [
   },
   {
     id: 'serif',
+    /*
+     * 한글 명조를 라틴 세리프보다 뒤, 그러나 고딕보다는 앞에 둡니다.
+     *
+     * 앞서는 "Apple SD Gothic Neo" 가 끼어 있었습니다. 이름은 세리프 벌에 있어도
+     * 실제로는 고딕이라, 한글은 산세리프와 똑같이 그려졌습니다. 글꼴을 바꿔도
+     * 한글만 그대로인 것처럼 보인 까닭입니다. 글자마다 앞에서부터 그 글자를 가진
+     * 첫 벌을 쓰므로, 한글 자리에는 명조만 놓아야 합니다.
+     */
     name: '세리프',
     stack:
-      'ui-serif, Georgia, "Apple SD Gothic Neo", "Noto Serif KR", "Nanum Myeongjo", batang, serif',
+      'ui-serif, Georgia, "Apple SD Myungjo", AppleMyungjo, "Noto Serif KR", "Source Han Serif K",'
+      + ' "Nanum Myeongjo", NanumMyeongjo, Batang, BatangChe, 바탕, serif',
   },
   {
     id: 'mono',
@@ -334,9 +343,11 @@ export const FONTS: { id: FontId; name: string; stack: string }[] = [
 ]
 
 export const SIZES: { id: SizeId; name: string; value: string }[] = [
+  { id: 'smallest', name: '아주 작게', value: '13px' },
   { id: 'small', name: '작게', value: '14px' },
   { id: 'medium', name: '보통', value: '15px' },
   { id: 'large', name: '크게', value: '17px' },
+  { id: 'largest', name: '아주 크게', value: '19px' },
 ]
 
 /*
@@ -410,7 +421,7 @@ export function applyTheme(settings: ThemeSettings, isDark: boolean): void {
   }
 
   const font = FONTS.find((item) => item.id === settings.font) ?? FONTS[0]
-  const size = SIZES.find((item) => item.id === settings.size) ?? SIZES[1]
+  const size = SIZES.find((item) => item.id === settings.size) ?? SIZES[2]
   const leading = LEADINGS.find((item) => item.id === settings.leading) ?? LEADINGS[2]
   const width = WIDTHS.find((item) => item.id === settings.width) ?? WIDTHS[1]
 

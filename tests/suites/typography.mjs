@@ -4,7 +4,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-mkdirSync(join(HERE, '..', 'shots', 'leading'), { recursive: true })
+mkdirSync(join(HERE, '..', 'shots', 'typography'), { recursive: true })
 const problems = []
 const step = (n) => console.log('\n>>> ' + n)
 const ok = (n) => console.log('  ok  ' + n)
@@ -28,6 +28,34 @@ const openDoc = async (label) => {
   await page.waitForSelector('.editor', { timeout: 8000 })
   await page.waitForTimeout(400)
 }
+/** 모양 묶음을 펴고 그 안의 단추를 누릅니다. 이름이 서로 겹쳐 통째로 같은 것만 짚습니다. */
+const pick = async (group, name) => {
+  await page.click('button[aria-label="설정"]')
+  await page.waitForSelector('.settings-nav')
+  await page.click('.settings-nav button:has-text("모양")')
+  await page.waitForTimeout(300)
+  await page.click(`[aria-label="${group}"] button:text-is("${name}")`)
+  await page.waitForTimeout(300)
+  await page.click('.sheet-close')
+  await page.waitForTimeout(400)
+}
+/**
+ * 미리보기 안에서 한글 한 줄이 차지하는 폭.
+ *
+ * 글꼴 이름만 봐서는 실제로 바뀌었는지 알 수 없습니다. 이름은 걸려 있어도 그 벌에
+ * 한글이 없으면 다른 글꼴로 그려집니다. 그려진 폭을 재야 정말 바뀐 것을 압니다.
+ */
+const koreanWidth = () => page.evaluate(() => {
+  const host = document.querySelector('.preview')
+  if (!host) return null
+  const probe = document.createElement('span')
+  probe.textContent = '한글명조체시험문장입니다'
+  Object.assign(probe.style, { whiteSpace: 'nowrap', position: 'absolute', visibility: 'hidden' })
+  host.appendChild(probe)
+  const width = probe.getBoundingClientRect().width
+  probe.remove()
+  return Math.round(width * 100) / 100
+})
 const setLeading = async (name) => {
   await page.click('button[aria-label="설정"]')
   await page.waitForSelector('.settings-nav')
@@ -90,7 +118,7 @@ try {
   const loose = await measured()
   console.log('  ' + JSON.stringify(loose))
   expect('변수가 2.2', loose.variable === '2.2', loose.variable)
-  await page.screenshot({ path: join(HERE, '..', 'shots', 'leading', '01-loose.png'),
+  await page.screenshot({ path: join(HERE, '..', 'shots', 'typography', '01-loose.png'),
     clip: { x: 430, y: 60, width: 970, height: 420 } })
 
   step('4. 글자 크기를 바꿔도 비율은 그대로다')
@@ -98,7 +126,7 @@ try {
   await page.waitForSelector('.settings-nav')
   await page.click('.settings-nav button:has-text("모양")')
   await page.waitForTimeout(300)
-  await page.click('[aria-label="글자 크기"] button:has-text("크게")')
+  await page.click('[aria-label="글자 크기"] button:text-is("크게")')
   await page.waitForTimeout(300)
   const bigger = await page.evaluate(() => {
     const el = document.querySelector('.preview')
@@ -138,6 +166,72 @@ try {
   })
   console.log('  첨부 미리보기: ' + String(svgPane))
   expect('첨부 글도 따름', svgPane === null || svgPane === 2.2, String(svgPane))
+
+  step('7. 글자 크기는 다섯 단계가 차례대로 커진다')
+  await openDoc('개발 환경')
+  const sizes = [['아주 작게', 13], ['작게', 14], ['보통', 15], ['크게', 17], ['아주 크게', 19]]
+  const grew = []
+  for (const [name, want] of sizes) {
+    await pick('글자 크기', name)
+    const size = await page.evaluate(() =>
+      parseFloat(getComputedStyle(document.querySelector('.preview')).fontSize))
+    console.log(`  ${name}: ${size}px`)
+    expect(`${name} 가 ${want}px`, size === want, String(size))
+    grew.push(size)
+  }
+  expect('갈수록 커짐', grew.every((v, at) => at === 0 || v > grew[at - 1]), JSON.stringify(grew))
+  await pick('글자 크기', '보통')
+
+  step('8. 세리프를 고르면 한글도 명조로 바뀐다')
+  /*
+   * 앞서는 세리프 벌 안에 고딕 한글이 먼저 서 있어, 글꼴을 바꿔도 한글은 그대로였습니다.
+   * 이름만 보지 않고 그려진 폭을 재서 정말 다른 글꼴로 그려지는지 봅니다.
+   */
+  await pick('본문 글꼴', '산세리프')
+  const sans = { family: await page.evaluate(() =>
+    getComputedStyle(document.querySelector('.preview')).fontFamily), width: await koreanWidth() }
+  await pick('본문 글꼴', '세리프')
+  const serif = { family: await page.evaluate(() =>
+    getComputedStyle(document.querySelector('.preview')).fontFamily), width: await koreanWidth() }
+  console.log('  산세리프: ' + sans.width + 'px')
+  console.log('  세리프:   ' + serif.width + 'px')
+
+  const gothicFirst = /Gothic|Pretendard|system-ui/i.test(serif.family.split(',').slice(0, 3).join(','))
+  expect('세리프 벌 앞머리에 고딕이 없음', !gothicFirst, serif.family)
+
+  /*
+   * 어떤 명조가 깔려 있는지.
+   *
+   * document.fonts.check 는 없는 이름에도 참을 내놓아 믿을 수 없습니다.
+   * 없는 이름 하나로 잰 폭과 견주어, 달라지는 것만 실제로 깔린 것으로 봅니다.
+   */
+  const installed = await page.evaluate(() => {
+    const measure = (family) => {
+      const probe = document.createElement('span')
+      probe.textContent = '한글명조체시험문장입니다'
+      Object.assign(probe.style, {
+        position: 'absolute', visibility: 'hidden', whiteSpace: 'nowrap',
+        fontSize: '16px', fontFamily: family,
+      })
+      document.body.appendChild(probe)
+      const width = probe.getBoundingClientRect().width
+      probe.remove()
+      return width
+    }
+    const none = measure('없는글꼴-xyz')
+    return ['AppleMyungjo', 'Apple SD Myungjo', 'Noto Serif KR', 'Nanum Myeongjo', 'Batang']
+      .filter((name) => measure(`"${name}", 없는글꼴-xyz`) !== none)
+  })
+  console.log('  깔려 있는 명조: ' + JSON.stringify(installed))
+  if (installed.length === 0) {
+    ok('이 기계에 한글 명조가 없어 폭은 견주지 않음')
+  } else {
+    expect('한글이 다른 글꼴로 그려짐', sans.width !== serif.width,
+      `${sans.width} vs ${serif.width} — 이름만 바뀌고 글자는 그대로입니다`)
+  }
+  await page.screenshot({ path: join(HERE, '..', 'shots', 'typography', '02-serif.png'),
+    clip: { x: 430, y: 60, width: 970, height: 300 } })
+  await pick('본문 글꼴', '산세리프')
 } catch (cause) {
   fail('묶음이 도중에 멈춤', cause instanceof Error ? (cause.stack ?? cause.message) : String(cause))
 } finally {
