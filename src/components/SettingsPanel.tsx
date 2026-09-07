@@ -307,16 +307,117 @@ export function SettingsPanel({
   const [remember, setRemember] = useState(isRememberEnabled)
   const [cleared, setCleared] = useState(false)
 
+  /*
+   * 창을 끌어 옮긴 거리.
+   *
+   * 자리는 여전히 가운데 정렬이 잡고, 여기서는 그 자리에서 얼마나 밀렸는지만 셉니다.
+   * 창 크기가 바뀌어도 가운데를 기준으로 다시 잡히므로 화면 밖으로 달아나지 않습니다.
+   */
+  const [offset, setOffset] = useState({ x: 0, y: 0 })
+  const dragFrom = useRef<
+    { x: number; y: number; left: number; top: number; width: number } | null
+  >(null)
+  const sheetRef = useRef<HTMLDivElement>(null)
+
+  /** 창을 아무리 끌어도 화면에 남겨 둘 만큼. 이만큼은 남아야 다시 잡을 수 있습니다. */
+  const KEEP_ON_SCREEN = 80
+
+  const startDrag = (event: React.PointerEvent) => {
+    // 머리줄의 단추(닫기)를 누른 것이면 끌기가 아닙니다.
+    if ((event.target as HTMLElement).closest('button')) return
+    const sheet = sheetRef.current
+    if (!sheet) return
+
+    /*
+     * 옮기기 전 자리와 크기를 잡을 때 한 번만 재 둡니다.
+     * 끄는 동안 다시 재면 방금 준 값이 아직 화면에 그려지기 전이라 기준이 흔들립니다.
+     */
+    const rect = sheet.getBoundingClientRect()
+    dragFrom.current = {
+      x: event.clientX - offset.x,
+      y: event.clientY - offset.y,
+      left: rect.left - offset.x,
+      top: rect.top - offset.y,
+      width: rect.width,
+    }
+    event.currentTarget.setPointerCapture(event.pointerId)
+  }
+
+  const onDrag = (event: React.PointerEvent) => {
+    const from = dragFrom.current
+    if (!from) return
+
+    /*
+     * 창을 완전히 밀어내지는 못하게 막습니다. 머리줄이 위로 사라지면 다시 잡을
+     * 방법이 없으므로 위쪽은 화면 끝에서 멈추고, 나머지 세 방향은 조금 남겨 둡니다.
+     */
+    const clamp = (value: number, least: number, most: number) =>
+      Math.min(Math.max(value, least), most)
+
+    setOffset({
+      x: clamp(
+        event.clientX - from.x,
+        KEEP_ON_SCREEN - from.width - from.left,
+        window.innerWidth - KEEP_ON_SCREEN - from.left,
+      ),
+      y: clamp(
+        event.clientY - from.y,
+        -from.top,
+        window.innerHeight - KEEP_ON_SCREEN - from.top,
+      ),
+    })
+  }
+
+  const endDrag = (event: React.PointerEvent) => {
+    dragFrom.current = null
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId)
+    }
+  }
+
+  /*
+   * Esc 로 닫습니다.
+   *
+   * 확인 창이 위에 떠 있으면 그쪽이 먼저입니다. 뒤에 있는 설정 창이 닫히면
+   * 무엇에 답하는 물음인지 알 수 없게 됩니다.
+   */
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      if (document.querySelector('.dialog')) return
+      onClose()
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [onClose])
+
   return (
     <div
-      className="overlay"
+      /*
+       * 바탕을 어둡게 덮지 않습니다. 설정을 바꾸면서 화면이 어떻게 바뀌는지
+       * 바로 보여야 합니다. 대신 이 칸이 그대로 덮고 있어 뒤쪽은 눌리지 않습니다.
+       */
+      className="overlay is-clear"
       role="presentation"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onClose()
       }}
     >
-      <div className="sheet" role="dialog" aria-modal="true" aria-label="설정">
-        <header className="sheet-head">
+      <div
+        ref={sheetRef}
+        className="sheet is-movable"
+        role="dialog"
+        aria-modal="true"
+        aria-label="설정"
+        style={{ transform: `translate(${offset.x}px, ${offset.y}px)` }}
+      >
+        <header
+          className="sheet-head sheet-grab"
+          onPointerDown={startDrag}
+          onPointerMove={onDrag}
+          onPointerUp={endDrag}
+          onPointerCancel={endDrag}
+        >
           <h2>설정</h2>
           <button
             type="button"

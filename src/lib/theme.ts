@@ -1,6 +1,6 @@
 export type ThemeId =
-  | 'default' | 'github' | 'ink' | 'sepia' | 'gruvbox'
-  | 'rose' | 'forest' | 'grape' | 'nord' | 'solarized' | 'dracula'
+  | 'default' | 'github' | 'ink' | 'contrast' | 'sepia' | 'gruvbox' | 'citrus' | 'espresso'
+  | 'rose' | 'forest' | 'ocean' | 'grape' | 'nord' | 'solarized' | 'dracula'
 export type ModeSetting = 'system' | 'light' | 'dark'
 export type FontId = 'sans' | 'serif' | 'mono'
 export type SizeId = 'smallest' | 'small' | 'medium' | 'large' | 'largest'
@@ -151,6 +151,29 @@ export const THEMES: Theme[] = [
     },
   },
   {
+    id: 'contrast',
+    name: '고대비',
+    description: '흑백을 끝까지 밀어붙인 배색, 눈이 편치 않을 때',
+    light: {
+      bg: '#ffffff', bgSunken: '#eeeeee', bgRaised: '#ffffff',
+      border: '#767676', borderStrong: '#000000',
+      text: '#000000', textMuted: '#3a3a3a',
+      accent: '#0b3fd1', accentSoft: '#dde5ff',
+      danger: '#b00000', ok: '#006622', warn: '#6b4200', mark: '#ffff00',
+      hlKeyword: '#8000a0', hlString: '#006622', hlNumber: '#8a3800', hlComment: '#4a4a4a',
+      hlTitle: '#0b3fd1', hlType: '#6b4200', hlMeta: '#3a3a3a',
+    },
+    dark: {
+      bg: '#000000', bgSunken: '#000000', bgRaised: '#111111',
+      border: '#8a8a8a', borderStrong: '#d0d0d0',
+      text: '#ffffff', textMuted: '#d0d0d0',
+      accent: '#7fc4ff', accentSoft: '#00284a',
+      danger: '#ff8a80', ok: '#7be08f', warn: '#ffd75f', mark: '#5a5a00',
+      hlKeyword: '#ff9ee0', hlString: '#7be08f', hlNumber: '#ffb570', hlComment: '#c0c0c0',
+      hlTitle: '#7fc4ff', hlType: '#ffd75f', hlMeta: '#d0d0d0',
+    },
+  },
+  {
     id: 'gruvbox',
     name: '그루비박스',
     description: '흙빛 종이에 진한 색, 복고풍 배색',
@@ -171,6 +194,52 @@ export const THEMES: Theme[] = [
       danger: '#fb4934', ok: '#b8bb26', warn: '#fabd2f', mark: '#544a17',
       hlKeyword: '#fb4934', hlString: '#b8bb26', hlNumber: '#d3869b', hlComment: '#928374',
       hlTitle: '#8ec07c', hlType: '#fabd2f', hlMeta: '#83a598',
+    },
+  },
+  {
+    id: 'citrus',
+    name: '감귤',
+    description: '크림빛 종이에 잘 익은 주황, 환한 화면',
+    light: {
+      bg: '#fff9f0', bgSunken: '#fdeeda', bgRaised: '#fffdfa',
+      border: '#f0dcc0', borderStrong: '#d6b98f',
+      text: '#33240f', textMuted: '#7a6444',
+      accent: '#c25708', accentSoft: '#ffe6cc',
+      danger: '#b3261e', ok: '#4a7a20', warn: '#a06a00', mark: '#ffd98a',
+      hlKeyword: '#b3261e', hlString: '#4a7a20', hlNumber: '#8a4bb5', hlComment: '#9b8563',
+      hlTitle: '#0f6f7a', hlType: '#a06a00', hlMeta: '#7a6444',
+    },
+    dark: {
+      bg: '#1d1710', bgSunken: '#16110b', bgRaised: '#271f16',
+      border: '#3b3022', borderStrong: '#524331',
+      text: '#f2e6d6', textMuted: '#b39d80',
+      accent: '#ff9f45', accentSoft: '#3d2a14',
+      danger: '#ff7d6b', ok: '#a8cf72', warn: '#ffcc66', mark: '#5c4412',
+      hlKeyword: '#ff8a80', hlString: '#b6d98a', hlNumber: '#d9a3f0', hlComment: '#9c8768',
+      hlTitle: '#72c9d4', hlType: '#ffcc66', hlMeta: '#b39d80',
+    },
+  },
+  {
+    id: 'espresso',
+    name: '에스프레소',
+    description: '볶은 원두빛 짙은 갈색, 밤에도 따뜻하게',
+    light: {
+      bg: '#f6efe9', bgSunken: '#ebe0d6', bgRaised: '#fdf9f5',
+      border: '#dccdbf', borderStrong: '#b9a493',
+      text: '#2e2119', textMuted: '#6d5849',
+      accent: '#8a4b2a', accentSoft: '#f0dfd2',
+      danger: '#a3302a', ok: '#4f7040', warn: '#96681a', mark: '#e8d29c',
+      hlKeyword: '#8a4b2a', hlString: '#4f7040', hlNumber: '#8a5a9e', hlComment: '#93806f',
+      hlTitle: '#2f6470', hlType: '#96681a', hlMeta: '#6d5849',
+    },
+    dark: {
+      bg: '#1a1310', bgSunken: '#130d0b', bgRaised: '#241a15',
+      border: '#382a22', borderStrong: '#4e3b30',
+      text: '#ece0d6', textMuted: '#ab9384',
+      accent: '#d9a173', accentSoft: '#3a271c',
+      danger: '#f0836f', ok: '#9dc47f', warn: '#e5bd72', mark: '#544017',
+      hlKeyword: '#e9a17f', hlString: '#a9cd8a', hlNumber: '#cba3e0', hlComment: '#8d7867',
+      hlTitle: '#86c2c9', hlType: '#e5bd72', hlMeta: '#ab9384',
     },
   },
   {
@@ -217,6 +286,29 @@ export const THEMES: Theme[] = [
       danger: '#f08272', ok: '#7bc47f', warn: '#dcb45e', mark: '#41521f',
       hlKeyword: '#c4a2e8', hlString: '#a8d67f', hlNumber: '#e0a86a', hlComment: '#849279',
       hlTitle: '#7fc7c0', hlType: '#dcb45e', hlMeta: '#9aac93',
+    },
+  },
+  {
+    id: 'ocean',
+    name: '바다',
+    description: '청록빛 물색, 서늘하고 맑은 화면',
+    light: {
+      bg: '#f2fafb', bgSunken: '#e2f2f4', bgRaised: '#fbfeff',
+      border: '#c9e4e8', borderStrong: '#9dc4ca',
+      text: '#12282c', textMuted: '#4f6d72',
+      accent: '#0f7d8c', accentSoft: '#d4eef1',
+      danger: '#b53a2c', ok: '#2f7d5a', warn: '#996a12', mark: '#a8e6d8',
+      hlKeyword: '#0f6f9e', hlString: '#2f7d5a', hlNumber: '#a05a2c', hlComment: '#7d959a',
+      hlTitle: '#0f7d8c', hlType: '#996a12', hlMeta: '#5b7c82',
+    },
+    dark: {
+      bg: '#0e1a1d', bgSunken: '#091316', bgRaised: '#152528',
+      border: '#22383c', borderStrong: '#345054',
+      text: '#dceef1', textMuted: '#8fadb3',
+      accent: '#5fd0da', accentSoft: '#123b41',
+      danger: '#ff8272', ok: '#74d2a4', warn: '#e3c06a', mark: '#1d5450',
+      hlKeyword: '#79c0e8', hlString: '#8fd6a8', hlNumber: '#e5a97a', hlComment: '#7e979c',
+      hlTitle: '#5fd0da', hlType: '#e3c06a', hlMeta: '#9ab8bd',
     },
   },
   {

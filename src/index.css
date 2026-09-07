@@ -699,6 +699,25 @@ mark { background: var(--mark); color: inherit; border-radius: 2px; }
   border: 1px solid var(--border);
   border-radius: 10px;
 }
+/*
+ * 바탕을 덮지 않는 덮개. 설정 창에 씁니다.
+ *
+ * 색을 바꾸는 동안 화면이 어떻게 바뀌는지 그대로 보여야 하므로 어둡게 하지 않습니다.
+ * 자리는 그대로 덮고 있어 뒤쪽은 눌리지 않습니다.
+ */
+.overlay.is-clear { background: transparent; }
+/* 어둡게 깔리지 않으니 창이 떠 있다는 것은 그림자와 테두리로 알립니다. */
+.overlay.is-clear .sheet {
+  border-color: var(--border-strong);
+  box-shadow: 0 12px 36px rgb(0 0 0 / 28%);
+}
+/* 끌어 옮기는 창. 옮기는 동안 글자가 잡히면 끌기가 아니라 선택이 됩니다. */
+.sheet.is-movable { user-select: none; }
+.sheet.is-movable .sheet-body { user-select: text; }
+.sheet-grab { cursor: grab; touch-action: none; }
+.sheet-grab:active { cursor: grabbing; }
+/* 머리줄의 단추는 끌기가 아니라 누르는 자리입니다. */
+.sheet-grab button { cursor: pointer; }
 .sheet-head {
   display: flex;
   justify-content: space-between;
