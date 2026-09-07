@@ -221,6 +221,17 @@ try {
   await page.waitForTimeout(400)
   await page.click('.sheet-close')
 
+  // 나란히 보기의 몫도 옮겨 둡니다. 이것도 기억되는 취향입니다.
+  await page.click('.tree-row:has-text("개발 환경")')
+  await page.waitForSelector('.editor', { timeout: 8000 })
+  await page.waitForTimeout(400)
+  const splitter = await page.locator('.split-resizer').boundingBox()
+  await page.mouse.move(splitter.x + 3, splitter.y + 120)
+  await page.mouse.down()
+  await page.mouse.move(splitter.x + 3 - 150, splitter.y + 120, { steps: 8 })
+  await page.mouse.up()
+  await page.waitForTimeout(400)
+
   // 옆줄을 즐겨찾기 탭으로 돌려 둡니다. 어느 탭을 보고 있었는지도 기억되는 취향입니다.
   await page.hover('.tree-row:has-text("개발 환경")')
   await page.click('.tree-row:has-text("개발 환경") .tree-tools button[aria-label="즐겨찾기에 담기"]')

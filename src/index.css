@@ -574,8 +574,42 @@ mark { background: var(--mark); color: inherit; border-radius: 2px; }
 .doc-path { font-family: var(--mono); font-size: 12px; color: var(--text-muted); }
 
 .doc-body { display: grid; gap: 1px; background: var(--border); flex: 1; min-height: 420px; }
-.doc-body.mode-split { grid-template-columns: 1fr 1fr; }
+/*
+ * 나란히 볼 때는 가운데에 손잡이가 한 칸 섭니다. 그 칸이 사이를 가르므로
+ * 여기서는 틈을 두지 않습니다. 보이는 선은 손잡이가 직접 그립니다.
+ */
+.doc-body.mode-split {
+  grid-template-columns: var(--split-a, 50%) 7px minmax(0, 1fr);
+  gap: 0;
+}
 .doc-body.mode-edit, .doc-body.mode-preview { grid-template-columns: 1fr; }
+
+/*
+ * 원문과 결과 사이의 손잡이. 트리 너비 손잡이와 같은 규칙입니다.
+ * 보이는 선은 1px 이지만 잡히는 자리는 그보다 넓어야 겨누기 쉽습니다.
+ */
+.split-resizer {
+  position: relative;
+  z-index: 1;
+  background: var(--bg);
+  cursor: col-resize;
+  touch-action: none;
+}
+.split-resizer::after {
+  content: '';
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 3px;
+  width: 1px;
+  background: var(--border);
+  transition: background 120ms ease, width 120ms ease;
+}
+.split-resizer:hover::after,
+.split-resizer:focus-visible::after { background: var(--accent); width: 2px; }
+.split-resizer:focus-visible { outline: none; }
+@media (prefers-reduced-motion: reduce) {
+  .split-resizer::after { transition: none; }
+}
 
 .editor {
   border: 0;
@@ -774,7 +808,9 @@ mark { background: var(--mark); color: inherit; border-radius: 2px; }
 
 @media (max-width: 720px) {
   .sidebar { width: 220px; }
+  /* 좁으면 위아래로 눕히므로 좌우 손잡이는 뜻이 없습니다. */
   .doc-body.mode-split { grid-template-columns: 1fr; }
+  .split-resizer { display: none; }
 }
 
 /* ---------- 저장소 선택 ---------- */

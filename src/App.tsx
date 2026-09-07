@@ -14,6 +14,7 @@ import {
 } from './components/icons'
 import { TextPreview } from './components/TextPreview'
 import { SettingsPanel } from './components/SettingsPanel'
+import { SplitResizer } from './components/SplitResizer'
 import { SyncReportSheet } from './components/SyncReportSheet'
 import { TreeView } from './components/TreeView'
 import { useGitHubSync } from './hooks/useGitHubSync'
@@ -30,7 +31,8 @@ import { formatTidyFor, textPreviewKind, trimWhitespace } from './lib/textPrevie
 import {
   clampSidebarWidth, DEFAULT_SIDEBAR_WIDTH, maxSidebarWidth, MIN_SIDEBAR_WIDTH,
   readImagePreview, readSaveOptions, readSidebarOpen, readSidebarTab, readSidebarWidth,
-  writeImagePreview, writeSidebarOpen, writeSidebarTab, writeSidebarWidth,
+  readSplitRatio, writeImagePreview, writeSidebarOpen, writeSidebarTab, writeSidebarWidth,
+  writeSplitRatio,
 } from './lib/saveOptions'
 import { displayPath, FAVORITES_FILE, fileNameOf } from './lib/paths'
 import { loadFavorites } from './lib/store'
@@ -373,6 +375,17 @@ export default function App() {
   const applyImagePreview = useCallback((on: boolean) => {
     setImagePreview(on)
     writeImagePreview(on)
+  }, [])
+
+  /*
+   * 나란히 볼 때 원문이 차지하는 몫. 그리는 자리가 두 군데(마크다운·글 첨부)라
+   * 여기서 한 번만 들고 양쪽에 내려보냅니다.
+   */
+  const [splitRatio, setSplitRatio] = useState(readSplitRatio)
+
+  const applySplitRatio = useCallback((percent: number) => {
+    setSplitRatio(percent)
+    writeSplitRatio(percent)
   }, [])
 
   /*
@@ -1068,7 +1081,10 @@ export default function App() {
 
               {editableText ? (
                 // 보여 줄 것이 있으면 마크다운처럼 나란히 놓고, 없으면 편집기만 넓게 씁니다.
-                <div className={`doc-body mode-${textPreview ? viewMode : 'edit'}`}>
+                <div
+                  className={`doc-body mode-${textPreview ? viewMode : 'edit'}`}
+                  style={{ '--split-a': `${splitRatio}%` } as CSSProperties}
+                >
                   {(!textPreview || viewMode !== 'preview') && (
                     <Editor
                       path={selection.path}
@@ -1079,6 +1095,9 @@ export default function App() {
                       }}
                       onSave={() => void commit()}
                     />
+                  )}
+                  {textPreview && viewMode === 'split' && (
+                    <SplitResizer ratio={splitRatio} onRatio={applySplitRatio} />
                   )}
                   {textPreview && viewMode !== 'edit' && (
                     <TextPreview kind={textPreview} path={selection.path} text={draft} />
@@ -1123,7 +1142,10 @@ export default function App() {
                 </dl>
               )}
 
-              <div className={`doc-body mode-${viewMode}`}>
+              <div
+                className={`doc-body mode-${viewMode}`}
+                style={{ '--split-a': `${splitRatio}%` } as CSSProperties}
+              >
                 {viewMode !== 'preview' && (
                   <Editor
                     path={selectedPath}
@@ -1134,6 +1156,9 @@ export default function App() {
                     }}
                     onSave={() => void commit()}
                   />
+                )}
+                {viewMode === 'split' && (
+                  <SplitResizer ratio={splitRatio} onRatio={applySplitRatio} />
                 )}
                 {viewMode !== 'edit' && vault.root && (
                   <Preview
@@ -1183,6 +1208,8 @@ export default function App() {
           onSidebarWidth={(width) => applySidebarWidth(width)}
           sidebarTab={sidebarTab}
           onSidebarTab={applySidebarTab}
+          splitRatio={splitRatio}
+          onSplitRatio={applySplitRatio}
           imagePreview={imagePreview}
           onImagePreview={applyImagePreview}
           onShowReport={() => setReportOpen(true)}

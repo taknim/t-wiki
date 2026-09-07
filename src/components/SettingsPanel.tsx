@@ -38,6 +38,9 @@ interface SettingsPanelProps {
   /** 트리 너비. 내보내고 들여올 때 함께 다룹니다. */
   sidebarWidth: number
   onSidebarWidth: (width: number) => void
+  /** 나란히 볼 때 원문이 차지하는 몫. 내보내고 들여올 때 함께 다룹니다. */
+  splitRatio: number
+  onSplitRatio: (percent: number) => void
   /** 옆줄에 어느 탭을 펴 두었는지. 내보내고 들여올 때 함께 다룹니다. */
   sidebarTab: SidebarTab
   onSidebarTab: (tab: SidebarTab) => void
@@ -57,6 +60,7 @@ const TABS: { id: TabId; name: string; hint: string }[] = [
 export function SettingsPanel({
   onClose, sync, onShowReport, vaultName, vaultRoot,
   sidebarOpen, onSidebarOpen, sidebarWidth, onSidebarWidth, sidebarTab, onSidebarTab,
+  splitRatio, onSplitRatio,
   imagePreview, onImagePreview,
   initialTab = 'general',
 }: SettingsPanelProps) {
@@ -96,6 +100,7 @@ export function SettingsPanel({
       rememberSession: remember,
       sidebarOpen,
       sidebarWidth,
+      splitRatio,
       sidebarTab,
       imagePreview,
       saveOptions,
@@ -213,6 +218,7 @@ export function SettingsPanel({
     setRememberEnabled(bundle.general.rememberSession)
     onSidebarOpen(bundle.general.sidebarOpen)
     onSidebarWidth(bundle.general.sidebarWidth)
+    onSplitRatio(bundle.general.splitRatio)
     onSidebarTab(bundle.general.sidebarTab)
     onImagePreview(bundle.general.imagePreview)
     setIncludeToken(bundle.general.includeToken)

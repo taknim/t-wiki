@@ -152,6 +152,44 @@ export function writeImagePreview(on: boolean): void {
 }
 
 /*
+ * 나란히 볼 때 왼쪽(편집기)이 차지하는 몫.
+ *
+ * 트리 너비와 같은 성격이라 여기 둡니다. 사람마다 원문을 보는 눈과 결과를 보는 눈의
+ * 비중이 다릅니다. 첫 그림부터 제 몫으로 그려야 반반이었다가 옮겨 가는 깜빡임이
+ * 없으므로 localStorage 를 씁니다.
+ *
+ * 어느 쪽도 아주 사라지지는 않게 양끝을 막아 둡니다. 한쪽이 없어지면 나란히 볼
+ * 까닭이 없고, 손잡이도 잡을 수 없게 됩니다.
+ */
+const SPLIT_RATIO = 'mdwiki:split-ratio'
+
+export const DEFAULT_SPLIT_RATIO = 50
+export const MIN_SPLIT_RATIO = 20
+export const MAX_SPLIT_RATIO = 80
+
+export function clampSplitRatio(percent: number): number {
+  if (!Number.isFinite(percent)) return DEFAULT_SPLIT_RATIO
+  return Math.min(Math.max(Math.round(percent), MIN_SPLIT_RATIO), MAX_SPLIT_RATIO)
+}
+
+export function readSplitRatio(): number {
+  try {
+    const saved = Number(localStorage.getItem(SPLIT_RATIO))
+    return saved ? clampSplitRatio(saved) : DEFAULT_SPLIT_RATIO
+  } catch {
+    return DEFAULT_SPLIT_RATIO
+  }
+}
+
+export function writeSplitRatio(percent: number): void {
+  try {
+    localStorage.setItem(SPLIT_RATIO, String(clampSplitRatio(percent)))
+  } catch {
+    // 저장이 막혀 있어도 이번에는 그대로 적용됩니다.
+  }
+}
+
+/*
  * 옆줄에 즐겨찾기와 폴더 중 어느 탭을 펴 두었는지.
  *
  * 기본은 폴더입니다. 처음 온 사람에게는 담아 둔 즐겨찾기가 없습니다.
