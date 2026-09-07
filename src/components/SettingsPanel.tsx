@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
-  FONTS, SIZES, THEMES, WIDTHS,
-  type FontId, type ModeSetting, type SizeId, type ThemeId, type WidthId,
+  FONTS, LEADINGS, SIZES, THEMES, WIDTHS,
+  type FontId, type LeadingId, type ModeSetting, type SizeId, type ThemeId, type WidthId,
 } from '../lib/theme'
 import type { GitHubSync } from '../hooks/useGitHubSync'
 import { GitHubSettings } from './GitHubSettings'
@@ -522,6 +522,28 @@ export function SettingsPanel({
                 </button>
               ))}
             </div>
+          </section>
+
+          <section className="field">
+            <label>줄 간격</label>
+            <div className="segmented" role="group" aria-label="줄 간격">
+              {LEADINGS.map((leading) => (
+                <button
+                  key={leading.id}
+                  type="button"
+                  className={leading.id === settings.leading ? 'is-active' : ''}
+                  data-tip={`줄 높이를 글자 크기의 ${leading.value} 배로 둡니다`}
+                  aria-pressed={leading.id === settings.leading}
+                  onClick={() => update({ leading: leading.id as LeadingId })}
+                >
+                  {leading.name}
+                </button>
+              ))}
+            </div>
+            <p className="hint">
+              미리보기와 편집기에 함께 걸립니다. 읽는 쪽과 쓰는 쪽이 따로 놀면 어지럽습니다.
+              배수라서 글자 크기를 바꿔도 비율은 그대로입니다.
+            </p>
           </section>
 
           <section className="field">

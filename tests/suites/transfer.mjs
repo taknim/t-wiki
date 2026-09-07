@@ -203,6 +203,8 @@ try {
   await page.fill('.row input[placeholder="저장소 이름"]', 'wiki')
   await page.click('.settings-nav button:has-text("모양")')
   await page.click('.theme-card:has-text("세피아")')
+  // 줄 간격도 기본에서 옮겨 둡니다. 꾸러미에 넣는 것을 잊으면 여기서 걸립니다.
+  await page.click('[aria-label="줄 간격"] button:has-text("넓게")')
   await page.click('.settings-nav button:has-text("일반")')
   // 이 화면에서 켜고 끌 수 있는 것을 모두 뒤집어 둡니다.
   for (const label of ['마지막 상태로', '고른 이미지를', '줄 끝 공백', '들여쓰기 다시 잡기']) {

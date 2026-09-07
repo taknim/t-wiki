@@ -1,4 +1,6 @@
-import { DEFAULT_SETTINGS, FONTS, SIZES, THEMES, WIDTHS, type ThemeSettings } from './theme'
+import {
+  DEFAULT_SETTINGS, FONTS, LEADINGS, SIZES, THEMES, WIDTHS, type ThemeSettings,
+} from './theme'
 import {
   clampSidebarWidth, DEFAULT_SAVE_OPTIONS, DEFAULT_SIDEBAR_TAB, DEFAULT_SIDEBAR_WIDTH,
   type SaveOptions,
@@ -117,6 +119,7 @@ export function parseBundle(raw: string): SettingsBundle | null {
         : DEFAULT_SETTINGS.mode,
       font: pick(appearance.font, FONTS, DEFAULT_SETTINGS.font),
       size: pick(appearance.size, SIZES, DEFAULT_SETTINGS.size),
+      leading: pick(appearance.leading, LEADINGS, DEFAULT_SETTINGS.leading),
       width: pick(appearance.width, WIDTHS, DEFAULT_SETTINGS.width),
     },
     general: {

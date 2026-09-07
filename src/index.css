@@ -26,6 +26,7 @@
   --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
   --doc-font: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", Pretendard, system-ui, sans-serif;
   --doc-size: 15px;
+  --doc-leading: 1.7;
   --doc-width: 780px;
   --sans: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard",
     "Malgun Gothic", system-ui, sans-serif;
@@ -580,7 +581,8 @@ mark { background: var(--mark); color: inherit; border-radius: 2px; }
   background: var(--bg);
   font-family: var(--mono);
   font-size: 13px;
-  line-height: 1.75;
+  /* 읽는 쪽과 쓰는 쪽이 따로 놀지 않게 같은 값을 씁니다. */
+  line-height: var(--doc-leading, 1.7);
   tab-size: 2;
 }
 .editor:focus { outline: none; }
@@ -591,6 +593,7 @@ mark { background: var(--mark); color: inherit; border-radius: 2px; }
   overflow: auto;
   font-family: var(--doc-font, var(--sans));
   font-size: var(--doc-size, 15px);
+  line-height: var(--doc-leading, 1.7);
 }
 /* 한 줄이 너무 길어지지 않게 본문만 가운데로 모읍니다.
    스크롤 영역은 그대로 두어야 표나 코드가 잘리지 않습니다. */
@@ -1213,7 +1216,7 @@ mark { background: var(--mark); color: inherit; border-radius: 2px; }
   background: var(--bg-sunken);
   font-family: var(--mono);
   font-size: 12px;
-  line-height: 1.7;
+  line-height: var(--doc-leading, 1.7);
   white-space: pre-wrap;
   word-break: break-word;
 }
@@ -1423,7 +1426,7 @@ mark { background: var(--mark); color: inherit; border-radius: 2px; }
   background: var(--bg-sunken);
   font-family: var(--mono);
   font-size: 12px;
-  line-height: 1.7;
+  line-height: var(--doc-leading, 1.7);
   overflow: auto;
 }
 

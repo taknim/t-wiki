@@ -4,6 +4,7 @@ export type ThemeId =
 export type ModeSetting = 'system' | 'light' | 'dark'
 export type FontId = 'sans' | 'serif' | 'mono'
 export type SizeId = 'small' | 'medium' | 'large'
+export type LeadingId = 'tight' | 'normal' | 'loose'
 export type WidthId = 'narrow' | 'medium' | 'wide'
 
 export interface ThemeSettings {
@@ -11,6 +12,7 @@ export interface ThemeSettings {
   mode: ModeSetting
   font: FontId
   size: SizeId
+  leading: LeadingId
   width: WidthId
 }
 
@@ -19,6 +21,7 @@ export const DEFAULT_SETTINGS: ThemeSettings = {
   mode: 'system',
   font: 'sans',
   size: 'medium',
+  leading: 'normal',
   width: 'medium',
 }
 
@@ -336,6 +339,18 @@ export const SIZES: { id: SizeId; name: string; value: string }[] = [
   { id: 'large', name: '크게', value: '17px' },
 ]
 
+/*
+ * 줄 간격.
+ *
+ * 글자 크기와 따로 둡니다. 큰 글자로 빽빽하게 보는 사람도, 작은 글자로 널찍하게
+ * 보는 사람도 있습니다. 값은 배수라 글자 크기를 바꿔도 비율이 유지됩니다.
+ */
+export const LEADINGS: { id: LeadingId; name: string; value: string }[] = [
+  { id: 'tight', name: '좁게', value: '1.45' },
+  { id: 'normal', name: '보통', value: '1.7' },
+  { id: 'loose', name: '넓게', value: '2' },
+]
+
 export const WIDTHS: { id: WidthId; name: string; value: string }[] = [
   { id: 'narrow', name: '좁게', value: '620px' },
   { id: 'medium', name: '보통', value: '780px' },
@@ -394,10 +409,12 @@ export function applyTheme(settings: ThemeSettings, isDark: boolean): void {
 
   const font = FONTS.find((item) => item.id === settings.font) ?? FONTS[0]
   const size = SIZES.find((item) => item.id === settings.size) ?? SIZES[1]
+  const leading = LEADINGS.find((item) => item.id === settings.leading) ?? LEADINGS[1]
   const width = WIDTHS.find((item) => item.id === settings.width) ?? WIDTHS[1]
 
   root.style.setProperty('--doc-font', font.stack)
   root.style.setProperty('--doc-size', size.value)
+  root.style.setProperty('--doc-leading', leading.value)
   root.style.setProperty('--doc-width', width.value)
 
   // 스크롤 막대와 기본 폼 요소도 같이 맞춰 줍니다.
@@ -422,6 +439,7 @@ export function loadSettings(): ThemeSettings {
       mode: ['system', 'light', 'dark'].includes(parsed.mode ?? '') ? parsed.mode! : DEFAULT_SETTINGS.mode,
       font: FONTS.some((f) => f.id === parsed.font) ? parsed.font! : DEFAULT_SETTINGS.font,
       size: SIZES.some((s) => s.id === parsed.size) ? parsed.size! : DEFAULT_SETTINGS.size,
+      leading: LEADINGS.some((l) => l.id === parsed.leading) ? parsed.leading! : DEFAULT_SETTINGS.leading,
       width: WIDTHS.some((w) => w.id === parsed.width) ? parsed.width! : DEFAULT_SETTINGS.width,
     }
   } catch {
