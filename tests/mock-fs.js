@@ -63,6 +63,20 @@ window.__installMockFs = function installMockFs() {
     async queryPermission() { return 'granted' }
     async requestPermission() { return 'granted' }
     async isSameEntry(other) { return other?.name === this.name && other?.kind === this.kind }
+    /** 이 폴더 아래에 있으면 경로 조각을, 아니면 null. 실제 브라우저와 같습니다. */
+    async resolve(other) {
+      const walk = (dir, trail) => {
+        for (const [name, child] of dir._children) {
+          if (child === other) return [...trail, name]
+          if (child.kind === 'directory') {
+            const found = walk(child, [...trail, name])
+            if (found) return found
+          }
+        }
+        return null
+      }
+      return walk(this, [])
+    }
   }
 
   const root = new MemDir('내 위키')
@@ -88,4 +102,23 @@ window.__installMockFs = function installMockFs() {
 
   window.showDirectoryPicker = async () => root
   window.__mockRoot = root
+
+  /*
+   * 저장 창. 네이티브 창은 자동화로 만질 수 없어 여기서 갈아끼웁니다.
+   * 기본은 볼트 밖의 딴 폴더에 씁니다. __saveInto 를 'vault' 로 두면 볼트 안에
+   * 저장하는 길을, __saveCancel 로는 창을 그냥 닫는 경우를 시험할 수 있습니다.
+   */
+  const savedDir = new MemDir('저장한 곳')
+  window.__saveInto = 'outside'
+  window.__saveCancel = false
+  window.showSaveFilePicker = async (options) => {
+    if (window.__saveCancel) throw new DOMException('사용자가 닫음', 'AbortError')
+    const dir = window.__saveInto === 'vault' ? window.__mockRoot : savedDir
+    return dir.getFileHandle(options?.suggestedName ?? '설정.json', { create: true })
+  }
+  window.__savedNames = () => [...savedDir._children.keys()]
+  window.__savedText = async (name) => {
+    const handle = savedDir._children.get(name)
+    return handle ? (await handle.getFile()).text() : null
+  }
 }

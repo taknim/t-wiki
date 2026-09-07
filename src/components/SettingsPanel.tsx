@@ -9,6 +9,7 @@ import { clearSessions, isRememberEnabled, setRememberEnabled } from '../lib/ses
 import {
   readIncludeToken, readSaveOptions, writeIncludeToken, writeSaveOptions, type SaveOptions,
 } from '../lib/saveOptions'
+import { removeEntry } from '../lib/fsAccess'
 import { buildBundle, bundleFileName, parseBundle } from '../lib/settingsFile'
 import type { SidebarTab } from '../types'
 import { useTheme } from './themeContext'
@@ -28,6 +29,8 @@ interface SettingsPanelProps {
   initialTab?: TabId
   /** 지금 열려 있는 폴더 이름. 내보낸 파일에 적어 둡니다. */
   vaultName: string | null
+  /** 지금 열려 있는 폴더. 내보낸 파일이 그 안에 떨어졌는지 가리는 데 씁니다. */
+  vaultRoot: FileSystemDirectoryHandle | null
   /** 트리를 펴 두었는지. 내보내고 들여올 때 함께 다룹니다. */
   sidebarOpen: boolean
   onSidebarOpen: (open: boolean) => void
@@ -51,7 +54,7 @@ const TABS: { id: TabId; name: string; hint: string }[] = [
 ]
 
 export function SettingsPanel({
-  onClose, sync, onShowReport, vaultName,
+  onClose, sync, onShowReport, vaultName, vaultRoot,
   sidebarOpen, onSidebarOpen, sidebarWidth, onSidebarWidth, sidebarTab, onSidebarTab,
   imagePreview, onImagePreview,
   initialTab = 'general',
@@ -61,7 +64,8 @@ export function SettingsPanel({
   const [tab, setTab] = useState<TabId>(initialTab)
   const [saveOptions, setSaveOptions] = useState<SaveOptions>(readSaveOptions)
   const [includeToken, setIncludeToken] = useState(readIncludeToken)
-  const [transfer, setTransfer] = useState<string | null>(null)
+  /** 주고받기 결과 한 줄. 조심해야 할 결과는 눈에 띄게 그립니다. */
+  const [transfer, setTransfer] = useState<{ text: string; danger?: boolean } | null>(null)
   const bundleInput = useRef<HTMLInputElement>(null)
 
   const exportSettings = async () => {
@@ -73,7 +77,7 @@ export function SettingsPanel({
     const ok = await dialogs.confirm({
       title: includeToken ? '액세스 토큰까지 내보낼까요?' : '설정을 내보낼까요?',
       label: includeToken
-        ? '내려받는 파일에 액세스 토큰이 그대로 적힙니다.\n'
+        ? '저장하는 파일에 액세스 토큰이 그대로 적힙니다.\n'
           + '그 토큰으로 저장소를 읽고 쓸 수 있으니, 메일·채팅·공유 폴더로 주고받지 마시고'
           + ' 옮긴 뒤에는 지워 주세요.\n\n'
           + `담기는 것: 모양, 저장 방식, 트리 접힘${holding}\n`
@@ -98,22 +102,87 @@ export function SettingsPanel({
       includeToken,
     })
 
-    const url = URL.createObjectURL(
-      new Blob([JSON.stringify(bundle, null, 2)], { type: 'application/json' }),
-    )
-    const link = document.createElement('a')
-    link.href = url
-    link.download = bundleFileName(vaultName)
-    link.click()
-    // 브라우저가 다 읽을 틈을 주고 치웁니다.
-    setTimeout(() => URL.revokeObjectURL(url), 1000)
-    setTransfer(includeToken ? '내보냈습니다. 토큰이 들어 있으니 파일을 잘 간수해 주세요.' : '내보냈습니다.')
+    /*
+     * 내려받기 폴더로 흘려보내지 않고 고른 자리에 곧바로 씁니다.
+     * 이 앱은 이미 폴더 손잡이로 파일을 다루므로, 설정 파일도 같은 길로 나갑니다.
+     */
+    let handle: FileSystemFileHandle
+    try {
+      handle = await window.showSaveFilePicker({
+        id: 'mdwiki-settings',
+        suggestedName: bundleFileName(vaultName),
+        types: [{ description: 't-WiKi 설정 파일', accept: { 'application/json': ['.json'] } }],
+      })
+    } catch {
+      // 저장 창을 그냥 닫으면 여기로 옵니다. 알릴 것이 없습니다.
+      return
+    }
+
+    /*
+     * 고른 자리가 볼트 안이면 그 파일도 동기화 대상이 됩니다.
+     * 토큰이 든 파일이 저장소에 올라가는 일은 되돌리기 어려우므로, 쓰기 전에 묻습니다.
+     * 아직 아무것도 쓰지 않았으니 여기서 물러서면 파일도 생기지 않습니다.
+     */
+    const inside = vaultRoot ? await vaultRoot.resolve(handle) : null
+    if (inside && includeToken) {
+      const go = await dialogs.confirm({
+        title: '열어 둔 폴더 안에 저장할까요?',
+        label: `"${inside.join('/')}" 는 지금 열어 둔 폴더 안입니다.\n`
+          + '이 자리에 두면 다음 동기화 때 액세스 토큰이 담긴 채로 저장소에 올라갑니다.\n'
+          + '올라간 토큰은 커밋 기록에 남아 지워도 되돌리기 어렵습니다.',
+        confirmText: '그래도 저장',
+        danger: true,
+      })
+      if (!go) {
+        /*
+         * 저장 창에서 이름을 정하는 순간 브라우저가 빈 파일을 만들어 둡니다.
+         * 여기서 물러서면 아무 내용도 쓰지 않았으니 그 빈 껍데기를 치웁니다.
+         * 원래 있던 파일을 골랐다면 비어 있지 않으므로 손대지 않습니다.
+         */
+        try {
+          if ((await handle.getFile()).size === 0) {
+            await removeEntry(vaultRoot!, inside.join('/'))
+          }
+        } catch {
+          // 치우지 못해도 내용은 쓰지 않았습니다. 알릴 것은 없습니다.
+        }
+        return
+      }
+    }
+
+    try {
+      const writable = await handle.createWritable()
+      await writable.write(JSON.stringify(bundle, null, 2))
+      await writable.close()
+    } catch (cause) {
+      setTransfer({
+        text: `저장하지 못했습니다: ${cause instanceof Error ? cause.message : String(cause)}`,
+        danger: true,
+      })
+      return
+    }
+
+    if (inside) {
+      setTransfer({
+        text: `"${handle.name}" 를 열어 둔 폴더 안에 저장했습니다.`
+          + ' 다음 동기화 때 저장소로 함께 올라갑니다.'
+          + (includeToken ? ' 토큰이 들어 있으니 폴더 밖으로 옮겨 주세요.' : ''),
+        danger: includeToken,
+      })
+      return
+    }
+
+    setTransfer({
+      text: includeToken
+        ? `"${handle.name}" 로 저장했습니다. 토큰이 들어 있으니 파일을 잘 간수해 주세요.`
+        : `"${handle.name}" 로 저장했습니다.`,
+    })
   }
 
   const importSettings = async (file: File) => {
     const bundle = parseBundle(await file.text())
     if (!bundle) {
-      setTransfer('t-WiKi 설정 파일이 아닙니다.')
+      setTransfer({ text: 't-WiKi 설정 파일이 아닙니다.', danger: true })
       return
     }
 
@@ -168,11 +237,11 @@ export function SettingsPanel({
       sync.restartAutoSync()
     }
 
-    setTransfer(
-      bundle.github
+    setTransfer({
+      text: bundle.github
         ? `가져왔습니다${vaultName ? ` · 저장소 설정은 "${vaultName}" 에 넣었습니다` : ''}.`
         : '가져왔습니다.',
-    )
+    })
   }
 
   const changeSave = (patch: Partial<SaveOptions>) => {
@@ -403,7 +472,7 @@ export function SettingsPanel({
                 <button
                   type="button"
                   className="btn"
-                  data-tip="지금 설정을 파일로 내려받습니다"
+                  data-tip="지금 설정을 파일로 저장합니다. 저장할 자리는 다음 창에서 고릅니다"
                   onClick={() => void exportSettings()}
                 >
                   설정 내보내기
@@ -411,12 +480,19 @@ export function SettingsPanel({
                 <button
                   type="button"
                   className="btn"
-                  data-tip="내려받아 둔 설정 파일을 읽어 옵니다"
+                  data-tip="저장해 둔 설정 파일을 읽어 옵니다"
                   onClick={() => bundleInput.current?.click()}
                 >
                   설정 가져오기
                 </button>
-                {transfer && <span className="hint" style={{ margin: 0 }}>{transfer}</span>}
+                {transfer && (
+                  <span
+                    className={transfer.danger ? 'hint transfer-warn' : 'hint'}
+                    style={{ margin: 0 }}
+                  >
+                    {transfer.text}
+                  </span>
+                )}
               </div>
 
               <input

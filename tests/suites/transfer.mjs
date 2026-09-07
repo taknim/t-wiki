@@ -1,5 +1,5 @@
 import { chromium } from 'playwright'
-import { readFileSync, mkdirSync, rmSync } from 'node:fs'
+import { readFileSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createGitHubMock } from '../github-mock.mjs'
@@ -18,7 +18,7 @@ const expect = (n, c, d = '') => (c ? ok(n) : fail(n, d))
 
 const github = createGitHubMock()
 const browser = await chromium.launch({ channel: 'chrome' })
-const page = await browser.newPage({ viewport: { width: 1400, height: 920 }, acceptDownloads: true })
+const page = await browser.newPage({ viewport: { width: 1400, height: 920 } })
 const errors = []
 page.on('pageerror', (e) => errors.push('pageerror: ' + e.message))
 await page.route('https://api.github.com/**', github.handler)
@@ -50,18 +50,27 @@ const openSettings = async () => {
   await page.waitForSelector('.settings-nav')
   await page.waitForTimeout(500)
 }
+/*
+ * 내보내기는 내려받지 않고 고른 자리에 곧바로 씁니다.
+ * 목이 그 자리를 들고 있으므로, 거기서 꺼내 진짜 파일로 옮겨 두었다가
+ * 가져오기 시험에 다시 씁니다.
+ */
 const exportTo = async (withToken) => {
   const box = page.locator('.checkbox:has-text("액세스 토큰도 함께") input')
   if ((await box.isChecked()) !== withToken) await box.click()
   await page.click('button:has-text("설정 내보내기")')
   await page.waitForSelector('.dialog', { timeout: 5000 })
-  const [download] = await Promise.all([
-    page.waitForEvent('download'),
-    page.click('.dialog button:has-text("내보내기")'),
-  ])
-  const to = join(DOWN, download.suggestedFilename())
-  await download.saveAs(to)
-  return { path: to, name: download.suggestedFilename() }
+  await page.click('.dialog button:has-text("내보내기")')
+  await page.waitForTimeout(700)
+  const saved = await page.evaluate(async () => {
+    const names = window.__savedNames()
+    const name = names[names.length - 1]
+    return { name, body: name ? await window.__savedText(name) : null }
+  })
+  if (!saved.name) throw new Error('저장된 파일이 없습니다')
+  const to = join(DOWN, saved.name)
+  writeFileSync(to, saved.body)
+  return { path: to, name: saved.name }
 }
 
 try {
@@ -168,13 +177,12 @@ try {
   expect('토큰을 담을 때는 조심하라고 알림',
     warn.includes('액세스 토큰') && warn.includes('주고받지 마'), warn.slice(0, 120))
   expect('무엇이 담기는지 밝힘', warn.includes('기준점은 담기지 않습니다'), warn.slice(0, 200))
-  // 물러섭니다. 파일이 내려오면 안 됩니다.
-  const cancelled = await Promise.race([
-    page.waitForEvent('download', { timeout: 2500 }).then(() => 'download'),
-    page.click('.dialog button:has-text("취소")').then(() => 'cancel'),
-  ])
-  expect('물러서면 파일이 내려오지 않음', cancelled === 'cancel', String(cancelled))
-  await page.waitForTimeout(300)
+  // 물러섭니다. 파일이 생기면 안 됩니다.
+  const madeBefore = await page.evaluate(() => window.__savedNames().length)
+  await page.click('.dialog button:has-text("취소")')
+  await page.waitForTimeout(800)
+  const madeAfter = await page.evaluate(() => window.__savedNames().length)
+  expect('물러서면 파일이 생기지 않음', madeAfter === madeBefore, `${madeBefore} -> ${madeAfter}`)
 
   const beforeCancel = await page.inputValue('#gh-token').catch(() => null)
   await page.setInputFiles('#settings-bundle', plain.path)
@@ -272,7 +280,68 @@ try {
   expect('빠진 취향이 없음', missing.length === 0,
     '되돌아오지 않은 값: ' + JSON.stringify(missing.map((k) => [k, before[k], after[k]])))
 
-  step('8. 콘솔 오류')
+  step('8. 저장 창을 그냥 닫으면 아무 일도 없다')
+  await openSettings()
+  const kept = await page.evaluate(() => {
+    window.__saveCancel = true
+    return window.__savedNames().length
+  })
+  await page.click('button:has-text("설정 내보내기")')
+  await page.waitForSelector('.dialog')
+  await page.click('.dialog button:has-text("내보내기")')
+  await page.waitForTimeout(800)
+  const afterCancel = await page.evaluate(() => {
+    window.__saveCancel = false
+    return { count: window.__savedNames().length, note: document.body.textContent.includes('저장하지 못했습니다') }
+  })
+  console.log('  ' + JSON.stringify(afterCancel))
+  expect('파일이 생기지 않음', afterCancel.count === kept, `${kept} -> ${afterCancel.count}`)
+  expect('오류라고 하지 않음', !afterCancel.note, '창을 닫은 것은 잘못이 아닙니다')
+
+  step('9. 열어 둔 폴더 안에 저장하려 하면 한 번 더 묻는다')
+  /*
+   * 볼트 안에 두면 그 파일도 동기화 대상이 됩니다. 토큰이 든 채로 저장소에 올라가면
+   * 커밋 기록에 남아 되돌리기 어려우므로, 쓰기 전에 묻고 그 뒤에도 알려 줘야 합니다.
+   */
+  await page.evaluate(() => { window.__saveInto = 'vault' })
+  await page.click('button:has-text("설정 내보내기")')
+  await page.waitForSelector('.dialog')
+  await page.click('.dialog button:has-text("내보내기")')
+  await page.waitForSelector('.dialog:has-text("열어 둔 폴더 안에")', { timeout: 5000 })
+  const second = await page.textContent('.dialog')
+  console.log('  ' + second.replace(/\s+/g, ' ').slice(0, 110))
+  expect('저장소로 올라간다고 알림', second.includes('저장소에 올라갑니다'), second.slice(0, 160))
+  await page.click('.dialog button:has-text("취소")')
+  await page.waitForTimeout(500)
+  const notWritten = await page.evaluate(async () => {
+    const names = []
+    for await (const [name] of window.__mockRoot.entries()) names.push(name)
+    return names.filter((n) => n.startsWith('t-WiKi'))
+  })
+  expect('물러서면 폴더에 쓰지 않음', notWritten.length === 0, JSON.stringify(notWritten))
+
+  await page.click('button:has-text("설정 내보내기")')
+  await page.waitForSelector('.dialog')
+  await page.click('.dialog button:has-text("내보내기")')
+  await page.waitForSelector('.dialog:has-text("열어 둔 폴더 안에")', { timeout: 5000 })
+  await page.click('.dialog button:has-text("그래도 저장")')
+  await page.waitForTimeout(800)
+  const written = await page.evaluate(async () => {
+    const names = []
+    for await (const [name] of window.__mockRoot.entries()) names.push(name)
+    return {
+      files: names.filter((n) => n.startsWith('t-WiKi')),
+      warned: document.querySelector('.transfer-warn')?.textContent ?? null,
+    }
+  })
+  console.log('  ' + JSON.stringify(written))
+  expect('그래도 저장하면 폴더에 씀', written.files.length === 1, JSON.stringify(written.files))
+  expect('올라간다고 눈에 띄게 알림',
+    (written.warned ?? '').includes('저장소로 함께 올라갑니다'), String(written.warned))
+  await page.evaluate(() => { window.__saveInto = 'outside' })
+  await page.click('.sheet-close')
+
+  step('10. 콘솔 오류')
   const real = errors.filter((l) => !l.includes('404') && !l.includes('Failed to load resource'))
   if (real.length > 0) fail('콘솔', real.join('\n      '))
   else ok('콘솔 오류 없음')

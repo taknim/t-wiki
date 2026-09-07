@@ -1176,6 +1176,7 @@ export default function App() {
           initialTab={settingsTab}
           sync={sync}
           vaultName={vault.vaultName ?? null}
+          vaultRoot={vault.root}
           sidebarOpen={sidebarOpen}
           onSidebarOpen={applySidebarOpen}
           sidebarWidth={sidebarWidth}

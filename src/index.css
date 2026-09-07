@@ -114,6 +114,9 @@ button, input, select, textarea { font: inherit; color: inherit; }
 
 .status { margin: 8px 0 0; font-size: 13px; color: var(--text-muted); }
 
+/* 조심해야 할 주고받기 결과. 토큰이 새는 자리라 흐린 글씨로 두면 안 됩니다. */
+.transfer-warn { color: var(--danger); font-weight: 600; }
+
 /* 마지막 동기화 시각 옆에 서는 커밋 이름. 등폭이라야 16진수가 눈에 들어옵니다. */
 .commit-link {
   font-family: var(--mono);
