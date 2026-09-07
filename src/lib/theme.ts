@@ -4,7 +4,7 @@ export type ThemeId =
 export type ModeSetting = 'system' | 'light' | 'dark'
 export type FontId = 'sans' | 'serif' | 'mono'
 export type SizeId = 'small' | 'medium' | 'large'
-export type LeadingId = 'tight' | 'normal' | 'loose'
+export type LeadingId = 'tightest' | 'tight' | 'normal' | 'loose' | 'loosest'
 export type WidthId = 'narrow' | 'medium' | 'wide'
 
 export interface ThemeSettings {
@@ -346,9 +346,11 @@ export const SIZES: { id: SizeId; name: string; value: string }[] = [
  * 보는 사람도 있습니다. 값은 배수라 글자 크기를 바꿔도 비율이 유지됩니다.
  */
 export const LEADINGS: { id: LeadingId; name: string; value: string }[] = [
-  { id: 'tight', name: '좁게', value: '1.45' },
+  { id: 'tightest', name: '아주 좁게', value: '1.3' },
+  { id: 'tight', name: '좁게', value: '1.5' },
   { id: 'normal', name: '보통', value: '1.7' },
-  { id: 'loose', name: '넓게', value: '2' },
+  { id: 'loose', name: '넓게', value: '1.9' },
+  { id: 'loosest', name: '아주 넓게', value: '2.2' },
 ]
 
 export const WIDTHS: { id: WidthId; name: string; value: string }[] = [
@@ -409,7 +411,7 @@ export function applyTheme(settings: ThemeSettings, isDark: boolean): void {
 
   const font = FONTS.find((item) => item.id === settings.font) ?? FONTS[0]
   const size = SIZES.find((item) => item.id === settings.size) ?? SIZES[1]
-  const leading = LEADINGS.find((item) => item.id === settings.leading) ?? LEADINGS[1]
+  const leading = LEADINGS.find((item) => item.id === settings.leading) ?? LEADINGS[2]
   const width = WIDTHS.find((item) => item.id === settings.width) ?? WIDTHS[1]
 
   root.style.setProperty('--doc-font', font.stack)

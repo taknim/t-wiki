@@ -33,7 +33,7 @@ const setLeading = async (name) => {
   await page.waitForSelector('.settings-nav')
   await page.click('.settings-nav button:has-text("모양")')
   await page.waitForTimeout(300)
-  await page.click(`[aria-label="줄 간격"] button:has-text("${name}")`)
+  await page.click(`[aria-label="줄 간격"] button:text-is("${name}")`)
   await page.waitForTimeout(300)
   await page.click('.sheet-close')
   await page.waitForTimeout(400)
@@ -66,22 +66,30 @@ try {
   expect('미리보기가 따름', first.preview === 1.7, String(first.preview))
   expect('편집기도 따름', first.editor === 1.7, String(first.editor))
 
-  step('2. 좁게 고르면 줄이 붙는다')
-  await setLeading('좁게')
-  const tight = await measured()
-  console.log('  ' + JSON.stringify(tight))
-  expect('변수가 1.45', tight.variable === '1.45', tight.variable)
-  expect('미리보기가 좁아짐', tight.preview === 1.45, String(tight.preview))
-  expect('편집기도 좁아짐', tight.editor === 1.45, String(tight.editor))
+  step('2. 다섯 단계가 차례대로 벌어진다')
+  const steps = [
+    ['아주 좁게', '1.3'],
+    ['좁게', '1.5'],
+    ['보통', '1.7'],
+    ['넓게', '1.9'],
+    ['아주 넓게', '2.2'],
+  ]
+  const seen = []
+  for (const [name, want] of steps) {
+    await setLeading(name)
+    const now = await measured()
+    console.log(`  ${name}: ` + JSON.stringify(now))
+    expect(`${name} 변수가 ${want}`, now.variable === want, now.variable)
+    expect(`${name} 미리보기가 따름`, now.preview === Number(want), String(now.preview))
+    expect(`${name} 편집기도 따름`, now.editor === Number(want), String(now.editor))
+    seen.push(now.preview)
+  }
+  expect('갈수록 벌어짐', seen.every((v, at) => at === 0 || v > seen[at - 1]), JSON.stringify(seen))
 
-  step('3. 넓게 고르면 줄이 벌어진다')
-  await setLeading('넓게')
+  step('3. 마지막으로 고른 아주 넓게가 걸려 있다')
   const loose = await measured()
   console.log('  ' + JSON.stringify(loose))
-  expect('변수가 2', loose.variable === '2', loose.variable)
-  expect('미리보기가 넓어짐', loose.preview === 2, String(loose.preview))
-  expect('편집기도 넓어짐', loose.editor === 2, String(loose.editor))
-  expect('고른 것이 눌려 있음', loose.pressed === null, '설정 창을 닫아 두었습니다')
+  expect('변수가 2.2', loose.variable === '2.2', loose.variable)
   await page.screenshot({ path: join(HERE, '..', 'shots', 'leading', '01-loose.png'),
     clip: { x: 430, y: 60, width: 970, height: 420 } })
 
@@ -103,8 +111,8 @@ try {
   })
   console.log('  ' + JSON.stringify(bigger))
   expect('글자가 커짐', bigger.size === 17, String(bigger.size))
-  expect('비율은 그대로', bigger.ratio === 2, String(bigger.ratio))
-  expect('고른 칸이 눌려 있음', bigger.pressed === '넓게', String(bigger.pressed))
+  expect('비율은 그대로', bigger.ratio === 2.2, String(bigger.ratio))
+  expect('고른 칸이 눌려 있음', bigger.pressed === '아주 넓게', String(bigger.pressed))
   await page.click('.sheet-close')
   await page.waitForTimeout(300)
 
@@ -114,8 +122,8 @@ try {
   await openDoc('개발 환경')
   const kept = await measured()
   console.log('  ' + JSON.stringify(kept))
-  expect('변수가 그대로', kept.variable === '2', kept.variable)
-  expect('미리보기도 그대로', kept.preview === 2, String(kept.preview))
+  expect('변수가 그대로', kept.variable === '2.2', kept.variable)
+  expect('미리보기도 그대로', kept.preview === 2.2, String(kept.preview))
 
   step('6. 첨부 미리보기에도 걸린다')
   await page.click('.tree-row:has-text("첨부")')
@@ -129,7 +137,7 @@ try {
     return Math.round((parseFloat(style.lineHeight) / parseFloat(style.fontSize)) * 100) / 100
   })
   console.log('  첨부 미리보기: ' + String(svgPane))
-  expect('첨부 글도 따름', svgPane === null || svgPane === 2, String(svgPane))
+  expect('첨부 글도 따름', svgPane === null || svgPane === 2.2, String(svgPane))
 } catch (cause) {
   fail('묶음이 도중에 멈춤', cause instanceof Error ? (cause.stack ?? cause.message) : String(cause))
 } finally {
