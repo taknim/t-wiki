@@ -103,6 +103,19 @@ window.__installMockFs = function installMockFs() {
   window.showDirectoryPicker = async () => root
   window.__mockRoot = root
 
+  /** 볼트 안 파일의 내용. 앱이 정말 그 자리에 그 내용을 썼는지 볼 때 씁니다. */
+  window.__vaultText = async (path) => {
+    const segments = path.split('/')
+    const name = segments.pop()
+    let dir = root
+    for (const segment of segments) {
+      dir = dir._children.get(segment)
+      if (!dir || dir.kind !== 'directory') return null
+    }
+    const handle = dir._children.get(name)
+    return handle && handle.kind === 'file' ? (await handle.getFile()).text() : null
+  }
+
   /*
    * 저장 창. 네이티브 창은 자동화로 만질 수 없어 여기서 갈아끼웁니다.
    * 기본은 볼트 밖의 딴 폴더에 씁니다. __saveInto 를 'vault' 로 두면 볼트 안에

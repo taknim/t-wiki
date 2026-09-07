@@ -48,7 +48,7 @@ export function FolderView({ onDropFiles, onPickFiles }: FolderViewProps) {
           </button>
         </p>
         <p className="folder-drop-types">
-          <strong>이미지</strong> ({IMAGE_EXTENSIONS.join(', ')}),{' '}
+          <strong>마크다운</strong> (md), <strong>이미지</strong> ({IMAGE_EXTENSIONS.join(', ')}),{' '}
           <strong>문서</strong> ({DOCUMENT_EXTENSIONS.join(', ')}) 형식의 파일을 추가하실 수 있습니다.
         </p>
       </div>

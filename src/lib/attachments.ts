@@ -21,8 +21,11 @@ const ATTACHMENT_EXTENSIONS = new Set([...IMAGE_EXTENSIONS, ...DOCUMENT_EXTENSIO
 /** 이보다 큰 첨부는 동기화하지 않습니다. 로컬에는 그대로 두고 목록에만 표시합니다. */
 export const MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024
 
-/** 파일 고르기 창에서 미리 걸러 주는 목록. */
-export const ACCEPT_ATTRIBUTE = [...IMAGE_EXTENSIONS, ...DOCUMENT_EXTENSIONS]
+/**
+ * 파일 고르기 창에서 미리 걸러 주는 목록.
+ * 마크다운을 빼면 이 위키가 다루는 본래 형식을 정작 넣을 수 없습니다.
+ */
+export const ACCEPT_ATTRIBUTE = ['md', ...IMAGE_EXTENSIONS, ...DOCUMENT_EXTENSIONS]
   .map((extension) => `.${extension}`)
   .join(',')
 
@@ -40,6 +43,11 @@ export function isMarkdown(path: string): boolean {
 
 export function isAttachment(path: string): boolean {
   return ATTACHMENT_EXTENSIONS.has(extensionOf(path))
+}
+
+/** 밖에서 끌어다 넣을 수 있는 형식인지. 마크다운과 첨부가 모두 들어옵니다. */
+export function isAddable(path: string): boolean {
+  return isMarkdown(path) || isAttachment(path)
 }
 
 /** 동기화 대상인지. 마크다운이거나, 크기 제한을 넘지 않는 첨부입니다. */

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { AssetIndex, DocIndex, VaultNode } from '../types'
 import {
-  attachmentKind, extensionOf, isAttachment, isMarkdown, isSyncable, MAX_ATTACHMENT_BYTES,
+  attachmentKind, extensionOf, isAddable, isMarkdown, isSyncable, MAX_ATTACHMENT_BYTES,
 } from '../lib/attachments'
 import { clearAssetCache } from '../lib/assets'
 import { clearTextIndex } from '../lib/textIndex'
@@ -309,7 +309,7 @@ export function useVault(): Vault {
       const result: AddResult = { added: [], rejected: [], tooBig: [] }
 
       for (const file of files) {
-        if (!isAttachment(file.name)) {
+        if (!isAddable(file.name)) {
           result.rejected.push(file.name)
           continue
         }
@@ -317,7 +317,8 @@ export function useVault(): Vault {
         const path = await uniquePath(root, joinPath(dirPath, file.name))
         await fs.writeBinaryFile(root, path, file)
         result.added.push(path)
-        if (file.size > MAX_ATTACHMENT_BYTES) result.tooBig.push(path)
+        // 크기 제한은 첨부에만 걸립니다. 마크다운은 아무리 길어도 동기화합니다.
+        if (!isMarkdown(path) && file.size > MAX_ATTACHMENT_BYTES) result.tooBig.push(path)
       }
 
       if (result.added.length > 0) await refresh()

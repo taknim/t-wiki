@@ -524,12 +524,14 @@ export default function App() {
         // 여는 방식은 트리에서 고를 때와 같아야 합니다. 직접 상태를 만지면
         // 글자로 된 첨부의 내용을 못 읽어, 편집기가 빈 채로 열리고 고치는 순간 잘려 나갑니다.
         const first = result.added[0]
-        if (first && selectedDir === null) await openAsset(first)
+        if (first && selectedDir === null) {
+          await (isMarkdown(first) ? openDoc(first) : openAsset(first))
+        }
       } catch (cause) {
         report(cause)
       }
     },
-    [currentDir, flash, openAsset, report, selectedDir, vault],
+    [currentDir, flash, openAsset, openDoc, report, selectedDir, vault],
   )
 
 
@@ -946,6 +948,7 @@ export default function App() {
             {/* 파일 고르기 창은 브라우저가 띄웁니다. 목록에 있는 형식만 걸러 보여 줍니다. */}
             <input
               ref={filePicker}
+              id="add-files"
               type="file"
               multiple
               accept={ACCEPT_ATTRIBUTE}

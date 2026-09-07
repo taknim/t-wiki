@@ -49,7 +49,7 @@ export function TreeView({
       icon: <FolderPlusIcon />, run: () => props.onNewFolder('') },
     { key: 'doc', label: '새 문서', tip: '최상위에 새 문서 만들기',
       icon: <DocPlusIcon />, run: () => props.onNewDoc('') },
-    { key: 'file', label: '파일 추가', tip: '이미지·문서 파일을 골라 최상위에 넣기',
+    { key: 'file', label: '파일 추가', tip: '마크다운·이미지·문서 파일을 골라 최상위에 넣기',
       icon: <ClipIcon />, run: onPickFiles },
     { key: 'refresh', label: '새로고침', tip: '폴더를 다시 읽어 바깥에서 바뀐 파일을 반영합니다',
       icon: <RefreshIcon />, run: onRefresh },
@@ -201,7 +201,7 @@ function TreeRow({ node, depth, selectedPath, expanded, onToggle, ...actions }: 
               <button
                 type="button"
                 aria-label="파일 추가"
-                data-tip={`이미지·문서 파일을 골라 "${node.name}" 안에 넣기`}
+                data-tip={`마크다운·이미지·문서 파일을 골라 "${node.name}" 안에 넣기`}
                 onClick={() => actions.onPickFilesFor(node.path)}
               >
                 <ClipIcon />
