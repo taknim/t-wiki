@@ -289,17 +289,43 @@ export default function App() {
    * 눌렀는데 아무 일도 없는 것처럼 보입니다.
    * 그 사이에 사라진 파일이면 창을 그대로 두고 알리기만 합니다.
    */
+  const closeSheets = useCallback(() => {
+    setHistoryOpen(false)
+    setReportOpen(false)
+    setSettingsTab(null)
+  }, [])
+
   const openFromSync = useCallback((path: string) => {
     const isDoc = vault.index.has(path)
     if (!isDoc && !vault.assets.has(path)) {
       flash('그 파일은 이제 이 폴더에 없습니다')
       return
     }
-    setHistoryOpen(false)
-    setReportOpen(false)
-    setSettingsTab(null)
+    closeSheets()
     void (isDoc ? openDoc(path) : openAsset(path))
-  }, [flash, openAsset, openDoc, vault.assets, vault.index])
+  }, [closeSheets, flash, openAsset, openDoc, vault.assets, vault.index])
+
+  /*
+   * 경로 가운데 폴더 이름을 눌렀을 때. 지운 줄에서도 담고 있던 폴더로는 갈 수 있습니다.
+   * 여는 방식은 트리에서 폴더를 고를 때와 같고, 트리에서도 보이도록 위쪽을 펴 둡니다.
+   */
+  const openDirFromSync = useCallback((path: string) => {
+    if (!vault.tree || !findNode(vault.tree, path)) {
+      flash('그 폴더는 이제 여기에 없습니다')
+      return
+    }
+    closeSheets()
+    setSelectedDir(path)
+    setSelectedPath(null)
+    setExpanded((previous) => {
+      const next = new Set(previous)
+      const segments = path.split('/')
+      for (let depth = 1; depth <= segments.length; depth += 1) {
+        next.add(segments.slice(0, depth).join('/'))
+      }
+      return next
+    })
+  }, [closeSheets, flash, vault.tree])
 
   // 볼트를 다시 스캔한 뒤에도 열려 있던 문서의 내용을 최신으로 맞춥니다.
   useEffect(() => {
@@ -1267,6 +1293,7 @@ export default function App() {
           config={sync.config}
           onClose={() => setHistoryOpen(false)}
           onOpen={openFromSync}
+          onOpenDir={openDirFromSync}
         />
       )}
 
@@ -1280,6 +1307,7 @@ export default function App() {
             void sync.confirmTarget()
           }}
           onOpen={openFromSync}
+          onOpenDir={openDirFromSync}
         />
       )}
     </div>

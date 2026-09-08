@@ -314,8 +314,8 @@ try {
     error: null,
     cut: 0,
     log: [
-      { path: '개발 환경.md', action: 'upload-update', status: 'ok', detail: '로컬에서 수정' },
-      { path: '지운 문서.md', action: 'delete-remote', status: 'ok', detail: '로컬에서 지움' },
+      { path: '회사/온보딩.md', action: 'upload-update', status: 'ok', detail: '로컬에서 수정' },
+      { path: '옛 폴더/지운 문서.md', action: 'delete-remote', status: 'ok', detail: '로컬에서 지움' },
     ],
   })
   await closeVault()
@@ -324,20 +324,24 @@ try {
   await openHistory()
   await page.click('.run:first-child .run-open')
   await page.waitForTimeout(300)
-  const paths = await page.evaluate(() => ({
-    rows: document.querySelectorAll('.run .plan li').length,
-    links: [...document.querySelectorAll('.run .plan .plan-open')].map((one) => one.textContent),
-    flat: [...document.querySelectorAll('.run .plan li')]
-      .filter((li) => li.querySelector('.plan-open') === null)
-      .map((li) => li.querySelector('.plan-path').textContent),
-  }))
+  const paths = await page.evaluate(() => [...document.querySelectorAll('.run .plan li')]
+    .map((li) => ({
+      shown: li.querySelector('.plan-path').textContent,
+      links: [...li.querySelectorAll('.plan-open')].map((one) => one.textContent),
+    })))
   console.log('  ' + JSON.stringify(paths))
-  expect('두 줄 가운데 하나만 눌림', paths.rows === 2 && paths.links.length === 1,
-    JSON.stringify(paths))
-  expect('눌리는 쪽이 오간 파일', paths.links[0] === '/개발 환경.md', JSON.stringify(paths))
-  expect('지운 줄은 그냥 글자', paths.flat.join() === '/지운 문서.md', JSON.stringify(paths))
+  expect('두 줄이 보임', paths.length === 2, JSON.stringify(paths))
+  // 폴더 마디와 파일 이름이 저마다 눌리는 자리입니다.
+  const nested = paths.find((one) => one.shown.includes('온보딩'))
+  expect('경로는 그대로 보임', nested?.shown === '/회사/온보딩.md', JSON.stringify(nested))
+  expect('폴더와 파일이 따로 눌림',
+    nested?.links.join() === '회사,온보딩.md', JSON.stringify(nested))
+  const removed = paths.find((one) => one.shown.includes('지운'))
+  expect('지운 줄은 폴더만 눌림',
+    removed?.links.join() === '옛 폴더', JSON.stringify(removed))
 
-  await page.click('.run .plan .plan-open')
+  // 파일 이름부터. 창이 걷히고 그 문서가 열립니다.
+  await page.click('.run .plan .plan-open:text-is("온보딩.md")')
   await page.waitForTimeout(700)
   const landed = await page.evaluate(() => ({
     sheets: document.querySelectorAll('.overlay').length,
@@ -346,11 +350,50 @@ try {
   }))
   console.log('  ' + JSON.stringify(landed))
   expect('겹쳐 뜬 창이 모두 닫힘', landed.sheets === 0, JSON.stringify(landed))
-  expect('그 문서가 열림', landed.path === '/개발 환경.md', JSON.stringify(landed))
+  expect('그 문서가 열림', landed.path === '/회사/온보딩.md', JSON.stringify(landed))
   expect('편집기까지 떠 있음', landed.editor === 1, JSON.stringify(landed))
   await page.screenshot({ path: join(HERE, '..', 'shots', 'synchistory', '04-opened.png') })
 
-  step('11. 폴더가 다르면 기록도 남남이다')
+  step('11. 경로 가운데 폴더를 누르면 그 폴더가 열린다')
+  await openSync()
+  await openHistory()
+  await page.click('.run:first-child .run-open')
+  await page.waitForTimeout(300)
+  await page.click('.run .plan .plan-open:text-is("회사")')
+  await page.waitForTimeout(700)
+  const folder = await page.evaluate(() => ({
+    sheets: document.querySelectorAll('.overlay').length,
+    path: document.querySelector('.info-path')?.textContent ?? null,
+    view: document.querySelectorAll('.folder-view').length,
+    // 트리에서도 그 폴더가 펴져 아이가 보여야 합니다. :has-text 는 플레이라이트 말이라 못 씁니다.
+    opened: [...document.querySelectorAll('.tree-name')]
+      .filter((one) => one.textContent.includes('온보딩')).length,
+  }))
+  console.log('  ' + JSON.stringify(folder))
+  expect('창이 모두 닫힘', folder.sheets === 0, JSON.stringify(folder))
+  expect('그 폴더가 열림', folder.path === '/회사', JSON.stringify(folder))
+  expect('폴더 화면이 뜸', folder.view === 1, JSON.stringify(folder))
+  expect('트리에서도 펴짐', folder.opened === 1, JSON.stringify(folder))
+
+  step('12. 사라진 폴더는 알리기만 하고 창을 두른 채로 둔다')
+  await openSync()
+  await openHistory()
+  await page.click('.run:first-child .run-open')
+  await page.waitForTimeout(300)
+  await page.click('.run .plan .plan-open:text-is("옛 폴더")')
+  await page.waitForTimeout(500)
+  const missing = await page.evaluate(() => ({
+    sheets: document.querySelectorAll('.overlay').length,
+    toast: document.querySelector('.toast')?.textContent ?? null,
+  }))
+  console.log('  ' + JSON.stringify(missing))
+  expect('창은 그대로', missing.sheets > 0, JSON.stringify(missing))
+  expect('없다고 알림', (missing.toast ?? '').includes('없습니다'), JSON.stringify(missing))
+  await closeSheet()
+  await page.click('[aria-label="설정"] .sheet-close')
+  await page.waitForTimeout(300)
+
+  step('13. 폴더가 다르면 기록도 남남이다')
   await closeVault()
   await openVault('other')
   await openSync()

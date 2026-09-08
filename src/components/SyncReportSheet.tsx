@@ -12,10 +12,12 @@ interface SyncReportSheetProps {
   onConfirm: () => void
   /** 오간 파일을 눌렀을 때. 창을 걷고 그 파일을 엽니다. */
   onOpen: (path: string) => void
+  /** 경로 가운데 폴더를 눌렀을 때. 창을 걷고 그 폴더를 엽니다. */
+  onOpenDir: (path: string) => void
 }
 
 export function SyncReportSheet({
-  report, config, onClose, onConfirm, onOpen,
+  report, config, onClose, onConfirm, onOpen, onOpenDir,
 }: SyncReportSheetProps) {
   // 설정 창 위에 떠 있을 때가 많습니다. Esc 는 위에 있는 이쪽부터 닫습니다.
   useEscapeClose(onClose)
@@ -143,6 +145,7 @@ export function SyncReportSheet({
                 commitSha={report.commitSha}
                 config={config}
                 onOpen={onOpen}
+                onOpenDir={onOpenDir}
               />
             </section>
           )}

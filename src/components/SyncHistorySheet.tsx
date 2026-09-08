@@ -12,6 +12,8 @@ interface SyncHistorySheetProps {
   onClose: () => void
   /** 오간 파일을 눌렀을 때. 창을 걷고 그 파일을 엽니다. */
   onOpen: (path: string) => void
+  /** 경로 가운데 폴더를 눌렀을 때. 창을 걷고 그 폴더를 엽니다. */
+  onOpenDir: (path: string) => void
 }
 
 /** 목록에 백 줄이 늘어서므로 시각은 짧게 적습니다. */
@@ -24,7 +26,9 @@ const when = (at: number) =>
  * 한 회차를 눌러야 파일 목록이 펴집니다. 백 건을 한꺼번에 펼쳐 두면
  * 정작 찾으려던 회차가 수천 줄 사이에 묻힙니다.
  */
-export function SyncHistorySheet({ runs, config, onClose, onOpen }: SyncHistorySheetProps) {
+export function SyncHistorySheet({
+  runs, config, onClose, onOpen, onOpenDir,
+}: SyncHistorySheetProps) {
   // 설정 창 위에 떠 있습니다. Esc 는 위에 있는 이쪽부터 닫습니다.
   useEscapeClose(onClose)
 
@@ -114,6 +118,7 @@ export function SyncHistorySheet({ runs, config, onClose, onOpen }: SyncHistoryS
                             commitSha={run.commitSha}
                             config={config}
                             onOpen={onOpen}
+                            onOpenDir={onOpenDir}
                           />
                           {run.cut > 0 && (
                             <p className="hint">그 밖에 {run.cut}건은 남기지 않았습니다.</p>
