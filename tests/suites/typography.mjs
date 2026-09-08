@@ -16,7 +16,25 @@ const page = await browser.newPage({ viewport: { width: 1400, height: 920 } })
 const errors = []
 page.on('pageerror', (e) => errors.push('pageerror: ' + e.message))
 await page.addInitScript(readFileSync(join(HERE, '..', 'mock-fs.js'), 'utf8'))
-await page.addInitScript(() => window.__installMockFs())
+await page.addInitScript(() => {
+  window.__installMockFs()
+  // 표와 코드가 든 문서. 씨앗에는 둘 다 없어 너비를 견줄 수 없습니다.
+  const root = window.__mockRoot
+  const sample = root._children.get('개발 환경.md')
+  root._children.set('너비.md', Object.assign(
+    Object.create(Object.getPrototypeOf(sample)),
+    {
+      kind: 'file',
+      name: '너비.md',
+      _lastModified: Date.now(),
+      _data: '# 너비\n\n글줄입니다. 이 문단과 아래 표·코드가 같은 폭에 서야 합니다.\n\n'
+        + '| 가 | 나 | 다 | 라 | 마 | 바 | 사 | 아 |\n'
+        + '| --- | --- | --- | --- | --- | --- | --- | --- |\n'
+        + '| 하나 | 둘 | 셋 | 넷 | 다섯 | 여섯 | 일곱 | 여덟 |\n\n'
+        + '```js\nconst 아주긴줄 = "' + 'x'.repeat(200) + '"\n```\n',
+    },
+  ))
+})
 
 const openVault = async () => {
   await page.click('button:has-text("폴더 열기")')
@@ -232,6 +250,60 @@ try {
   await page.screenshot({ path: join(HERE, '..', 'shots', 'typography', '02-serif.png'),
     clip: { x: 430, y: 60, width: 970, height: 300 } })
   await pick('본문 글꼴', '산세리프')
+
+  /*
+   * 표와 코드는 예전에 창 끝까지 늘어져 있었습니다. 그러면 글줄과 왼쪽만 맞고
+   * 오른쪽이 어긋나 글이 들쭉날쭉해 보입니다.
+   */
+  step('9. 표와 코드도 본문 너비를 따른다')
+  await openDoc('너비')
+  // 나란히 보기에서는 칸이 반쪽이라 너비 설정이 걸리지 않습니다. 결과만 봅니다.
+  await page.click('.mode-switch button[aria-label="미리보기"]')
+  await page.waitForTimeout(500)
+  const widths = () => page.evaluate(() => {
+    const at = (selector) => {
+      const node = document.querySelector(selector)
+      return node ? Math.round(node.getBoundingClientRect().width) : null
+    }
+    return { pane: at('.preview'), text: at('.preview > p'), code: at('.preview > pre'), table: at('.preview > table') }
+  })
+
+  await pick('본문 너비', '보통')
+  const medium = await widths()
+  console.log('  보통: ' + JSON.stringify(medium))
+  expect('보통은 840', medium.text === 840, JSON.stringify(medium))
+  expect('코드도 같은 폭', medium.code === medium.text, JSON.stringify(medium))
+  expect('표도 같은 폭', medium.table === medium.text, JSON.stringify(medium))
+  expect('창은 그보다 넓음', medium.pane > medium.text, JSON.stringify(medium))
+  await page.screenshot({ path: join(HERE, '..', 'shots', 'typography', '03-width.png') })
+
+  await pick('본문 너비', '좁게')
+  const narrow = await widths()
+  console.log('  좁게: ' + JSON.stringify(narrow))
+  expect('좁게는 680', narrow.text === 680, JSON.stringify(narrow))
+  expect('코드와 표도 함께 좁아짐',
+    narrow.code === 680 && narrow.table === 680, JSON.stringify(narrow))
+
+  await pick('본문 너비', '넓게')
+  const wide = await widths()
+  console.log('  넓게: ' + JSON.stringify(wide))
+  expect('넓게는 창을 다 씀', wide.text > medium.text, JSON.stringify(wide))
+  expect('코드와 표도 함께 넓어짐',
+    wide.code === wide.text && wide.table === wide.text, JSON.stringify(wide))
+
+  // 넘치는 것은 잘리지 않고 제 칸 안에서 굴러가야 합니다.
+  await pick('본문 너비', '좁게')
+  const scrolls = await page.evaluate(() => {
+    const code = document.querySelector('.preview > pre')
+    const table = document.querySelector('.preview > table')
+    return {
+      code: code.scrollWidth > code.clientWidth + 4,
+      table: table.scrollWidth > table.clientWidth + 4 || table.scrollWidth <= table.clientWidth,
+    }
+  })
+  console.log('  ' + JSON.stringify(scrolls))
+  expect('긴 코드는 옆으로 굴러감', scrolls.code === true, JSON.stringify(scrolls))
+  await pick('본문 너비', '보통')
 } catch (cause) {
   fail('묶음이 도중에 멈춤', cause instanceof Error ? (cause.stack ?? cause.message) : String(cause))
 } finally {
