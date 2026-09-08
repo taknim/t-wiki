@@ -803,16 +803,20 @@ mark { background: var(--mark); color: inherit; border-radius: 2px; }
 .checkbox .hint { display: block; margin-inline-start: 20px; }
 
 .plan { list-style: none; margin: 0; padding: 0; max-height: 260px; overflow: auto; font-size: 12px; }
+/*
+ * 갈래 · 경로 · 까닭을 한 줄에 놓습니다. 까닭을 아래로 내리면 파일 하나에 두 줄이
+ * 들고, 한 회차를 펴는 것만으로 창이 가득 찹니다. 까닭이 길면 제 칸 안에서 접힙니다.
+ */
 .plan li {
   display: grid;
-  grid-template-columns: 96px 1fr;
+  grid-template-columns: 96px minmax(0, 1fr) minmax(0, auto);
   gap: 4px 10px;
   padding: 6px 8px;
   border-bottom: 1px solid var(--border);
 }
 .plan-action { color: var(--text-muted); }
 .plan-path { font-family: var(--mono); word-break: break-all; }
-.plan-reason { grid-column: 2; color: var(--text-muted); }
+.plan-reason { color: var(--text-muted); text-align: end; overflow-wrap: anywhere; }
 .plan-conflict .plan-action, .plan-error .plan-action { color: var(--danger); font-weight: 600; }
 .plan-delete-local .plan-action, .plan-delete-remote .plan-action { color: var(--warn); font-weight: 600; }
 

@@ -1,10 +1,10 @@
 import { useState } from 'react'
 import type { GitHubConfig, SyncRun } from '../types'
-import { displayPath } from '../lib/paths'
-import { commitUrl, commitsUrl } from '../lib/github/links'
+import { commitsUrl } from '../lib/github/links'
 import { MAX_SYNC_HISTORY } from '../lib/store'
 import { useEscapeClose } from '../hooks/useEscapeClose'
-import { ACTION_LABEL, summarizeLog } from './syncLabels'
+import { LogRows } from './LogRows'
+import { summarizeLog } from './syncLabels'
 
 interface SyncHistorySheetProps {
   runs: SyncRun[]
@@ -85,38 +85,20 @@ export function SyncHistorySheet({ runs, config, onClose }: SyncHistorySheetProp
               {shown.map((run) => {
                 const open = opened === run.at
                 const failures = run.log.filter((line) => line.status === 'error').length
-                const sha = commitUrl(config, run.commitSha)
                 return (
                   <li key={run.at} className="run">
-                    <div className="run-head">
-                      <button
-                        type="button"
-                        className="run-open"
-                        aria-expanded={open}
-                        onClick={() => setOpened(open ? null : run.at)}
-                      >
-                        <span className="run-when">{when(run.at)}</span>
-                        <span className="run-trigger">{run.trigger === 'auto' ? '자동' : '직접'}</span>
-                        <span
-                          className={
-                            run.error || failures > 0 ? 'run-sum is-bad' : 'run-sum'
-                          }
-                        >
-                          {run.error ?? summarizeLog(run.log)}
-                        </span>
-                      </button>
-                      {run.commitSha && sha && (
-                        <a
-                          className="commit-link"
-                          href={sha}
-                          target="_blank"
-                          rel="noreferrer noopener"
-                          data-tip={`${run.commitSha.slice(0, 7)} 커밋을 GitHub 에서 새 탭으로 엽니다`}
-                        >
-                          {run.commitSha.slice(0, 7)}
-                        </a>
-                      )}
-                    </div>
+                    <button
+                      type="button"
+                      className="run-open"
+                      aria-expanded={open}
+                      onClick={() => setOpened(open ? null : run.at)}
+                    >
+                      <span className="run-when">{when(run.at)}</span>
+                      <span className="run-trigger">{run.trigger === 'auto' ? '자동' : '직접'}</span>
+                      <span className={run.error || failures > 0 ? 'run-sum is-bad' : 'run-sum'}>
+                        {run.error ?? summarizeLog(run.log)}
+                      </span>
+                    </button>
 
                     {open && (
                       run.log.length === 0 ? (
@@ -125,18 +107,7 @@ export function SyncHistorySheet({ runs, config, onClose }: SyncHistorySheetProp
                         </p>
                       ) : (
                         <>
-                          <ul className="plan">
-                            {run.log.map((line, position) => (
-                              <li
-                                key={`${line.path}-${position}`}
-                                className={line.status === 'error' ? 'plan-error' : `plan-${line.action}`}
-                              >
-                                <span className="plan-action">{ACTION_LABEL[line.action]}</span>
-                                <span className="plan-path">{displayPath(line.path)}</span>
-                                {line.detail && <span className="plan-reason">{line.detail}</span>}
-                              </li>
-                            ))}
-                          </ul>
+                          <LogRows lines={run.log} commitSha={run.commitSha} config={config} />
                           {run.cut > 0 && (
                             <p className="hint">그 밖에 {run.cut}건은 남기지 않았습니다.</p>
                           )}

@@ -78,8 +78,28 @@ const rows = () => page.evaluate(() => [...document.querySelectorAll('.run')].ma
   when: li.querySelector('.run-when')?.textContent ?? '',
   trigger: li.querySelector('.run-trigger')?.textContent ?? '',
   sum: li.querySelector('.run-sum')?.textContent ?? '',
-  sha: li.querySelector('.commit-link')?.textContent ?? null,
 })))
+
+/** 펼친 회차의 첫 줄. 커밋 이름은 이 줄 안에 있어야 합니다. */
+const firstLine = () => page.evaluate(() => {
+  const row = document.querySelector('.run .plan li')
+  if (!row) return null
+  const path = row.querySelector('.plan-path')
+  const reason = row.querySelector('.plan-reason')
+  const link = row.querySelector('.plan-reason .commit-link')
+  return {
+    path: path?.textContent ?? '',
+    reason: reason?.textContent ?? '',
+    sha: link?.textContent ?? null,
+    href: link?.getAttribute('href') ?? null,
+    target: link?.getAttribute('target') ?? null,
+    rel: link?.getAttribute('rel') ?? null,
+    // 경로와 까닭의 윗변이 같으면 한 줄에 나란히 선 것입니다.
+    sameLine: path && reason
+      ? Math.abs(path.getBoundingClientRect().top - reason.getBoundingClientRect().top) < 4
+      : false,
+  }
+})
 
 const detailLink = () => page.evaluate(() => {
   const a = [...document.querySelectorAll('.sheet a.btn')].find((n) => n.textContent.includes('자세히 보기'))
@@ -134,8 +154,8 @@ try {
   expect('한 줄이 생김', one.length === 1, JSON.stringify(one))
   expect('무엇이 올라갔는지 적힘', /올림 \d+/.test(one[0].sum), JSON.stringify(one[0]))
   expect('직접 돌린 것으로 셈', one[0].trigger === '직접', JSON.stringify(one[0]))
-  expect('커밋 이름이 붙음', one[0].sha !== null && github.headSha.startsWith(one[0].sha),
-    one[0].sha + ' vs ' + github.headSha)
+  const headLinks = await page.locator('.run .commit-link').count()
+  expect('머리줄에는 커밋 링크가 없음', headLinks === 0, String(headLinks))
   await page.screenshot({ path: join(HERE, '..', 'shots', 'synchistory', '01-one.png') })
 
   step('3. 회차를 누르면 오간 파일이 펴진다')
@@ -145,12 +165,24 @@ try {
   const openedRows = await page.locator('.run .plan li').count()
   expect('펴기 전에는 접혀 있음', closed === 0, String(closed))
   expect('펴면 파일이 보임', openedRows > 0, String(openedRows))
-  const anyPath = await page.locator('.run .plan .plan-path').first().textContent()
-  console.log('  첫 줄: ' + anyPath)
-  expect('경로가 적혀 있음', (anyPath ?? '').includes('.md'), String(anyPath))
+  const line = await firstLine()
+  console.log('  첫 줄: ' + JSON.stringify(line))
+  expect('경로가 적혀 있음', line.path.includes('.md'), line.path)
+  expect('까닭이 경로와 한 줄에 섬', line.sameLine, JSON.stringify(line))
   await page.screenshot({ path: join(HERE, '..', 'shots', 'synchistory', '02-open.png') })
 
-  step('4. 자세히 보기는 그 저장소의 커밋 목록으로 간다')
+  step('4. 그 줄의 커밋 이름이 커밋으로 가는 길이다')
+  expect('커밋 이름이 줄 안에 있음',
+    line.sha !== null && github.headSha.startsWith(line.sha), line.sha + ' vs ' + github.headSha)
+  expect('그 커밋으로 감',
+    line.href === 'https://github.com/tester/wiki/commit/' + github.headSha, String(line.href))
+  expect('새 탭으로 열림', line.target === '_blank', String(line.target))
+  expect('opener 를 넘기지 않음', String(line.rel).includes('noopener'), String(line.rel))
+  // 링크로 바꾼 자리에 글자가 남아 두 번 적히면 안 됩니다.
+  expect('이름이 한 번만 적힘',
+    (line.reason.match(new RegExp(line.sha ?? 'x', 'g')) ?? []).length === 1, line.reason)
+
+  step('5. 자세히 보기는 그 저장소의 커밋 목록으로 간다')
   const link = await detailLink()
   console.log('  ' + JSON.stringify(link))
   expect('저장소와 브랜치가 주소에 들어감',
@@ -158,7 +190,7 @@ try {
   expect('새 탭으로 열림', link?.target === '_blank', JSON.stringify(link))
   expect('opener 를 넘기지 않음', String(link?.rel).includes('noopener'), JSON.stringify(link))
 
-  step('5. 오갈 것이 없던 회차도 남되, 걸러 볼 수 있다')
+  step('6. 오갈 것이 없던 회차도 남되, 걸러 볼 수 있다')
   await closeSheet()
   await syncNow()
   await openHistory()
@@ -174,7 +206,7 @@ try {
   await page.click('.checkbox:has-text("오간 회차만") input')
   await page.waitForTimeout(200)
 
-  step('6. 하위 폴더를 정하면 그 아래 커밋만 보러 간다')
+  step('7. 하위 폴더를 정하면 그 아래 커밋만 보러 간다')
   await closeSheet()
   await page.fill('input[placeholder^="저장소 안 하위 폴더"]', '노트')
   await page.waitForTimeout(400)
@@ -188,7 +220,7 @@ try {
   await page.fill('input[placeholder^="저장소 안 하위 폴더"]', '')
   await page.waitForTimeout(400)
 
-  step('7. 새로고침해도 기록은 남는다')
+  step('8. 새로고침해도 기록은 남는다')
   await page.reload({ waitUntil: 'domcontentloaded' })
   await openVault('first')
   await openSync()
@@ -197,7 +229,7 @@ try {
   console.log('  ' + kept.length + '줄')
   expect('두 줄이 그대로 있음', kept.length === 2, JSON.stringify(kept))
 
-  step('8. 백 건을 넘으면 오래된 것부터 버린다')
+  step('9. 백 건을 넘으면 오래된 것부터 버린다')
   await closeSheet()
   const stuffed = await stuffHistory(150)
   console.log('  채워 넣은 뒤: ' + stuffed + '건')
@@ -225,7 +257,7 @@ try {
     reach !== null && reach.bottom <= reach.edge, JSON.stringify(reach))
   await page.screenshot({ path: join(HERE, '..', 'shots', 'synchistory', '03-capped.png') })
 
-  step('9. 폴더가 다르면 기록도 남남이다')
+  step('10. 폴더가 다르면 기록도 남남이다')
   await closeSheet()
   await page.click('[aria-label="설정"] .sheet-close')
   await page.waitForTimeout(300)

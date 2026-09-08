@@ -31,3 +31,23 @@ export function summarizeLog(log: SyncLogLine[]): string {
   if (failed > 0) parts.push(`실패 ${failed}`)
   return parts.join(' · ') || '변화 없음'
 }
+
+/**
+ * 자취 끝에 붙은 커밋 이름을 떼어 냅니다.
+ *
+ * 올린 줄에는 `로컬에서 수정 · a3841cc` 처럼 그 회차의 커밋 이름이 글자로 붙어
+ * 있습니다(github/sync.ts). 링크로 바꾸려면 떼어 내야 하는데, 아무 여섯 자리나
+ * 잘라 내면 까닭에 든 글자를 잘못 집습니다. 그래서 **이 회차의 커밋 이름과
+ * 똑같을 때만** 뗍니다.
+ */
+export function splitCommitSha(
+  detail: string | undefined,
+  commitSha: string | null,
+): { text: string; sha: string | null } {
+  const text = detail ?? ''
+  if (!commitSha) return { text, sha: null }
+  const tail = ` · ${commitSha.slice(0, 7)}`
+  return text.endsWith(tail)
+    ? { text: text.slice(0, -tail.length), sha: commitSha }
+    : { text, sha: null }
+}

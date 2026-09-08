@@ -1233,6 +1233,7 @@ export default function App() {
       {reportOpen && sync.report && (
         <SyncReportSheet
           report={sync.report}
+          config={sync.config}
           onClose={() => setReportOpen(false)}
           onConfirm={() => {
             setReportOpen(false)

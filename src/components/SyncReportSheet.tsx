@@ -1,15 +1,18 @@
+import type { GitHubConfig } from '../types'
 import type { SyncReport } from '../hooks/useGitHubSync'
 import { displayPath } from '../lib/paths'
 import { useEscapeClose } from '../hooks/useEscapeClose'
+import { LogRows } from './LogRows'
 import { ACTION_LABEL } from './syncLabels'
 
 interface SyncReportSheetProps {
   report: SyncReport
+  config: GitHubConfig
   onClose: () => void
   onConfirm: () => void
 }
 
-export function SyncReportSheet({ report, onClose, onConfirm }: SyncReportSheetProps) {
+export function SyncReportSheet({ report, config, onClose, onConfirm }: SyncReportSheetProps) {
   // 설정 창 위에 떠 있을 때가 많습니다. Esc 는 위에 있는 이쪽부터 닫습니다.
   useEscapeClose(onClose)
 
@@ -131,18 +134,7 @@ export function SyncReportSheet({ report, onClose, onConfirm }: SyncReportSheetP
                 {report.log.length}건 처리
                 {failures.length > 0 && ` · 실패 ${failures.length}건`}
               </h3>
-              <ul className="plan">
-                {report.log.map((line, position) => (
-                  <li
-                    key={`${line.path}-${position}`}
-                    className={line.status === 'error' ? 'plan-error' : `plan-${line.action}`}
-                  >
-                    <span className="plan-action">{ACTION_LABEL[line.action]}</span>
-                    <span className="plan-path">{displayPath(line.path)}</span>
-                    <span className="plan-reason">{line.detail}</span>
-                  </li>
-                ))}
-              </ul>
+              <LogRows lines={report.log} commitSha={report.commitSha} config={config} />
             </section>
           )}
         </div>
