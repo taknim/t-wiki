@@ -458,8 +458,28 @@ git 은 한 번 올린 바이너리를 이력에 영구히 남겨서, 지워도 
 늘 그렇습니다. 통계가 필요 없어지면 그 두 줄을 지우면 그만입니다.
 
 `public/_headers` 에 응답 머리말을 적어 두었습니다. 이 앱은 액세스 토큰을 브라우저에
-들고 있으므로 남의 페이지 안에 끼워 넣지 못하게 막고(`X-Frame-Options: DENY`),
-바깥으로 새는 정보를 줄입니다. 파일 이름에 내용 해시가 붙는 `assets/` 는 오래 물려 둡니다.
+들고 있으므로 남의 페이지 안에 끼워 넣지 못하게 막고(`X-Frame-Options: DENY`,
+`frame-ancestors 'none'`), 바깥으로 새는 정보를 줄입니다.
+파일 이름에 내용 해시가 붙는 `assets/` 는 오래 물려 둡니다.
+
+**CSP(Content-Security-Policy)로 이 오리진에서 도는 코드를 우리가 올린 것으로 묶습니다.**
+어디선가 스크립트 한 줄이 끼어들어도 실행되지 않고, 나가는 곳도 GitHub API 로 좁혀 둡니다.
+토큰이 든 오리진이라 이 울타리의 값이 큽니다.
+
+| 갈래 | 왜 그렇게 두었나 |
+| --- | --- |
+| `script-src 'self' …cloudflareinsights.com` | 우리 번들과 통계 조각만. `unsafe-inline` 은 두지 않습니다 |
+| `connect-src 'self' api.github.com …` | 토큰을 들고 나갈 수 있는 곳을 좁힙니다 |
+| `img-src 'self' blob: data:` | 볼트 안 그림은 blob URL 로 그립니다 |
+| `style-src 'self' 'unsafe-inline'` | 화면 곳곳의 인라인 스타일, 문서 안 `<style>`, mermaid 가 넣는 스타일 |
+| `font-src 'self' data:` | KaTeX 글꼴 한 벌이 작아 CSS 안에 박혀 나옵니다 |
+| `frame-src 'self' blob:` | PDF 미리보기가 blob URL 을 씁니다 |
+| `object-src 'none'` · `base-uri 'self'` · `form-action 'none'` | 쓰지 않는 길은 아예 닫습니다 |
+
+CSP 는 어긋나도 조용히 깨집니다. 그래서 `csp` 시험 묶음이 **빌드 결과에 이 머리말을
+실제로 붙여 띄우고** 그림·다이어그램·수식·HTML 첨부·동기화가 모두 되는지, 막힌 것이
+하나도 없는지 확인합니다. 머리말은 이 파일에서 그대로 읽어 오므로 따로 적어 둔 사본이
+어긋날 일이 없습니다.
 
 > **HTTPS 가 아니면 동작하지 않습니다.** 폴더를 고르는 API 는 보안 맥락에서만 열립니다.
 > `localhost` 는 예외로 열리지만, 다른 기기에서 `http://192.168.…` 로 들어오면 폴더를

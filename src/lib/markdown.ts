@@ -386,10 +386,25 @@ marked.use({
       const isExternal = /^(https?:|data:|blob:)/i.test(href)
       return isExternal
         ? `<img src="${escapeHtml(href)}" alt="${alt}"${title} />`
-        : `<img data-vault-src="${escapeHtml(decodeURIComponent(href))}" alt="${alt}"${title} />`
+        : `<img data-vault-src="${escapeHtml(decodePath(href))}" alt="${alt}"${title} />`
     },
   },
 })
+
+/**
+ * 주소에 쓰인 %  자리를 되돌립니다.
+ *
+ * `decodeURIComponent` 는 `%` 하나만 있어도 던집니다. 그러면 문서 한 줄 때문에
+ * 렌더가 통째로 멈추고 미리보기가 빈 채로 남습니다. 되돌릴 수 없는 글자는
+ * 적힌 그대로 두는 편이 낫습니다.
+ */
+function decodePath(href: string): string {
+  try {
+    return decodeURIComponent(href)
+  } catch {
+    return href
+  }
+}
 
 // 외부 링크는 새 탭에서 열되 opener 를 넘겨주지 않도록 후처리합니다.
 DOMPurify.addHook('afterSanitizeAttributes', (node) => {

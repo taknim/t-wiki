@@ -2,6 +2,13 @@
 # 이 앱은 GitHub 액세스 토큰을 브라우저에 들고 있으므로, 남의 페이지 안에 끼워
 # 넣지 못하게 막고 바깥으로 새는 정보를 줄입니다.
 /*
+  # 토큰이 든 출처에서 도는 코드를 우리가 올린 것으로 묶습니다. 어디선가 스크립트가
+  # 한 줄 끼어들어도 실행되지 않고, 나가는 곳도 GitHub API 로 좁혀 둡니다.
+  # 'unsafe-inline' 은 style 에만 둡니다. 화면 곳곳의 인라인 스타일과 문서 안의
+  # <style>, mermaid 가 그려 넣는 스타일이 모두 여기에 걸립니다.
+  # font-src 에 data: 를 두는 것은 KaTeX 글꼴 한 벌이 작아서 CSS 안에 박혀 나오기
+  # 때문입니다. 빼면 수식 글꼴 하나가 조용히 다른 글꼴로 그려집니다.
+  Content-Security-Policy: default-src 'self'; script-src 'self' https://static.cloudflareinsights.com; connect-src 'self' https://api.github.com https://cloudflareinsights.com; img-src 'self' blob: data:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; frame-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none'
   X-Frame-Options: DENY
   X-Content-Type-Options: nosniff
   Referrer-Policy: no-referrer
