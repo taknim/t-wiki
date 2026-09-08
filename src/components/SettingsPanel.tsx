@@ -25,7 +25,7 @@ const MODES: { id: ModeSetting; name: string; hint: string }[] = [
 interface SettingsPanelProps {
   onClose: () => void
   sync: GitHubSync
-  onShowReport: () => void
+  onShowHistory: () => void
   /** 설정 창을 열 때 바로 보여 줄 묶음. */
   initialTab?: TabId
   /** 지금 열려 있는 폴더 이름. 내보낸 파일에 적어 둡니다. */
@@ -58,7 +58,7 @@ const TABS: { id: TabId; name: string; hint: string }[] = [
 ]
 
 export function SettingsPanel({
-  onClose, sync, onShowReport, vaultName, vaultRoot,
+  onClose, sync, onShowHistory, vaultName, vaultRoot,
   sidebarOpen, onSidebarOpen, sidebarWidth, onSidebarWidth, sidebarTab, onSidebarTab,
   splitRatio, onSplitRatio,
   imagePreview, onImagePreview,
@@ -751,7 +751,7 @@ export function SettingsPanel({
 
             <section className="settings-section" ref={sectionRefs.sync}>
               <h3 className="settings-heading">GitHub 동기화</h3>
-              <GitHubSettings sync={sync} onShowReport={onShowReport} />
+              <GitHubSettings sync={sync} onShowHistory={onShowHistory} />
             </section>
           </div>
         </div>

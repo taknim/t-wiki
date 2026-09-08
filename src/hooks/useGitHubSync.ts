@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type {
-  AssetIndex, DocIndex, GitHubConfig, LastCommit, SyncLogLine, SyncPlanItem,
+  AssetIndex, DocIndex, GitHubConfig, LastCommit, SyncLogLine, SyncPlanItem, SyncRun,
 } from '../types'
 import { applyPlan, buildPlan, localShas, scanRemote } from '../lib/github/sync'
 import { vaultKeyFor } from '../lib/vaultKey'
 import {
+  appendSyncRun,
+  clearSyncHistory,
+  loadSyncHistory,
   loadGitHubConfig,
   loadLastCommit,
   loadLastSyncAt,
@@ -63,6 +66,8 @@ export interface GitHubSync {
   isConfigured: boolean
   status: SyncStatus
   report: SyncReport | null
+  /** 지난 회차들. 새것이 앞에 옵니다. */
+  history: SyncRun[]
   lastSyncAt: number | null
   /** 마지막으로 올린 커밋. 아직 아무것도 올리지 않았으면 null 입니다. */
   lastCommit: LastCommit | null
@@ -126,6 +131,7 @@ export function useGitHubSync({ root, docs, assets, onBeforeSync, onLocalChanged
   const [loaded, setLoaded] = useState(false)
   const [status, setStatus] = useState<SyncStatus>(IDLE)
   const [report, setReport] = useState<SyncReport | null>(null)
+  const [history, setHistory] = useState<SyncRun[]>([])
   const [lastSyncAt, setLastSyncAt] = useState<number | null>(null)
   const [lastCommit, setLastCommit] = useState<LastCommit | null>(null)
   const [nextAutoSyncAt, setNextAutoSyncAt] = useState<number | null>(null)
@@ -179,6 +185,7 @@ export function useGitHubSync({ root, docs, assets, onBeforeSync, onLocalChanged
         if (cancelled) return
         setVaultKey(null)
         setConfig(DEFAULT_GITHUB_CONFIG)
+        setHistory([])
         setLastSyncAt(null)
         setLastCommit(null)
         setLoaded(false)
@@ -193,6 +200,7 @@ export function useGitHubSync({ root, docs, assets, onBeforeSync, onLocalChanged
         if (cancelled) return
         setVaultKey(null)
         setConfig(DEFAULT_GITHUB_CONFIG)
+        setHistory([])
         setLastSyncAt(null)
         setLastCommit(null)
         setLoaded(false)
@@ -202,11 +210,13 @@ export function useGitHubSync({ root, docs, assets, onBeforeSync, onLocalChanged
       const saved = await loadGitHubConfig(key)
       const at = await loadLastSyncAt(key)
       const commit = await loadLastCommit(key)
+      const past = await loadSyncHistory(key)
       if (cancelled) return
 
       vaultKeyRef.current = key
       setVaultKey(key)
       setConfig({ ...DEFAULT_GITHUB_CONFIG, ...saved })
+      setHistory(past)
       setLastSyncAt(at ?? null)
       setLastCommit(commit ?? null)
       setLoaded(true)
@@ -227,6 +237,32 @@ export function useGitHubSync({ root, docs, assets, onBeforeSync, onLocalChanged
     if (!loaded || !vaultKey) return
     pendingSaveRef.current = saveGitHubConfig(vaultKey, config)
   }, [config, loaded, vaultKey])
+
+  /**
+   * 한 회차를 마무리합니다. 화면에 결과를 띄우고 지난 기록에도 남깁니다.
+   *
+   * 두 자리를 따로 부르면 언젠가 한쪽을 빠뜨립니다. 확인을 기다리는 회차는
+   * 아직 아무 일도 벌어지지 않았으니 이리로 오지 않습니다. 기록에 실패하더라도
+   * 동기화 자체는 이미 끝난 일이므로 흐름을 끊지 않습니다.
+   *
+   * **상태 글귀를 먼저 세워 두고 부릅니다.** 화면은 결과가 바뀌는 것을 신호로
+   * 삼아 알림을 띄우는데, 여기서 기다리는 사이에 그 신호가 먼저 나가면
+   * 알림에 앞 단계의 글귀("비교하는 중…")가 실립니다.
+   */
+  const finish = useCallback(async (key: string, run: SyncReport) => {
+    setReport(run)
+    try {
+      setHistory(await appendSyncRun(key, {
+        at: run.at,
+        trigger: run.trigger,
+        commitSha: run.commitSha,
+        error: run.error,
+        log: run.log,
+      }))
+    } catch {
+      // 자취를 못 남겨도 이번 회차의 결과는 화면에 그대로 있습니다.
+    }
+  }, [])
 
   /**
    * 한 번의 비교와 적용. 저장소가 그 사이에 바뀌어 커밋이 거부되면 true 를 돌려주고,
@@ -292,8 +328,8 @@ export function useGitHubSync({ root, docs, assets, onBeforeSync, onLocalChanged
           await saveSyncState(key, signature, synced)
           await saveLastSyncAt(key, at)
           setLastSyncAt(at)
-          setReport({ at, trigger, plan, log: [], commitSha: null, error: null })
           setStatus({ phase: 'done', message: '이미 저장소와 같습니다', progress: null })
+          await finish(key, { at, trigger, plan, log: [], commitSha: null, error: null })
           return false
         }
 
@@ -325,20 +361,24 @@ export function useGitHubSync({ root, docs, assets, onBeforeSync, onLocalChanged
         }
 
         const failures = result.log.filter((line) => line.status === 'error')
-        setReport({ at, trigger, plan, log: result.log, commitSha: result.commitSha, error: null })
         setStatus({
           phase: failures.length > 0 ? 'error' : 'done',
           message: failures.length > 0 ? `${failures.length}건 실패` : summarize(result.log),
           progress: null,
         })
+        await finish(key, {
+          at, trigger, plan, log: result.log, commitSha: result.commitSha, error: null,
+        })
       } catch (cause) {
         const message = cause instanceof Error ? cause.message : String(cause)
-        setReport({ at: Date.now(), trigger, plan: [], log: [], commitSha: null, error: message })
         setStatus({ phase: 'error', message, progress: null })
+        await finish(key, {
+          at: Date.now(), trigger, plan: [], log: [], commitSha: null, error: message,
+        })
       }
       return false
     },
-    [],
+    [finish],
   )
 
   const run = useCallback(async (trigger: 'manual' | 'auto' = 'manual') => {
@@ -420,8 +460,11 @@ export function useGitHubSync({ root, docs, assets, onBeforeSync, onLocalChanged
     // 방금까지의 저장이 끝난 뒤에 지워야 지운 것이 되살아나지 않습니다.
     await pendingSaveRef.current
     await clearGitHubConfig(key)
+    // 자취는 그 저장소와 주고받은 기록입니다. 설정을 지우면 함께 지웁니다.
+    await clearSyncHistory(key)
     confirmedRef.current = null
     setConfig(DEFAULT_GITHUB_CONFIG)
+    setHistory([])
     setReport(null)
     setStatus(IDLE)
   }, [])
@@ -492,7 +535,7 @@ export function useGitHubSync({ root, docs, assets, onBeforeSync, onLocalChanged
   const dismissReport = useCallback(() => setReport(null), [])
 
   return {
-    config, loaded, isConfigured, status, report, lastSyncAt, lastCommit,
+    config, loaded, isConfigured, status, report, history, lastSyncAt, lastCommit,
     // 꺼져 있으면 예정 시각도 없는 것으로 봅니다. 상태가 남아 있어도 화면에는 안 나옵니다.
     nextAutoSyncAt: autoOn ? nextAutoSyncAt : null,
     update, run, confirmTarget, dismissReport, reset, restartAutoSync,

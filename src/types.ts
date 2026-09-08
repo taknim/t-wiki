@@ -92,6 +92,22 @@ export interface SyncLogLine {
   detail?: string
 }
 
+/**
+ * 지난 동기화 한 회차의 자취. 폴더마다 100건까지 남깁니다.
+ *
+ * 결과 전체가 아니라 남길 만한 것만 담습니다. 계획은 이미 벌어진 일이 아니라
+ * 벌어질 뻔한 일이라 지난 기록에서는 뜻이 옅고, 회차마다 안고 있으면 자리만 먹습니다.
+ */
+export interface SyncRun {
+  at: number
+  trigger: 'manual' | 'auto'
+  commitSha: string | null
+  error: string | null
+  log: SyncLogLine[]
+  /** 너무 길어 잘라낸 줄 수. 0 이면 그대로 남겼습니다. */
+  cut: number
+}
+
 /** 문서를 원문만, 나란히, 결과만 중 어떻게 보여 줄지. */
 export type ViewMode = 'edit' | 'split' | 'preview'
 

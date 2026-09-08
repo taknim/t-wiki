@@ -1,6 +1,6 @@
 import { del, get, set } from 'idb-keyval'
 import { vaultKeyFor } from './vaultKey'
-import type { GitHubConfig, LastCommit, SyncState } from '../types'
+import type { GitHubConfig, LastCommit, SyncRun, SyncState } from '../types'
 
 const VAULT_HANDLE = 'mdwiki:vault-handle'
 const GITHUB_CONFIG = 'mdwiki:github-config'
@@ -9,6 +9,7 @@ const LAST_SYNC = 'mdwiki:last-sync-at'
 const LAST_COMMIT = 'mdwiki:last-commit'
 const ASSET_HASHES = 'mdwiki:asset-hashes'
 const FAVORITES = 'mdwiki:favorites'
+const SYNC_HISTORY = 'mdwiki:sync-history'
 
 /**
  * FileSystemDirectoryHandle 은 구조화 복제가 되므로 IndexedDB 에 그대로 넣어둘 수 있습니다.
@@ -153,6 +154,42 @@ export async function saveLastCommit(vault: string, commit: LastCommit): Promise
   const store = await readByVault<LastCommit>(LAST_COMMIT)
   store[vault] = commit
   await set(LAST_COMMIT, store)
+}
+
+/**
+ * 지난 동기화의 자취. 폴더마다 최근 것부터 이만큼만 남깁니다.
+ *
+ * 자동 동기화를 켜 두면 회차는 하루에도 수십 번 쌓입니다. 다 안고 있을 까닭이
+ * 없어 넘치는 것부터 버립니다. 한 회차의 줄 수도 함께 묶어 둡니다.
+ * 몇천 줄짜리 첫 동기화 하나가 나머지 아흔아홉 건보다 무거워지는 일을 막습니다.
+ */
+export const MAX_SYNC_HISTORY = 100
+export const MAX_RUN_LINES = 200
+
+export const loadSyncHistory = async (vault: string): Promise<SyncRun[]> =>
+  (await readByVault<SyncRun[]>(SYNC_HISTORY))[vault] ?? []
+
+/** 새 회차를 맨 앞에 놓고, 넘치는 뒤쪽을 버린 목록을 돌려줍니다. */
+export async function appendSyncRun(
+  vault: string,
+  run: Omit<SyncRun, 'cut'>,
+): Promise<SyncRun[]> {
+  const trimmed: SyncRun = {
+    ...run,
+    log: run.log.slice(0, MAX_RUN_LINES),
+    cut: Math.max(0, run.log.length - MAX_RUN_LINES),
+  }
+  const store = await readByVault<SyncRun[]>(SYNC_HISTORY)
+  const kept = [trimmed, ...(store[vault] ?? [])].slice(0, MAX_SYNC_HISTORY)
+  store[vault] = kept
+  await set(SYNC_HISTORY, store)
+  return kept
+}
+
+export async function clearSyncHistory(vault: string): Promise<void> {
+  const store = await readByVault<SyncRun[]>(SYNC_HISTORY)
+  delete store[vault]
+  await set(SYNC_HISTORY, store)
 }
 
 /**

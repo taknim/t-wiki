@@ -1,18 +1,7 @@
-import type { SyncPlanItem } from '../types'
 import type { SyncReport } from '../hooks/useGitHubSync'
 import { displayPath } from '../lib/paths'
 import { useEscapeClose } from '../hooks/useEscapeClose'
-
-const ACTION_LABEL: Record<SyncPlanItem['action'], string> = {
-  'upload-new': '커밋(신규)',
-  'upload-update': '커밋(갱신)',
-  'download-new': '내려받기(신규)',
-  'download-update': '내려받기(갱신)',
-  'delete-local': '로컬 삭제',
-  'delete-remote': '저장소 삭제',
-  conflict: '충돌',
-  skip: '변경 없음',
-}
+import { ACTION_LABEL } from './syncLabels'
 
 interface SyncReportSheetProps {
   report: SyncReport

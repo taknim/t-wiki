@@ -1,29 +1,20 @@
 import { useCallback, useState } from 'react'
 import type { ConflictPolicy } from '../types'
 import * as api from '../lib/github/api'
+import { commitUrl } from '../lib/github/links'
 import type { GitHubSync } from '../hooks/useGitHubSync'
 
 interface GitHubSettingsProps {
   sync: GitHubSync
-  onShowReport: () => void
+  onShowHistory: () => void
 }
 
-export function GitHubSettings({ sync, onShowReport }: GitHubSettingsProps) {
+export function GitHubSettings({ sync, onShowHistory }: GitHubSettingsProps) {
   const { config, update, reset } = sync
   const [confirming, setConfirming] = useState(false)
 
-  /*
-   * 마지막으로 올린 커밋으로 가는 길.
-   *
-   * 저장소를 아직 안 골랐거나 이 폴더의 설정을 지운 뒤라면 주소를 지을 수 없습니다.
-   * 그때는 링크를 아예 내보내지 않습니다. 어디로도 가지 못하는 링크를 두느니 낫습니다.
-   */
-  const owner = config.owner.trim()
-  const repo = config.repo.trim()
-  const commitUrl =
-    sync.lastCommit && owner && repo
-      ? `https://github.com/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/commit/${sync.lastCommit.sha}`
-      : null
+  // 마지막으로 올린 커밋으로 가는 길. 지을 수 없으면 null 이고, 그때는 링크를 안 내놓습니다.
+  const lastCommitUrl = commitUrl(config, sync.lastCommit?.sha ?? null)
   const [viewer, setViewer] = useState<string | null>(null)
   const [repos, setRepos] = useState<api.RepoInfo[] | null>(null)
   const [branches, setBranches] = useState<string[] | null>(null)
@@ -266,16 +257,19 @@ export function GitHubSettings({ sync, onShowReport }: GitHubSettingsProps) {
           >
             {sync.status.phase === 'running' ? '동기화 중…' : '지금 동기화'}
           </button>
-          {sync.report && (
-            <button
-              type="button"
-              className="btn"
-              data-tip="마지막 동기화에서 무엇이 오갔는지 봅니다"
-              onClick={onShowReport}
-            >
-              지난 결과 보기
-            </button>
-          )}
+          <button
+            type="button"
+            className="btn"
+            data-tip={
+              sync.history.length > 0
+                ? `이 폴더에서 돈 동기화 ${sync.history.length}건을 봅니다`
+                : '아직 이 폴더에서 동기화한 적이 없습니다'
+            }
+            onClick={onShowHistory}
+            disabled={sync.history.length === 0}
+          >
+            지난 결과 보기
+          </button>
         </div>
         {busy && <p className="status">{busy}</p>}
         {error && <p className="status status-error">{error}</p>}
@@ -283,12 +277,12 @@ export function GitHubSettings({ sync, onShowReport }: GitHubSettingsProps) {
         <p className="hint" style={{ marginBottom: 0 }}>
           마지막 동기화:{' '}
           {sync.lastSyncAt ? new Date(sync.lastSyncAt).toLocaleString('ko-KR') : '아직 없습니다'}
-          {commitUrl && sync.lastCommit && (
+          {lastCommitUrl && sync.lastCommit && (
             <>
               {' · '}
               <a
                 className="commit-link"
-                href={commitUrl}
+                href={lastCommitUrl}
                 target="_blank"
                 rel="noreferrer noopener"
                 data-tip={`${sync.lastCommit.sha.slice(0, 7)} 커밋을 GitHub 에서 새 탭으로 엽니다`}

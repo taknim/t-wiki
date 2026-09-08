@@ -16,6 +16,7 @@ import { TextPreview } from './components/TextPreview'
 import { SettingsPanel } from './components/SettingsPanel'
 import { SplitResizer } from './components/SplitResizer'
 import { SyncReportSheet } from './components/SyncReportSheet'
+import { SyncHistorySheet } from './components/SyncHistorySheet'
 import { TreeView } from './components/TreeView'
 import { useGitHubSync } from './hooks/useGitHubSync'
 import { useTextIndex } from './hooks/useTextIndex'
@@ -66,6 +67,7 @@ export default function App() {
   const [favoriteQuery, setFavoriteQuery] = useState('')
   const [settingsTab, setSettingsTab] = useState<'general' | 'appearance' | 'sync' | null>(null)
   const [reportOpen, setReportOpen] = useState(false)
+  const [historyOpen, setHistoryOpen] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
 
   const saveTimer = useRef<number | null>(null)
@@ -1215,8 +1217,16 @@ export default function App() {
           onSplitRatio={applySplitRatio}
           imagePreview={imagePreview}
           onImagePreview={applyImagePreview}
-          onShowReport={() => setReportOpen(true)}
+          onShowHistory={() => setHistoryOpen(true)}
           onClose={() => setSettingsTab(null)}
+        />
+      )}
+
+      {historyOpen && (
+        <SyncHistorySheet
+          runs={sync.history}
+          config={sync.config}
+          onClose={() => setHistoryOpen(false)}
         />
       )}
 
