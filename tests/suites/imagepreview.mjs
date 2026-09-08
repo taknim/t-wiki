@@ -162,6 +162,8 @@ try {
         .map((chip) => getComputedStyle(chip).backgroundColor),
       labels: [...document.querySelectorAll('.backdrop-switch button')]
         .map((button) => button.textContent.trim()),
+      // 색조각 넷만 서 있으면 무엇을 고르는 자리인지 알 수 없습니다.
+      lead: document.querySelector('.doc-head .head-tool .head-tool-label')?.textContent ?? null,
     }
   })
   console.log('  ' + JSON.stringify(filled))
@@ -173,6 +175,7 @@ try {
     JSON.stringify(filled.swatches))
   expect('이름도 함께 적힘', filled.labels.join() === '기존,밝게,중간,어둡게',
     JSON.stringify(filled.labels))
+  expect('앞에 무엇을 고르는지 적힘', filled.lead === '배경', String(filled.lead))
 
   const marked = await page.evaluate(() => {
     const image = document.querySelector('.asset-image')

@@ -245,7 +245,10 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .vault-name { color: var(--text-muted); font-size: 13px; }
 
 /* 제목 줄 오른쪽 끝에 붙습니다. 제목이 길어져도 자리를 지킵니다. */
-.doc-head .mode-switch { margin-left: auto; align-self: center; }
+/* 제목 줄 오른쪽 끝에 서는 고르개 한 벌. 보기 모드와 그림 배경이 같은 자리를 씁니다. */
+.head-tool { display: flex; align-items: center; gap: 8px; }
+.doc-head .head-tool { margin-left: auto; align-self: center; }
+.head-tool-label { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
 .mode-switch { display: flex; border: 1px solid var(--border-strong); border-radius: 6px; overflow: hidden; }
 .mode-switch button {
   display: inline-flex;
@@ -1367,8 +1370,6 @@ a.btn { text-decoration: none; color: inherit; display: inline-block; }
 .asset-view.is-filled > .asset-note,
 .asset-view.is-filled > .status { margin: 12px 20px 0; }
 /* 바탕 고르는 줄. 보기 모드와 같은 자리, 제목 줄 오른쪽 끝에 섭니다. */
-.head-backdrop { display: flex; align-items: center; gap: 8px; }
-.doc-head .head-backdrop { margin-left: auto; align-self: center; }
 .backdrop-switch { display: flex; border: 1px solid var(--border-strong); border-radius: 6px; overflow: hidden; }
 .backdrop-switch button {
   display: inline-flex;

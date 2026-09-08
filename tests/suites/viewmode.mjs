@@ -55,6 +55,10 @@ const current = () => page.evaluate(() => {
   return {
     mode: on?.getAttribute('aria-label') ?? null,
     body: body ? [...body.classList].find((c) => c.startsWith('mode-')) ?? null : null,
+    // 아이콘 셋은 서로 닮아, 이름이 함께 적혀 있어야 눌러 보지 않고도 압니다.
+    labels: [...document.querySelectorAll('.mode-switch button')]
+      .map((button) => button.textContent.trim()),
+    lead: document.querySelector('.doc-head .head-tool .head-tool-label')?.textContent ?? null,
   }
 })
 const pick = async (label) => {
@@ -71,6 +75,9 @@ try {
   const fresh = await current()
   console.log('  처음: ' + JSON.stringify(fresh))
   expect('처음은 나란히', fresh.mode === '나란히', JSON.stringify(fresh))
+  expect('단추에 이름이 함께 적힘', fresh.labels.join() === '편집,나란히,미리보기',
+    JSON.stringify(fresh.labels))
+  expect('앞에 무엇을 고르는지 적힘', fresh.lead === '보기 모드', String(fresh.lead))
   await pick('미리보기')
   const picked = await current()
   console.log('  고른 뒤: ' + JSON.stringify(picked))

@@ -21,7 +21,9 @@ const BACKDROPS: { key: ImageBackdrop; label: string; tip: string }[] = [
  */
 export function BackdropSwitch({ backdrop, onChange }: BackdropSwitchProps) {
   return (
-    <div className="head-backdrop">
+    <div className="head-tool">
+      {/* 색조각만 넷 세워 두면 무엇을 고르는 자리인지 알 수 없습니다. */}
+      <span className="head-tool-label">배경</span>
       <div className="backdrop-switch" role="group" aria-label="이미지 배경">
         {BACKDROPS.map((entry) => (
           <button

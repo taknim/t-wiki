@@ -21,21 +21,27 @@ const MODES: { key: ViewMode; label: string; tip: string }[] = [
  */
 export function ViewModeSwitch({ mode, onChange }: ViewModeSwitchProps) {
   return (
-    <div className="mode-switch" role="group" aria-label="보기 모드">
-      {MODES.map((entry) => (
-        <button
-          key={entry.key}
-          type="button"
-          className={mode === entry.key ? 'is-active' : ''}
-          data-tip={entry.tip}
-          aria-label={entry.label}
-          aria-pressed={mode === entry.key}
-          onClick={() => onChange(entry.key)}
-        >
-          {entry.key === 'edit' ? <PencilIcon /> : entry.key === 'split' ? <ColumnsIcon /> : <EyeIcon />}
-          {entry.label}
-        </button>
-      ))}
+    <div className="head-tool">
+      {/* 단추 넷이 나란히 선 다른 줄(배경)과 헷갈리지 않도록 무엇을 고르는지 적어 둡니다. */}
+      <span className="head-tool-label">보기 모드</span>
+      <div className="mode-switch" role="group" aria-label="보기 모드">
+        {MODES.map((entry) => (
+          <button
+            key={entry.key}
+            type="button"
+            className={mode === entry.key ? 'is-active' : ''}
+            data-tip={entry.tip}
+            aria-label={entry.label}
+            aria-pressed={mode === entry.key}
+            onClick={() => onChange(entry.key)}
+          >
+            {entry.key === 'edit'
+              ? <PencilIcon />
+              : entry.key === 'split' ? <ColumnsIcon /> : <EyeIcon />}
+            {entry.label}
+          </button>
+        ))}
+      </div>
     </div>
   )
 }
