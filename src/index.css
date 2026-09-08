@@ -392,6 +392,14 @@ button, input, select, textarea { font: inherit; color: inherit; }
   padding: 4px 0 6px;
 }
 .favorites-list li { display: flex; align-items: center; gap: 2px; }
+/* 끌고 있는 줄은 흐려 두어, 지금 손에 든 것이 무엇인지 보이게 합니다. */
+.favorites-list li.is-held { opacity: 0.45; }
+/*
+ * 놓을 자리. 줄을 덮어쓰는 것이 아니라 그 앞이나 뒤에 끼워 넣는 것이므로,
+ * 줄 전체를 물들이지 않고 끼어들 모서리에만 금을 긋습니다.
+ */
+.favorites-list li.is-over-before { box-shadow: inset 0 2px 0 var(--accent); }
+.favorites-list li.is-over-after { box-shadow: inset 0 -2px 0 var(--accent); }
 .favorites-item {
   flex: 1;
   min-width: 0;

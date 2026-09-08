@@ -350,7 +350,80 @@ try {
   await page.screenshot({ path: join(HERE, '..', 'shots', 'favorites', '04-path.png'),
     clip: { x: 0, y: 40, width: 460, height: 320 } })
 
-  step('17. 콘솔 오류')
+  step('17. 끌어다 놓아 차례를 바꾼다')
+  await showTab('즐겨찾기')
+  const order = await listed()
+  console.log('  처음: ' + JSON.stringify(order))
+  const rows2 = page.locator('.favorites-list li')
+  const count = await rows2.count()
+  expect('셋 이상 담겨 있음', count >= 3, String(count))
+
+  // 맨 아래 줄을 맨 윗줄의 위쪽 절반에 떨어뜨립니다. 그러면 그 앞에 끼어듭니다.
+  await rows2.nth(count - 1).dragTo(rows2.nth(0), { targetPosition: { x: 30, y: 3 } })
+  await page.waitForTimeout(500)
+  const lifted = await listed()
+  console.log('  올린 뒤: ' + JSON.stringify(lifted))
+  expect('맨 아래가 맨 위로 옴', lifted[0] === order[count - 1], JSON.stringify(lifted))
+  expect('나머지 차례는 그대로',
+    JSON.stringify(lifted.slice(1)) === JSON.stringify(order.slice(0, count - 1)),
+    JSON.stringify(lifted))
+
+  // 아래쪽 절반에 놓으면 그 뒤로 갑니다.
+  await rows2.nth(0).dragTo(rows2.nth(1), { targetPosition: { x: 30, y: 34 } })
+  await page.waitForTimeout(500)
+  const swapped = await listed()
+  console.log('  내린 뒤: ' + JSON.stringify(swapped))
+  expect('첫 줄이 둘째 뒤로 감',
+    swapped[0] === lifted[1] && swapped[1] === lifted[0], JSON.stringify(swapped))
+
+  step('18. 바꾼 차례가 파일에 적히고 폴더를 다시 열어도 남는다')
+  const written = await page.evaluate(async () => {
+    const handle = await window.__mockRoot.getFileHandle('_t-wiki.favorites.json')
+    return (await handle.getFile()).text()
+  })
+  const saved = JSON.parse(written)
+  console.log('  파일: ' + JSON.stringify(saved))
+  expect('파일의 차례도 화면과 같음',
+    saved.map((one) => one.split('/').pop()).join() === swapped.join(), written)
+  await closeVault()
+  await openVault('first')
+  const reopened = await listed()
+  console.log('  다시 연 뒤: ' + JSON.stringify(reopened))
+  expect('다시 열어도 그 차례', JSON.stringify(reopened) === JSON.stringify(swapped),
+    JSON.stringify(reopened))
+
+  step('19. 끌지 않고 자판으로도 옮긴다')
+  await page.click('.favorites-list li:first-child .favorites-item')
+  await page.keyboard.press('Alt+ArrowDown')
+  await page.waitForTimeout(400)
+  const byKey = await listed()
+  console.log('  ' + JSON.stringify(byKey))
+  expect('한 칸 내려감', byKey[0] === reopened[1] && byKey[1] === reopened[0],
+    JSON.stringify(byKey))
+  await page.screenshot({ path: join(HERE, '..', 'shots', 'favorites', '05-order.png'),
+    clip: { x: 0, y: 40, width: 460, height: 320 } })
+
+  /*
+   * 걸러 보는 중에는 화면의 줄과 목록의 번호가 어긋납니다.
+   * 번호로 옮기면 가려져 있던 줄이 엉뚱하게 끌려 나옵니다.
+   */
+  step('20. 걸러 본 채로 옮겨도 가려진 줄은 제자리에 남는다')
+  await page.fill('.search-input', '.md')
+  await page.waitForTimeout(400)
+  const pair = page.locator('.favorites-list li')
+  const showing = await pair.count()
+  expect('두 줄만 보임', showing === 2, String(showing))
+  await pair.nth(1).dragTo(pair.nth(0), { targetPosition: { x: 30, y: 3 } })
+  await page.waitForTimeout(500)
+  await page.fill('.search-input', '')
+  await page.waitForTimeout(400)
+  const all = await listed()
+  console.log('  ' + JSON.stringify(all))
+  expect('가려졌던 줄은 제자리', all[0] === byKey[0], JSON.stringify(all))
+  expect('보이던 둘만 자리를 바꿈', all[1] === byKey[2] && all[2] === byKey[1],
+    JSON.stringify(all))
+
+  step('21. 콘솔 오류')
   const real = errors.filter((l) => !l.includes('404') && !l.includes('Failed to load resource'))
   if (real.length > 0) fail('콘솔', real.join('\n      '))
   else ok('콘솔 오류 없음')

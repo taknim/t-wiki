@@ -38,7 +38,7 @@ import {
 } from './lib/saveOptions'
 import { displayPath, FAVORITES_FILE, fileNameOf } from './lib/paths'
 import { loadFavorites } from './lib/store'
-import { favoritesFileBody, readFavoritesFile } from './lib/favorites'
+import { favoritesFileBody, readFavoritesFile, reorderFavorites } from './lib/favorites'
 import { vaultKeyFor } from './lib/vaultKey'
 import type { CSSProperties } from 'react'
 import type { ImageBackdrop, SidebarTab, ViewMode, VaultNode } from './types'
@@ -993,6 +993,8 @@ export default function App() {
                   setSelectedPath(null)
                 }}
                 onRemove={toggleFavorite}
+                onReorder={(from, to, place) =>
+                  applyFavorites(reorderFavorites(favorites, from, to, place))}
               />
             ) : query.trim() ? (
               <SearchPanel

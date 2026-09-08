@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import type { VaultNode } from '../types'
 import { attachmentKind, isMarkdown } from '../lib/attachments'
 import { DocIcon, FolderIcon, ImageIcon, StarIcon } from './icons'
@@ -14,6 +15,14 @@ interface FavoritesProps {
   onOpen: (path: string) => void
   onOpenDir: (path: string) => void
   onRemove: (path: string) => void
+  /** 한 줄을 다른 줄의 앞이나 뒤로 옮깁니다. */
+  onReorder: (from: string, to: string, place: 'before' | 'after') => void
+}
+
+/** 끌어 온 줄을 어느 쪽에 놓을지. 가리키는 줄의 위 절반이면 앞, 아래 절반이면 뒤입니다. */
+function placeFor(event: React.DragEvent<HTMLLIElement>): 'before' | 'after' {
+  const box = event.currentTarget.getBoundingClientRect()
+  return event.clientY < box.top + box.height / 2 ? 'before' : 'after'
 }
 
 /** 트리에 그 경로가 아직 있는지, 폴더인지 파일인지. */
@@ -48,7 +57,15 @@ function iconFor(path: string, kind: 'dir' | 'file') {
  * 열리지 않습니다. 담아 둔 것이 없으면 왜 비었는지 적어 둡니다. 탭을 골라서 온
  * 자리라, 아무 말 없이 빈 칸만 있으면 고장으로 보입니다.
  */
-export function Favorites({ paths, query, root, onOpen, onOpenDir, onRemove }: FavoritesProps) {
+export function Favorites({
+  paths, query, root, onOpen, onOpenDir, onRemove, onReorder,
+}: FavoritesProps) {
+  /*
+   * 끌고 있는 줄과, 지금 가리키는 자리.
+   * 자리를 표시해 주지 않으면 놓기 전까지 어디로 갈지 알 수 없습니다.
+   */
+  const [held, setHeld] = useState<string | null>(null)
+  const [over, setOver] = useState<{ path: string; place: 'before' | 'after' } | null>(null)
   const alive = paths
     .map((path) => ({ path, kind: findKind(root, path) }))
     .filter((entry): entry is { path: string; kind: 'dir' | 'file' } => entry.kind !== null)
@@ -74,12 +91,58 @@ export function Favorites({ paths, query, root, onOpen, onOpenDir, onRemove }: F
       {shown.map(({ path, kind }) => {
         const icon = iconFor(path, kind)
         const name = path.split('/').pop() ?? path
+        const mark = over?.path === path && held !== null && held !== path
+          ? ` is-over-${over.place}`
+          : ''
         return (
-          <li key={path}>
+          <li
+            key={path}
+            draggable
+            className={`${held === path ? 'is-held' : ''}${mark}`}
+            onDragStart={(event) => {
+              setHeld(path)
+              event.dataTransfer.effectAllowed = 'move'
+              // 자리 옮기기가 트리의 파일 옮기기와 섞이지 않도록 갈래를 따로 둡니다.
+              event.dataTransfer.setData('text/mdwiki-favorite', path)
+            }}
+            onDragOver={(event) => {
+              if (held === null) return
+              // 막지 않으면 브라우저가 놓기를 받아 주지 않습니다.
+              event.preventDefault()
+              event.dataTransfer.dropEffect = 'move'
+              const place = placeFor(event)
+              setOver((current) =>
+                current?.path === path && current.place === place ? current : { path, place })
+            }}
+            onDrop={(event) => {
+              if (held === null) return
+              event.preventDefault()
+              const place = placeFor(event)
+              setOver(null)
+              setHeld(null)
+              if (held !== path) onReorder(held, path, place)
+            }}
+            onDragEnd={() => {
+              setHeld(null)
+              setOver(null)
+            }}
+          >
             <button
               type="button"
               className="favorites-item"
               onClick={() => (kind === 'dir' ? onOpenDir(path) : onOpen(path))}
+              /*
+               * 끌지 못하는 사람도 자리를 바꿀 수 있어야 합니다.
+               * 화살표만으로는 줄 사이를 옮겨 다니는 것과 구별되지 않아 Alt 를 함께 씁니다.
+               */
+              onKeyDown={(event) => {
+                if (!event.altKey || (event.key !== 'ArrowUp' && event.key !== 'ArrowDown')) return
+                event.preventDefault()
+                const at = shown.findIndex((entry) => entry.path === path)
+                const up = event.key === 'ArrowUp'
+                const neighbour = shown[at + (up ? -1 : 1)]
+                if (neighbour) onReorder(path, neighbour.path, up ? 'before' : 'after')
+              }}
             >
               <span className={`tree-icon is-${icon.tone}`}>{icon.node}</span>
               <span className="favorites-text">

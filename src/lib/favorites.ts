@@ -28,3 +28,24 @@ export async function readFavoritesFile(
 export function favoritesFileBody(paths: string[]): string {
   return `${JSON.stringify(paths, null, 2)}\n`
 }
+
+/**
+ * 즐겨찾기 한 줄을 다른 줄의 앞이나 뒤로 옮긴 목록.
+ *
+ * 자리를 번호가 아니라 경로로 가리킵니다. 이름으로 걸러 보는 중에는 화면에 보이는
+ * 줄과 목록의 번호가 어긋나서, 번호로 옮기면 엉뚱한 줄이 자리를 바꿉니다.
+ * 걸러진 채로 옮겨도 화면에 없는 줄들의 앞뒤는 그대로 남습니다.
+ */
+export function reorderFavorites(
+  paths: string[],
+  from: string,
+  to: string,
+  place: 'before' | 'after',
+): string[] {
+  if (from === to) return paths
+  const rest = paths.filter((one) => one !== from)
+  const at = rest.indexOf(to)
+  if (at === -1) return paths
+  rest.splice(place === 'before' ? at : at + 1, 0, from)
+  return rest
+}
