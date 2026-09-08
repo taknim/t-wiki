@@ -727,7 +727,16 @@ mark { background: var(--mark); color: inherit; border-radius: 2px; }
 .markdown-body table { border-collapse: collapse; display: block; overflow-x: auto; margin-bottom: 12px; }
 .markdown-body th, .markdown-body td { border: 1px solid var(--border); padding: 6px 10px; }
 .markdown-body th { background: var(--bg-sunken); }
-.markdown-body img { max-width: 100%; }
+/*
+ * 문서 안 그림. 고른 최대 너비와 본문 너비 가운데 좁은 쪽을 씁니다.
+ * max-width 라 작은 그림은 늘어나지 않고, 큰 것만 줄어듭니다.
+ */
+.markdown-body img { max-width: min(100%, var(--img-width, 100%)); }
+/*
+ * 한 줄을 통째로 차지하는 그림만 세웁니다. 글줄에 섞여 흐르는 그림까지 옮기면
+ * 그 문단의 글자가 함께 밀려납니다.
+ */
+.markdown-body p:has(> img:only-child) { text-align: var(--img-align, start); }
 .markdown-body hr { border: 0; border-top: 1px solid var(--border); margin: 20px 0; }
 
 .markdown-body a.wikilink {
@@ -1451,7 +1460,8 @@ a.btn { text-decoration: none; color: inherit; display: inline-block; }
   min-height: 0;
   display: flex;
   align-items: center;
-  justify-content: center;
+  /* 세우는 자리와 최대 너비는 문서 안 그림과 같은 설정을 따릅니다. */
+  justify-content: var(--img-align, start);
   padding: 16px;
 }
 /* 손대지 않은 본디 모습. 이것만 테마를 따릅니다. */
@@ -1483,7 +1493,7 @@ a.btn { text-decoration: none; color: inherit; display: inline-block; }
  * 밝은 바탕에서는 안쪽 금이, 어두운 바탕에서는 바깥 테가 보입니다.
  */
 .asset-image {
-  max-width: 100%;
+  max-width: min(100%, var(--img-width, 100%));
   max-height: 100%;
   object-fit: contain;
   align-self: center;
@@ -1505,7 +1515,8 @@ a.btn { text-decoration: none; color: inherit; display: inline-block; }
   border-radius: 8px;
   background: var(--bg-sunken);
   font-family: var(--mono);
-  font-size: 12px;
+  /* 마크다운 코드 블록과 같은 배수를 씁니다. 한 문서 안에서 크기가 갈리면 어수선합니다. */
+  font-size: calc(var(--doc-size, 15px) * 0.9);
   line-height: var(--doc-leading, 1.7);
   white-space: pre-wrap;
   word-break: break-word;
@@ -1675,8 +1686,11 @@ a.btn { text-decoration: none; color: inherit; display: inline-block; }
 
 /* ---------- 글자 파일 미리보기 ---------- */
 
+/*
+ * 마크다운이 아닌 글도 문서입니다. 너비·글꼴·글자 크기·줄 간격을 똑같이 따릅니다.
+ * 한때 여기만 창 끝까지 늘여 두었는데, 같은 설정을 두고 화면마다 다르게 보였습니다.
+ */
 .text-preview { padding: 16px 20px; }
-.text-preview > * { max-width: none; margin-inline: 0; }
 
 .table-wrap {
   overflow: auto;
@@ -1685,7 +1699,8 @@ a.btn { text-decoration: none; color: inherit; display: inline-block; }
 }
 .data-table {
   border-collapse: collapse;
-  font-size: 13px;
+  /* 본문보다 조금 작게. 배수라 글자 크기를 바꾸면 함께 움직입니다. */
+  font-size: calc(var(--doc-size, 15px) * 0.9);
   width: 100%;
 }
 .data-table th,
@@ -1720,7 +1735,8 @@ a.btn { text-decoration: none; color: inherit; display: inline-block; }
   border-radius: 8px;
   background: var(--bg-sunken);
   font-family: var(--mono);
-  font-size: 12px;
+  /* 마크다운 코드 블록과 같은 배수를 씁니다. 한 문서 안에서 크기가 갈리면 어수선합니다. */
+  font-size: calc(var(--doc-size, 15px) * 0.9);
   line-height: var(--doc-leading, 1.7);
   overflow: auto;
 }

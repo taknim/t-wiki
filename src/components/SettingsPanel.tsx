@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
-  FONTS, LEADINGS, SIZES, THEMES, WIDTHS,
+  FONTS, IMAGE_ALIGNS, IMAGE_WIDTHS, LEADINGS, SIZES, THEMES, WIDTHS,
   type FontId, type LeadingId, type ModeSetting, type SizeId, type ThemeId, type WidthId,
 } from '../lib/theme'
 import type { GitHubSync } from '../hooks/useGitHubSync'
@@ -733,7 +733,7 @@ export function SettingsPanel({
                   data-tip={
                     width.value === 'none'
                       ? '창 너비를 다 씁니다'
-                      : `한 줄이 ${width.value} 를 넘지 않게 가운데로 모읍니다`
+                      : `글·표·코드가 ${width.value} 를 넘지 않게 묶습니다`
                   }
                   aria-pressed={width.id === settings.width}
                   onClick={() => update({ width: width.id as WidthId })}
@@ -742,6 +742,54 @@ export function SettingsPanel({
                 </button>
               ))}
             </div>
+          </section>
+
+          <section className="field">
+            <label>이미지 정렬</label>
+            <div className="segmented" role="group" aria-label="이미지 정렬">
+              {IMAGE_ALIGNS.map((align) => (
+                <button
+                  key={align.id}
+                  type="button"
+                  className={align.id === settings.imageAlign ? 'is-active' : ''}
+                  data-tip={`한 줄을 통째로 차지하는 그림을 ${align.name}에 세웁니다`}
+                  aria-pressed={align.id === settings.imageAlign}
+                  onClick={() => update({ imageAlign: align.id })}
+                >
+                  {align.name}
+                </button>
+              ))}
+            </div>
+            <p className="hint">
+              문서 안의 그림과 그림 파일 미리보기에 함께 걸립니다.
+              글줄 사이에 섞여 흐르는 그림은 글을 따라가므로 건드리지 않습니다.
+            </p>
+          </section>
+
+          <section className="field">
+            <label>이미지 최대 너비</label>
+            <div className="segmented" role="group" aria-label="이미지 최대 너비">
+              {IMAGE_WIDTHS.map((width) => (
+                <button
+                  key={width.id}
+                  type="button"
+                  className={width.id === settings.imageWidth ? 'is-active' : ''}
+                  data-tip={
+                    width.value === '100%'
+                      ? '본문 너비까지 그대로 씁니다'
+                      : `${width.value} 보다 큰 그림만 줄여 보여 줍니다`
+                  }
+                  aria-pressed={width.id === settings.imageWidth}
+                  onClick={() => update({ imageWidth: width.id })}
+                >
+                  {width.name}
+                </button>
+              ))}
+            </div>
+            <p className="hint">
+              <strong>큰 그림만 줄이고 작은 그림은 늘리지 않습니다.</strong>
+              본문 너비보다 커지는 일도 없습니다. 둘 가운데 좁은 쪽을 씁니다.
+            </p>
           </section>
 
           <section className="field">

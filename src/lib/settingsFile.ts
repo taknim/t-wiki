@@ -1,5 +1,6 @@
 import {
-  DEFAULT_SETTINGS, FONTS, LEADINGS, SIZES, THEMES, WIDTHS, type ThemeSettings,
+  DEFAULT_SETTINGS, FONTS, IMAGE_ALIGNS, IMAGE_WIDTHS, LEADINGS, SIZES, THEMES, WIDTHS,
+  type ThemeSettings,
 } from './theme'
 import {
   clampSidebarWidth, clampSplitRatio, DEFAULT_IMAGE_BACKDROP, DEFAULT_SAVE_OPTIONS,
@@ -128,6 +129,8 @@ export function parseBundle(raw: string): SettingsBundle | null {
       size: pick(appearance.size, SIZES, DEFAULT_SETTINGS.size),
       leading: pick(appearance.leading, LEADINGS, DEFAULT_SETTINGS.leading),
       width: pick(appearance.width, WIDTHS, DEFAULT_SETTINGS.width),
+      imageAlign: pick(appearance.imageAlign, IMAGE_ALIGNS, DEFAULT_SETTINGS.imageAlign),
+      imageWidth: pick(appearance.imageWidth, IMAGE_WIDTHS, DEFAULT_SETTINGS.imageWidth),
     },
     general: {
       rememberSession: bool(general.rememberSession, true),

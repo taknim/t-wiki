@@ -6,6 +6,8 @@ export type FontId = 'sans' | 'serif' | 'mono'
 export type SizeId = 'smallest' | 'small' | 'medium' | 'large' | 'largest'
 export type LeadingId = 'tightest' | 'tight' | 'normal' | 'loose' | 'loosest'
 export type WidthId = 'narrow' | 'medium' | 'wide'
+export type ImageAlignId = 'start' | 'center' | 'end'
+export type ImageWidthId = 'full' | 'large' | 'medium' | 'small'
 
 export interface ThemeSettings {
   theme: ThemeId
@@ -14,6 +16,8 @@ export interface ThemeSettings {
   size: SizeId
   leading: LeadingId
   width: WidthId
+  imageAlign: ImageAlignId
+  imageWidth: ImageWidthId
 }
 
 export const DEFAULT_SETTINGS: ThemeSettings = {
@@ -23,6 +27,8 @@ export const DEFAULT_SETTINGS: ThemeSettings = {
   size: 'medium',
   leading: 'normal',
   width: 'medium',
+  imageAlign: 'start',
+  imageWidth: 'full',
 }
 
 /** CSS 변수로 내보낼 색 한 벌. */
@@ -471,6 +477,31 @@ export const WIDTHS: { id: WidthId; name: string; value: string }[] = [
   { id: 'wide', name: '넓게', value: 'none' },
 ]
 
+/*
+ * 그림을 어느 쪽에 세울지. 글줄 안에 섞여 흐르는 그림은 그대로 두고,
+ * 한 줄을 통째로 차지하는 그림에만 걸립니다.
+ * start·center·end 는 text-align 과 justify-content 에 그대로 쓰이는 말이라,
+ * 문서 안 그림과 그림 파일 미리보기가 같은 값 하나로 함께 움직입니다.
+ */
+export const IMAGE_ALIGNS: { id: ImageAlignId; name: string; value: string }[] = [
+  { id: 'start', name: '왼쪽', value: 'start' },
+  { id: 'center', name: '가운데', value: 'center' },
+  { id: 'end', name: '오른쪽', value: 'end' },
+]
+
+/*
+ * 그림의 최대 너비.
+ *
+ * 넘치는 것만 줄이고 작은 그림은 그대로 둡니다(max-width 는 늘리지 않습니다).
+ * 본문 너비보다 커지는 일도 없습니다. 두 값 가운데 작은 쪽을 씁니다.
+ */
+export const IMAGE_WIDTHS: { id: ImageWidthId; name: string; value: string }[] = [
+  { id: 'full', name: '제한 없음', value: '100%' },
+  { id: 'large', name: '크게', value: '720px' },
+  { id: 'medium', name: '보통', value: '520px' },
+  { id: 'small', name: '작게', value: '320px' },
+]
+
 export function themeById(id: ThemeId): Theme {
   return THEMES.find((theme) => theme.id === id) ?? THEMES[0]
 }
@@ -525,11 +556,15 @@ export function applyTheme(settings: ThemeSettings, isDark: boolean): void {
   const size = SIZES.find((item) => item.id === settings.size) ?? SIZES[2]
   const leading = LEADINGS.find((item) => item.id === settings.leading) ?? LEADINGS[2]
   const width = WIDTHS.find((item) => item.id === settings.width) ?? WIDTHS[1]
+  const align = IMAGE_ALIGNS.find((item) => item.id === settings.imageAlign) ?? IMAGE_ALIGNS[0]
+  const imageWidth = IMAGE_WIDTHS.find((item) => item.id === settings.imageWidth) ?? IMAGE_WIDTHS[0]
 
   root.style.setProperty('--doc-font', font.stack)
   root.style.setProperty('--doc-size', size.value)
   root.style.setProperty('--doc-leading', leading.value)
   root.style.setProperty('--doc-width', width.value)
+  root.style.setProperty('--img-align', align.value)
+  root.style.setProperty('--img-width', imageWidth.value)
 
   // 스크롤 막대와 기본 폼 요소도 같이 맞춰 줍니다.
   root.style.colorScheme = isDark ? 'dark' : 'light'
@@ -555,6 +590,12 @@ export function loadSettings(): ThemeSettings {
       size: SIZES.some((s) => s.id === parsed.size) ? parsed.size! : DEFAULT_SETTINGS.size,
       leading: LEADINGS.some((l) => l.id === parsed.leading) ? parsed.leading! : DEFAULT_SETTINGS.leading,
       width: WIDTHS.some((w) => w.id === parsed.width) ? parsed.width! : DEFAULT_SETTINGS.width,
+      imageAlign: IMAGE_ALIGNS.some((a) => a.id === parsed.imageAlign)
+        ? parsed.imageAlign!
+        : DEFAULT_SETTINGS.imageAlign,
+      imageWidth: IMAGE_WIDTHS.some((w) => w.id === parsed.imageWidth)
+        ? parsed.imageWidth!
+        : DEFAULT_SETTINGS.imageWidth,
     }
   } catch {
     return DEFAULT_SETTINGS

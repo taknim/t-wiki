@@ -21,6 +21,24 @@ await page.addInitScript(() => {
   // 표와 코드가 든 문서. 씨앗에는 둘 다 없어 너비를 견줄 수 없습니다.
   const root = window.__mockRoot
   const sample = root._children.get('개발 환경.md')
+  const seed = (name, data) => root._children.set(name, Object.assign(
+    Object.create(Object.getPrototypeOf(sample)),
+    { kind: 'file', name, _data: data, _lastModified: Date.now() },
+  ))
+  // 큰 그림. 줄여 보여 주는지 보려면 본문 너비보다 넓어야 합니다.
+  root._children.get('첨부')._children.set('큰그림.svg', Object.assign(
+    Object.create(Object.getPrototypeOf(sample)),
+    {
+      kind: 'file',
+      name: '큰그림.svg',
+      _lastModified: Date.now(),
+      _data: '<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="300">'
+        + '<rect width="1200" height="300" fill="#2f6feb"/></svg>',
+    },
+  ))
+  seed('그림 문서.md', '# 그림\n\n앞 글줄입니다.\n\n![큰그림](첨부/큰그림.svg)\n')
+  seed('자료.csv', '가,나,다\n하나,둘,셋\n넷,다섯,여섯\n')
+  seed('쪽지.json', '{\n  "이름": "값",\n  "수": 12\n}\n')
   root._children.set('너비.md', Object.assign(
     Object.create(Object.getPrototypeOf(sample)),
     {
@@ -44,6 +62,12 @@ const openVault = async () => {
 const openDoc = async (label) => {
   await page.click(`.tree-row:has-text("${label}")`)
   await page.waitForSelector('.editor', { timeout: 8000 })
+  await page.waitForTimeout(400)
+}
+/** 보기 모드는 폴더마다 기억되므로, 편집기가 없는 화면에서는 볼 것을 따로 짚습니다. */
+const openAs = async (label, selector) => {
+  await page.click(`.tree-row:has-text("${label}")`)
+  await page.waitForSelector(selector, { timeout: 8000 })
   await page.waitForTimeout(400)
 }
 /** 모양 묶음을 펴고 그 안의 단추를 누릅니다. 이름이 서로 겹쳐 통째로 같은 것만 짚습니다. */
@@ -317,6 +341,99 @@ try {
   console.log('  ' + JSON.stringify(scrolls))
   expect('긴 코드는 옆으로 굴러감', scrolls.code === true, JSON.stringify(scrolls))
   await pick('본문 너비', '보통')
+
+  step('10. 마크다운이 아닌 글도 같은 너비와 글자 크기를 따른다')
+  await openAs('자료.csv', '.text-preview')
+  const csv = await page.evaluate(() => {
+    const wrap = document.querySelector('.text-preview .table-wrap')
+    const table = document.querySelector('.data-table')
+    return {
+      width: wrap ? Math.round(wrap.getBoundingClientRect().width) : null,
+      pane: Math.round(document.querySelector('.preview').getBoundingClientRect().width),
+      size: table ? getComputedStyle(table).fontSize : null,
+    }
+  })
+  console.log('  표: ' + JSON.stringify(csv))
+  expect('표도 본문 너비에 섬', csv.width === 840, JSON.stringify(csv))
+  expect('창은 그보다 넓음', csv.pane > csv.width, JSON.stringify(csv))
+  expect('글자 크기도 본문을 따름', csv.size === '13.5px', String(csv.size))
+
+  await openAs('쪽지.json', '.code-preview')
+  const json = await page.evaluate(() => {
+    const code = document.querySelector('.code-preview')
+    return {
+      width: Math.round(code.getBoundingClientRect().width),
+      size: getComputedStyle(code).fontSize,
+      leading: getComputedStyle(code).lineHeight,
+    }
+  })
+  console.log('  코드: ' + JSON.stringify(json))
+  expect('코드도 본문 너비에 섬', json.width === 840, JSON.stringify(json))
+  expect('글자 크기도 본문을 따름', json.size === '13.5px', String(json.size))
+
+  // 크기를 키우면 첨부 미리보기의 글씨도 함께 커져야 합니다.
+  await pick('글자 크기', '아주 크게')
+  const grown = await page.evaluate(() =>
+    getComputedStyle(document.querySelector('.code-preview')).fontSize)
+  console.log('  키운 뒤: ' + grown)
+  expect('키우면 함께 커짐', parseFloat(grown) > parseFloat(json.size), `${json.size} -> ${grown}`)
+  await pick('글자 크기', '보통')
+
+  step('11. 큰 그림만 줄이고 고른 자리에 세운다')
+  await openAs('그림 문서', '.preview img')
+  const shot = () => page.evaluate(() => {
+    const image = document.querySelector('.preview img')
+    const line = document.querySelector('.preview > p')
+    const box = image.getBoundingClientRect()
+    const column = line.getBoundingClientRect()
+    return {
+      natural: image.naturalWidth,
+      width: Math.round(box.width),
+      // 글줄을 잣대로 어느 쪽에 붙었는지 봅니다.
+      left: Math.round(box.left - column.left),
+      right: Math.round(column.right - box.right),
+    }
+  })
+
+  await pick('이미지 최대 너비', '제한 없음')
+  const full = await shot()
+  console.log('  제한 없음: ' + JSON.stringify(full))
+  expect('본문 너비까지만 커짐', full.natural === 1200 && full.width === 840, JSON.stringify(full))
+
+  await pick('이미지 최대 너비', '보통')
+  const half = await shot()
+  console.log('  보통: ' + JSON.stringify(half))
+  expect('520 으로 줄어듦', half.width === 520, JSON.stringify(half))
+  expect('왼쪽에 붙어 있음', half.left === 0, JSON.stringify(half))
+
+  await pick('이미지 정렬', '가운데')
+  const middle = await shot()
+  console.log('  가운데: ' + JSON.stringify(middle))
+  expect('양옆이 같음', Math.abs(middle.left - middle.right) <= 1, JSON.stringify(middle))
+
+  await pick('이미지 정렬', '오른쪽')
+  const right = await shot()
+  console.log('  오른쪽: ' + JSON.stringify(right))
+  expect('오른쪽에 붙음', right.right === 0 && right.left > 0, JSON.stringify(right))
+
+  // 작은 그림은 늘리지 않습니다.
+  await pick('이미지 최대 너비', '크게')
+  await openAs('도표.svg', '.asset-canvas')
+  const small = await page.evaluate(() => {
+    const image = document.querySelector('.asset-image')
+    const canvas = document.querySelector('.asset-canvas')
+    return {
+      width: Math.round(image.getBoundingClientRect().width),
+      natural: image.naturalWidth,
+      justify: getComputedStyle(canvas).justifyContent,
+    }
+  })
+  console.log('  작은 그림: ' + JSON.stringify(small))
+  expect('작은 그림은 그대로', small.width === small.natural, JSON.stringify(small))
+  expect('그림 파일 미리보기도 같은 자리를 따름', small.justify === 'right' || small.justify === 'end',
+    String(small.justify))
+  await pick('이미지 정렬', '왼쪽')
+  await pick('이미지 최대 너비', '제한 없음')
 } catch (cause) {
   fail('묶음이 도중에 멈춤', cause instanceof Error ? (cause.stack ?? cause.message) : String(cause))
 } finally {

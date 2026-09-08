@@ -247,6 +247,9 @@ try {
   await page.click('.theme-card:has-text("세피아")')
   // 줄 간격도 기본에서 옮겨 둡니다. 꾸러미에 넣는 것을 잊으면 여기서 걸립니다.
   await page.click('[aria-label="줄 간격"] button:has-text("넓게")')
+  // 그림 자리와 최대 너비도 같은 까닭으로 옮겨 둡니다.
+  await page.click('[aria-label="이미지 정렬"] button:text-is("가운데")')
+  await page.click('[aria-label="이미지 최대 너비"] button:text-is("보통")')
   await page.click('.settings-nav button:has-text("일반")')
   // 이 화면에서 켜고 끌 수 있는 것을 모두 뒤집어 둡니다.
   for (const label of ['마지막 상태로', '고른 이미지를', '줄 끝 공백', '들여쓰기 다시 잡기']) {
