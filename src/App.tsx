@@ -36,7 +36,7 @@ import {
   readSidebarWidth, readSplitRatio, writeImageBackdrop, writeImagePreview, writeSidebarOpen,
   writeSidebarTab, writeSidebarWidth, writeSplitRatio,
 } from './lib/saveOptions'
-import { displayPath, FAVORITES_FILE, fileNameOf } from './lib/paths'
+import { displayPath, FAVORITES_FILE, fileNameOf, isAppFile } from './lib/paths'
 import { loadFavorites } from './lib/store'
 import { favoritesFileBody, readFavoritesFile, reorderFavorites } from './lib/favorites'
 import { vaultKeyFor } from './lib/vaultKey'
@@ -1138,6 +1138,16 @@ export default function App() {
                   <span className={dirty ? 'pill' : 'pill pill-ok'}>{dirty ? '저장 중…' : '저장됨'}</span>
                 )}
                 {selection.kind !== 'dir' && !editableText && <span className="pill">읽기 전용</span>}
+                {/*
+                  앱이 쓰는 살림 파일입니다. 트리에는 감춰 두었지만 동기화 결과에서는
+                  이름이 나오고, 그 이름을 눌러 여기까지 올 수 있습니다.
+                  손대면 즐겨찾기가 통째로 흐트러지므로 열자마자 눈에 띄게 알립니다.
+                */}
+                {isAppFile(selection.path) && (
+                  <span className="head-warn">
+                    앱이 쓰는 파일입니다. 고치면 즐겨찾기가 흐트러질 수 있습니다
+                  </span>
+                )}
                 {editableText && textPreview && (
                   <ViewModeSwitch mode={viewMode} onChange={setViewMode} />
                 )}

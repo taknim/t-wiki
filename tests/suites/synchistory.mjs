@@ -352,6 +352,8 @@ try {
   expect('겹쳐 뜬 창이 모두 닫힘', landed.sheets === 0, JSON.stringify(landed))
   expect('그 문서가 열림', landed.path === '/회사/온보딩.md', JSON.stringify(landed))
   expect('편집기까지 떠 있음', landed.editor === 1, JSON.stringify(landed))
+  expect('보통 문서에는 겁주는 글이 없음',
+    (await page.locator('.head-warn').count()) === 0)
   await page.screenshot({ path: join(HERE, '..', 'shots', 'synchistory', '04-opened.png') })
 
   step('11. 경로 가운데 폴더를 누르면 그 폴더가 열린다')
@@ -393,7 +395,59 @@ try {
   await page.click('[aria-label="설정"] .sheet-close')
   await page.waitForTimeout(300)
 
-  step('13. 폴더가 다르면 기록도 남남이다')
+  /*
+   * 즐겨찾기 파일은 트리에 감춰 두었지만 동기화 결과에는 이름이 나옵니다.
+   * 그 이름을 눌러 열 수 있게 되었으므로, 손대면 안 된다는 것을 알려야 합니다.
+   */
+  step('13. 앱이 쓰는 파일을 열면 조심하라고 알린다')
+  // 별을 눌러야 그 파일이 생깁니다.
+  await page.hover('.tree-row:has-text("개발 환경")')
+  await page.click('.tree-row:has-text("개발 환경") .tree-tools button[aria-label^="즐겨찾기"]')
+  await page.waitForTimeout(600)
+  await seedRun({
+    at: Date.now(),
+    trigger: 'manual',
+    commitSha: null,
+    error: null,
+    cut: 0,
+    log: [{
+      path: '_t-wiki.favorites.json',
+      action: 'upload-new',
+      status: 'ok',
+      detail: '로컬에만 있음',
+    }],
+  })
+  await closeVault()
+  await openVault('first')
+  await openSync()
+  await openHistory()
+  await page.click('.run:first-child .run-open')
+  await page.waitForTimeout(300)
+  await page.click('.run .plan .plan-open:text-is("_t-wiki.favorites.json")')
+  await page.waitForTimeout(700)
+  const warned = await page.evaluate(() => {
+    const warn = document.querySelector('.doc-head .head-warn')
+    const tone = warn ? getComputedStyle(warn).color.match(/\d+/g).map(Number) : null
+    const saved = [...document.querySelectorAll('.doc-head .pill')].map((one) => one.textContent)
+    return {
+      path: document.querySelector('.info-path')?.textContent ?? null,
+      text: warn?.textContent.trim() ?? null,
+      tone,
+      saved,
+      // "저장됨" 알약 바로 옆에 서야 눈에 들어옵니다.
+      beside: warn?.previousElementSibling?.classList.contains('pill') ?? false,
+    }
+  })
+  console.log('  ' + JSON.stringify(warned))
+  expect('그 파일이 열림', warned.path === '/_t-wiki.favorites.json', JSON.stringify(warned))
+  expect('조심하라고 적힘', (warned.text ?? '').includes('앱이 쓰는 파일'), String(warned.text))
+  expect('붉은 글씨', warned.tone !== null && warned.tone[0] > warned.tone[1] + 40
+    && warned.tone[0] > warned.tone[2] + 40, JSON.stringify(warned.tone))
+  expect('저장됨 알약 옆에 섬', warned.beside === true, JSON.stringify(warned))
+  await page.screenshot({ path: join(HERE, '..', 'shots', 'synchistory', '05-appfile.png'),
+    clip: { x: 430, y: 60, width: 970, height: 120 } })
+
+  step('14. 폴더가 다르면 기록도 남남이다')
   await closeVault()
   await openVault('other')
   await openSync()
