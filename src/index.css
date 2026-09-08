@@ -814,6 +814,11 @@ mark { background: var(--mark); color: inherit; border-radius: 2px; }
   padding: 6px 8px;
   border-bottom: 1px solid var(--border);
 }
+/*
+ * 마지막 줄의 밑줄은 지웁니다. 펼친 회차에서는 이 줄 바로 아래에 회차를 가르는
+ * 줄이 또 있어, 밑줄 두 개가 나란히 그어집니다.
+ */
+.plan li:last-child { border-bottom: 0; }
 .plan-action { color: var(--text-muted); }
 .plan-path { font-family: var(--mono); word-break: break-all; }
 .plan-reason { color: var(--text-muted); text-align: end; overflow-wrap: anywhere; }
@@ -822,7 +827,21 @@ mark { background: var(--mark); color: inherit; border-radius: 2px; }
 
 /* ---------- 지난 동기화 결과 ---------- */
 
-.run-list { list-style: none; margin: 12px 0 0; padding: 0; }
+/*
+ * 열 줄쯤 담을 자리를 미리 잡아 둡니다. 목록에 맞춰 창이 늘었다 줄었다 하면
+ * 회차를 하나 펼 때마다 창 크기가 출렁이고, 발치의 단추도 함께 뜁니다.
+ * 넘치는 것은 이 안에서 굴려 봅니다.
+ */
+.run-list {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  height: 360px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+/* 굴림 칸 안에 또 굴림 칸을 두면 어느 것이 움직일지 알 수 없습니다. */
+.run .plan { max-height: none; overflow: visible; }
 .run { border-bottom: 1px solid var(--border); }
 .run-head { display: flex; align-items: baseline; gap: 8px; }
 /*

@@ -169,6 +169,13 @@ try {
   console.log('  첫 줄: ' + JSON.stringify(line))
   expect('경로가 적혀 있음', line.path.includes('.md'), line.path)
   expect('까닭이 경로와 한 줄에 섬', line.sameLine, JSON.stringify(line))
+  /* 펼친 줄의 밑줄과 회차를 가르는 줄이 겹쳐 두 줄로 그어지면 안 됩니다. */
+  const edges = await page.evaluate(() => {
+    const last = [...document.querySelectorAll('.run .plan li')].pop()
+    const style = last ? getComputedStyle(last) : null
+    return { width: style?.borderBottomWidth ?? null }
+  })
+  expect('마지막 줄에는 밑줄이 없음', edges.width === '0px', JSON.stringify(edges))
   await page.screenshot({ path: join(HERE, '..', 'shots', 'synchistory', '02-open.png') })
 
   step('4. 그 줄의 커밋 이름이 커밋으로 가는 길이다')
@@ -239,6 +246,19 @@ try {
   console.log('  돌린 뒤: ' + capped.length + '줄')
   expect('백 줄에서 멈춤', capped.length === 100, String(capped.length))
   expect('가장 새것이 맨 위', capped[0].when.includes('.'), JSON.stringify(capped[0]))
+
+  /* 자리는 열 줄만 잡고 나머지는 그 안에서 굴려 봅니다. */
+  const area = await page.evaluate(() => {
+    const list = document.querySelector('.run-list')
+    const row = document.querySelector('.run')
+    return {
+      fits: Math.round(list.clientHeight / row.getBoundingClientRect().height),
+      scrolls: list.scrollHeight > list.clientHeight + 4,
+    }
+  })
+  console.log('  ' + JSON.stringify(area))
+  expect('열 줄쯤 보임', area.fits === 10, JSON.stringify(area))
+  expect('나머지는 굴려 봄', area.scrolls, JSON.stringify(area))
 
   /*
    * 목록 안에 두면 백 줄을 굴려 내려가야 닿습니다. 창 안에 있는지가 아니라
