@@ -265,7 +265,18 @@ try {
       const node = document.querySelector(selector)
       return node ? Math.round(node.getBoundingClientRect().width) : null
     }
-    return { pane: at('.preview'), text: at('.preview > p'), code: at('.preview > pre'), table: at('.preview > table') }
+    const left = (selector) => {
+      const node = document.querySelector(selector)
+      return node ? Math.round(node.getBoundingClientRect().left) : null
+    }
+    return {
+      pane: at('.preview'),
+      text: at('.preview > p'),
+      code: at('.preview > pre'),
+      table: at('.preview > table'),
+      // 왼쪽 끝이 어긋나면 표와 코드만 가운데로 밀려난 것입니다.
+      edges: [left('.preview > p'), left('.preview > pre'), left('.preview > table')],
+    }
   })
 
   await pick('본문 너비', '보통')
@@ -275,6 +286,7 @@ try {
   expect('코드도 같은 폭', medium.code === medium.text, JSON.stringify(medium))
   expect('표도 같은 폭', medium.table === medium.text, JSON.stringify(medium))
   expect('창은 그보다 넓음', medium.pane > medium.text, JSON.stringify(medium))
+  expect('셋 다 왼쪽 끝이 같음', new Set(medium.edges).size === 1, JSON.stringify(medium.edges))
   await page.screenshot({ path: join(HERE, '..', 'shots', 'typography', '03-width.png') })
 
   await pick('본문 너비', '좁게')
@@ -283,6 +295,7 @@ try {
   expect('좁게는 680', narrow.text === 680, JSON.stringify(narrow))
   expect('코드와 표도 함께 좁아짐',
     narrow.code === 680 && narrow.table === 680, JSON.stringify(narrow))
+  expect('좁혀도 왼쪽 끝은 그대로', new Set(narrow.edges).size === 1, JSON.stringify(narrow.edges))
 
   await pick('본문 너비', '넓게')
   const wide = await widths()
