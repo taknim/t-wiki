@@ -11,27 +11,18 @@ interface AssetViewProps {
   size: number
   /** 이미지를 그려 볼지. 꺼 두면 파일을 읽지도 않고 안내만 내놓습니다. */
   imagePreview: boolean
-  /** 그림 뒤에 깔 바탕. */
+  /** 그림 뒤에 깔 바탕. 고르는 자리는 제목 줄입니다. */
   backdrop: ImageBackdrop
-  onBackdrop: (next: ImageBackdrop) => void
 }
 
 /** 텍스트 미리보기에서 한 번에 읽을 최대 길이. 큰 로그 파일로 화면이 멎지 않게 합니다. */
 const TEXT_PREVIEW_LIMIT = 200_000
 
-const BACKDROPS: { key: ImageBackdrop; label: string; tip: string }[] = [
-  { key: 'checker', label: '바둑판', tip: '투명한 자리가 어디인지 드러냅니다' },
-  { key: 'light', label: '밝게', tip: '어두운 그림을 흰 바탕에 놓고 봅니다' },
-  { key: 'dark', label: '어둡게', tip: '흰 로고처럼 밝은 그림을 어두운 바탕에 놓고 봅니다' },
-]
-
 /**
  * 마크다운이 아닌 파일은 고쳐 쓸 수 없으므로 보여 주기만 합니다.
  * 이미지와 PDF 는 그대로 띄우고, 텍스트 계열은 내용을 읽어 보여 줍니다.
  */
-export function AssetView({
-  root, path, size, imagePreview, backdrop, onBackdrop,
-}: AssetViewProps) {
+export function AssetView({ root, path, size, imagePreview, backdrop }: AssetViewProps) {
   const [url, setUrl] = useState<string | null>(null)
   const [text, setText] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -112,34 +103,15 @@ export function AssetView({
         </p>
       )}
 
+      {/*
+        그림이 바탕에 묻히는 일이 잦습니다. 흰 로고는 밝은 테마에서, 어두운 도표는
+        어두운 테마에서 사라집니다. 그래서 뒤에 깔 바탕을 고를 수 있게 두었고,
+        고르는 자리는 제목 줄(BackdropSwitch)입니다.
+      */}
       {kind === 'image' && !skipped && url && (
-        <>
-          {/*
-            그림이 바탕에 묻히는 일이 잦습니다. 흰 로고는 밝은 테마에서, 어두운 도표는
-            어두운 테마에서 사라집니다. 투명한 그림은 어느 쪽에서든 반쯤 지워집니다.
-            그래서 그림 뒤에 깔 바탕을 손으로 고를 수 있게 둡니다.
-          */}
-          <div className="asset-tools">
-            <span className="asset-tools-label">배경</span>
-            <div className="backdrop-switch" role="group" aria-label="이미지 배경">
-              {BACKDROPS.map((entry) => (
-                <button
-                  key={entry.key}
-                  type="button"
-                  className={backdrop === entry.key ? 'is-active' : ''}
-                  data-tip={entry.tip}
-                  aria-pressed={backdrop === entry.key}
-                  onClick={() => onBackdrop(entry.key)}
-                >
-                  {entry.label}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className={`asset-canvas is-${backdrop}`}>
-            <img className="asset-image" src={url} alt={name} />
-          </div>
-        </>
+        <div className={`asset-canvas is-${backdrop}`}>
+          <img className="asset-image" src={url} alt={name} />
+        </div>
       )}
 
       {kind === 'pdf' && url && <iframe className="asset-frame" src={url} title={name} />}

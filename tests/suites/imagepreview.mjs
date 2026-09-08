@@ -42,7 +42,7 @@ const setPreview = async (on) => {
   await page.waitForTimeout(400)
 }
 
-/** 그림 뒤에 깔린 바탕. */
+/** 그림 뒤에 깔린 바탕. 고르는 줄은 제목 줄에 있습니다. */
 const canvas = () => page.evaluate(() => {
   const box = document.querySelector('.asset-canvas')
   if (!box) return null
@@ -51,11 +51,19 @@ const canvas = () => page.evaluate(() => {
   return {
     kind: [...box.classList].find((name) => name.startsWith('is-')) ?? null,
     color: style.backgroundColor,
-    checkered: style.backgroundImage.includes('linear-gradient'),
     sameAsPage: style.backgroundColor === page.backgroundColor,
     pressed: [...document.querySelectorAll('.backdrop-switch button')]
       .filter((button) => button.getAttribute('aria-pressed') === 'true')
       .map((button) => button.textContent),
+    // 제목과 윗변이 같으면 한 줄에 나란히 선 것입니다.
+    besideTitle: (() => {
+      const title = document.querySelector('.doc-head h1')
+      const tools = document.querySelector('.doc-head .backdrop-switch')
+      if (!title || !tools) return false
+      const a = title.getBoundingClientRect()
+      const b = tools.getBoundingClientRect()
+      return b.top < a.bottom && b.bottom > a.top && b.left > a.right
+    })(),
   }
 })
 
@@ -131,25 +139,73 @@ try {
   expect('안내는 사라짐', back.note === null, JSON.stringify(back))
   await page.screenshot({ path: join(HERE, '..', 'shots', 'imagepreview', '02-on.png') })
 
-  step('7. 그림 뒤에는 바둑판이 깔린다')
-  const board = await canvas()
-  console.log('  ' + JSON.stringify(board))
-  expect('바둑판이 기본', board?.kind === 'is-checker', JSON.stringify(board))
-  expect('투명한 자리가 드러남', board?.checkered === true, JSON.stringify(board))
-  expect('고른 것이 눌린 채로 보임', board?.pressed.join() === '바둑판', JSON.stringify(board))
+  step('7. 처음에는 본디 바탕 그대로다')
+  const plain = await canvas()
+  console.log('  ' + JSON.stringify(plain))
+  expect('기존이 기본', plain?.kind === 'is-theme', JSON.stringify(plain))
+  expect('화면 바탕과 같은 색', plain?.sameAsPage === true, JSON.stringify(plain))
+  expect('고른 것이 눌린 채로 보임', plain?.pressed.join() === '기존', JSON.stringify(plain))
+  // 보기 모드와 같은 자리입니다. 그림 위에 따로 한 줄을 더 쓰지 않습니다.
+  expect('제목과 같은 줄에 섬', plain?.besideTitle === true, JSON.stringify(plain))
 
-  step('8. 어둡게로 돌리면 어두운 바탕이 깔린다')
-  await page.click('.backdrop-switch button:text-is("어둡게")')
-  await page.waitForTimeout(300)
-  const dark = await canvas()
-  console.log('  ' + JSON.stringify(dark))
-  expect('어두운 바탕으로 바뀜', dark?.kind === 'is-dark', JSON.stringify(dark))
-  expect('바둑판은 걷힘', dark?.checkered === false, JSON.stringify(dark))
-  // 테마 바탕과 같은 색이면 묻히는 그림을 살릴 수 없습니다. 그러라고 만든 자리입니다.
-  expect('화면 바탕과 다른 색', dark?.sameAsPage === false, JSON.stringify(dark))
+  step('8. 밝게·중간·어둡게는 저마다 다른 색을 깐다')
+  const painted = {}
+  for (const label of ['밝게', '중간', '어둡게']) {
+    await page.click(`.backdrop-switch button:text-is("${label}")`)
+    await page.waitForTimeout(250)
+    painted[label] = await canvas()
+  }
+  console.log('  ' + JSON.stringify(painted))
+  expect('밝게는 흰 바탕', painted['밝게']?.color === 'rgb(255, 255, 255)', JSON.stringify(painted['밝게']))
+  expect('어둡게는 어두운 바탕', painted['어둡게']?.kind === 'is-dark', JSON.stringify(painted['어둡게']))
+  // 중간은 말 그대로 가운데라야 합니다. 한쪽으로 붙으면 둘 중 하나가 쓸모없어집니다.
+  const grey = (painted['중간']?.color.match(/\d+/g) ?? []).map(Number)
+  console.log('  중간: ' + JSON.stringify(grey))
+  expect('중간은 회색', grey.length >= 3 && Math.max(...grey.slice(0, 3)) - Math.min(...grey.slice(0, 3)) < 24,
+    JSON.stringify(grey))
+  expect('중간은 밝게와 어둡게 사이', grey[0] > 90 && grey[0] < 190, JSON.stringify(grey))
+  const distinct = new Set(['밝게', '중간', '어둡게'].map((label) => painted[label]?.color))
+  expect('셋이 서로 다른 색', distinct.size === 3, [...distinct].join(' / '))
+  // 밝은 테마에서 흰 로고가 묻히는 것을 살리는 자리입니다. 화면과 같은 색이면 헛일입니다.
+  expect('어둡게는 화면 바탕과 다른 색', painted['어둡게']?.sameAsPage === false,
+    JSON.stringify(painted['어둡게']))
   await page.screenshot({ path: join(HERE, '..', 'shots', 'imagepreview', '03-dark.png') })
 
-  step('9. 새로고침해도 고른 바탕이 남는다')
+  /*
+   * 테마를 따라가면 테마와 색이 비슷해 묻히는 그림을 살릴 수 없습니다.
+   * 화면을 어둡게 돌려 놓고도 세 벌의 색이 그대로인지 봅니다.
+   */
+  step('9. 밝기를 어둡게 돌려도 고른 바탕색은 그대로다')
+  await page.click('button[aria-label="설정"]')
+  await page.waitForSelector('.settings-nav')
+  await page.click('.settings-nav button:has-text("모양")')
+  await page.click('[aria-label="밝기"] button:text-is("어둡게")')
+  await page.waitForTimeout(400)
+  await page.click('.sheet-close')
+  await page.waitForTimeout(400)
+  const inDark = await canvas()
+  console.log('  ' + JSON.stringify(inDark))
+  expect('어둡게 바탕이 그대로', inDark?.color === painted['어둡게']?.color,
+    inDark?.color + ' vs ' + painted['어둡게']?.color)
+
+  step('10. 기존을 고르면 어두워진 화면을 그대로 따른다')
+  await page.click('.backdrop-switch button:text-is("기존")')
+  await page.waitForTimeout(300)
+  const followed = await canvas()
+  console.log('  ' + JSON.stringify(followed))
+  expect('화면 바탕을 따라감', followed?.sameAsPage === true, JSON.stringify(followed))
+  expect('밝을 때의 흰색이 아님', followed?.color !== 'rgb(255, 255, 255)', JSON.stringify(followed))
+  await page.click('button[aria-label="설정"]')
+  await page.waitForSelector('.settings-nav')
+  await page.click('.settings-nav button:has-text("모양")')
+  await page.click('[aria-label="밝기"] button:text-is("시스템 따름")')
+  await page.waitForTimeout(300)
+  await page.click('.sheet-close')
+  await page.waitForTimeout(300)
+  await page.click('.backdrop-switch button:text-is("어둡게")')
+  await page.waitForTimeout(300)
+
+  step('11. 새로고침해도 고른 바탕이 남는다')
   await page.reload({ waitUntil: 'domcontentloaded' })
   await openVault()
   await pickImage()
@@ -157,7 +213,7 @@ try {
   console.log('  ' + JSON.stringify(stillDark))
   expect('어둡게가 그대로', stillDark?.kind === 'is-dark', JSON.stringify(stillDark))
 
-  step('10. 미리보기를 끄면 바탕 고르는 줄도 사라진다')
+  step('12. 미리보기를 끄면 바탕 고르는 줄도 사라진다')
   await setPreview(false)
   await pickImage()
   const gone = await page.locator('.backdrop-switch').count()

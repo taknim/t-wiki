@@ -157,17 +157,20 @@ export function writeImagePreview(on: boolean): void {
  * 그림마다 알맞은 바탕이 다릅니다. 흰 로고는 어두운 바탕에서, 검은 도표는 밝은
  * 바탕에서 드러납니다. 어느 쪽인지 알아맞히려 들면 틀리는 날이 있으므로,
  * 고를 수 있게 두고 고른 것을 기억합니다.
- * 기본은 바둑판입니다. 투명한 자리가 어디인지 한눈에 보입니다.
+ * 기본은 손대지 않은 본디 모습입니다. 고르지 않은 사람의 화면은 그대로여야 합니다.
  */
 const IMAGE_BACKDROP = 'mdwiki:image-backdrop'
-export const DEFAULT_IMAGE_BACKDROP: ImageBackdrop = 'checker'
+export const DEFAULT_IMAGE_BACKDROP: ImageBackdrop = 'theme'
+
+export function isImageBackdrop(value: unknown): value is ImageBackdrop {
+  return value === 'theme' || value === 'light' || value === 'mid' || value === 'dark'
+}
 
 export function readImageBackdrop(): ImageBackdrop {
   try {
+    // 모르는 값이면 기본으로 돌립니다. 예전에 두었던 바둑판이 여기로 걸러집니다.
     const saved = localStorage.getItem(IMAGE_BACKDROP)
-    return saved === 'light' || saved === 'dark' || saved === 'checker'
-      ? saved
-      : DEFAULT_IMAGE_BACKDROP
+    return isImageBackdrop(saved) ? saved : DEFAULT_IMAGE_BACKDROP
   } catch {
     return DEFAULT_IMAGE_BACKDROP
   }

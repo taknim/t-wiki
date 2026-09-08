@@ -3,7 +3,8 @@ import {
 } from './theme'
 import {
   clampSidebarWidth, clampSplitRatio, DEFAULT_IMAGE_BACKDROP, DEFAULT_SAVE_OPTIONS,
-  DEFAULT_SIDEBAR_TAB, DEFAULT_SIDEBAR_WIDTH, DEFAULT_SPLIT_RATIO, type SaveOptions,
+  DEFAULT_SIDEBAR_TAB, DEFAULT_SIDEBAR_WIDTH, DEFAULT_SPLIT_RATIO, isImageBackdrop,
+  type SaveOptions,
 } from './saveOptions'
 import { DEFAULT_GITHUB_CONFIG } from '../hooks/useGitHubSync'
 import type { GitHubConfig, ImageBackdrop, SidebarTab } from '../types'
@@ -142,8 +143,8 @@ export function parseBundle(raw: string): SettingsBundle | null {
       sidebarTab: general.sidebarTab === 'favorites' ? 'favorites' : DEFAULT_SIDEBAR_TAB,
       // 이 값을 모르던 판에서 온 파일이면 켜진 것으로 봅니다. 기본이 그쪽입니다.
       imagePreview: bool(general.imagePreview, true),
-      // 모르는 값이면 바둑판으로 둡니다. 이 값을 모르던 판에서 온 파일도 그쪽입니다.
-      imageBackdrop: general.imageBackdrop === 'light' || general.imageBackdrop === 'dark'
+      // 모르는 값이면 본디 모습으로 둡니다. 이 값을 모르던 판에서 온 파일도 그쪽입니다.
+      imageBackdrop: isImageBackdrop(general.imageBackdrop)
         ? general.imageBackdrop
         : DEFAULT_IMAGE_BACKDROP,
       includeToken: bool(general.includeToken, false),

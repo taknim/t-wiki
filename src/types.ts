@@ -115,9 +115,10 @@ export type ViewMode = 'edit' | 'split' | 'preview'
  * 이미지 미리보기의 바탕.
  *
  * 투명한 그림이나 화면과 색이 비슷한 그림은 배경에 묻혀 보이지 않습니다.
- * 바둑판은 투명한 자리를 드러내고, 밝게·어둡게는 그림과 반대쪽으로 돌려 봅니다.
+ * 밝게·중간·어둡게로 그림과 반대쪽으로 돌려 놓고 봅니다.
+ * `theme` 는 손대지 않은 본디 모습, 곧 지금 테마의 바탕색입니다.
  */
-export type ImageBackdrop = 'checker' | 'light' | 'dark'
+export type ImageBackdrop = 'theme' | 'light' | 'mid' | 'dark'
 
 /** 옆줄에 즐겨찾기와 폴더 트리 중 어느 쪽을 펴 두었는지. */
 export type SidebarTab = 'favorites' | 'tree'

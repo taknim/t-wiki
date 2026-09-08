@@ -15,6 +15,7 @@ import {
 import { TextPreview } from './components/TextPreview'
 import { SettingsPanel } from './components/SettingsPanel'
 import { SplitResizer } from './components/SplitResizer'
+import { BackdropSwitch } from './components/BackdropSwitch'
 import { SyncReportSheet } from './components/SyncReportSheet'
 import { SyncHistorySheet } from './components/SyncHistorySheet'
 import { TreeView } from './components/TreeView'
@@ -1093,6 +1094,9 @@ export default function App() {
                 {editableText && textPreview && (
                   <ViewModeSwitch mode={viewMode} onChange={setViewMode} />
                 )}
+                {selection.kind === 'image' && imagePreview && (
+                  <BackdropSwitch backdrop={imageBackdrop} onChange={applyImageBackdrop} />
+                )}
               </div>
 
               {editableText ? (
@@ -1126,7 +1130,6 @@ export default function App() {
                   size={selection.size}
                   imagePreview={imagePreview}
                   backdrop={imageBackdrop}
-                  onBackdrop={applyImageBackdrop}
                 />
               ) : (
                 <FolderView
