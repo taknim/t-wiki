@@ -22,8 +22,6 @@ const BACKDROPS: { key: ImageBackdrop; label: string; tip: string }[] = [
 export function BackdropSwitch({ backdrop, onChange }: BackdropSwitchProps) {
   return (
     <div className="head-backdrop">
-      {/* 글자만 넷 세워 두면 무엇을 고르는 자리인지 알 수 없습니다. */}
-      <span className="backdrop-label">배경</span>
       <div className="backdrop-switch" role="group" aria-label="이미지 배경">
         {BACKDROPS.map((entry) => (
           <button
@@ -34,6 +32,8 @@ export function BackdropSwitch({ backdrop, onChange }: BackdropSwitchProps) {
             aria-pressed={backdrop === entry.key}
             onClick={() => onChange(entry.key)}
           >
+            {/* 어떤 색이 깔리는지는 이름보다 색조각이 빠릅니다. */}
+            <span className={`backdrop-chip is-${entry.key}`} aria-hidden="true" />
             {entry.label}
           </button>
         ))}

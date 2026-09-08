@@ -148,6 +148,52 @@ try {
   // 보기 모드와 같은 자리입니다. 그림 위에 따로 한 줄을 더 쓰지 않습니다.
   expect('제목과 같은 줄에 섬', plain?.besideTitle === true, JSON.stringify(plain))
 
+  const filled = await page.evaluate(() => {
+    const view = document.querySelector('.asset-view')
+    const box = document.querySelector('.asset-canvas')
+    const a = view.getBoundingClientRect()
+    const b = box.getBoundingClientRect()
+    return {
+      // 네 모서리가 맞닿아야 여백도 테두리도 없는 것입니다.
+      gaps: [b.top - a.top, b.left - a.left, a.right - b.right, a.bottom - b.bottom]
+        .map((one) => Math.round(one)),
+      border: getComputedStyle(box).borderTopWidth,
+      swatches: [...document.querySelectorAll('.backdrop-switch .backdrop-chip')]
+        .map((chip) => getComputedStyle(chip).backgroundColor),
+      labels: [...document.querySelectorAll('.backdrop-switch button')]
+        .map((button) => button.textContent.trim()),
+    }
+  })
+  console.log('  ' + JSON.stringify(filled))
+  expect('칸을 가득 채움', filled.gaps.every((gap) => gap === 0), JSON.stringify(filled.gaps))
+  expect('테두리 없음', filled.border === '0px', filled.border)
+  expect('단추마다 색조각이 붙음', filled.swatches.length === 4, JSON.stringify(filled.swatches))
+  // 기존은 테마 색이라 밝은 테마에서는 밝게와 같은 흰색일 수 있습니다. 나머지 셋만 봅니다.
+  expect('색조각이 저마다 다름', new Set(filled.swatches.slice(1)).size === 3,
+    JSON.stringify(filled.swatches))
+  expect('이름도 함께 적힘', filled.labels.join() === '기존,밝게,중간,어둡게',
+    JSON.stringify(filled.labels))
+
+  const marked = await page.evaluate(() => {
+    const image = document.querySelector('.asset-image')
+    const style = getComputedStyle(image)
+    const label = document.querySelector('.asset-size')
+    const box = document.querySelector('.asset-canvas').getBoundingClientRect()
+    const at = label?.getBoundingClientRect()
+    return {
+      outline: style.outlineWidth,
+      ring: style.boxShadow,
+      size: label?.textContent ?? null,
+      // 칸의 오른쪽 위 구석에 붙어 있어야 합니다.
+      corner: at ? Math.round(box.right - at.right) < 30 && Math.round(at.top - box.top) < 30 : false,
+    }
+  })
+  console.log('  ' + JSON.stringify(marked))
+  expect('그림에 테두리가 둘림', marked.outline !== '0px', JSON.stringify(marked))
+  expect('밝은 테도 함께 둘림', marked.ring !== 'none', JSON.stringify(marked))
+  expect('크기가 픽셀로 적힘', /^\d+px × \d+px$/.test(marked.size ?? ''), String(marked.size))
+  expect('오른쪽 위 구석에 있음', marked.corner === true, JSON.stringify(marked))
+
   step('8. 밝게·중간·어둡게는 저마다 다른 색을 깐다')
   const painted = {}
   for (const label of ['밝게', '중간', '어둡게']) {

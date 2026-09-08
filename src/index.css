@@ -251,13 +251,14 @@ button, input, select, textarea { font: inherit; color: inherit; }
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 34px;
+  gap: 5px;
   height: 28px;
-  padding: 0;
+  padding: 0 9px;
   border: 0;
   background: var(--bg-raised);
+  color: inherit;
   cursor: pointer;
-  font-size: 13px;
+  font-size: 12px;
 }
 .mode-switch button + button { border-inline-start: 1px solid var(--border); }
 .mode-switch .is-active { background: var(--accent); color: #fff; }
@@ -1361,14 +1362,20 @@ a.btn { text-decoration: none; color: inherit; display: inline-block; }
   background: var(--bg);
   overflow: auto;
 }
+/* 그림일 때는 바탕이 칸 끝까지 닿아야 하므로 여백을 걷고, 안내에만 따로 둡니다. */
+.asset-view.is-filled { padding: 0; overflow: hidden; }
+.asset-view.is-filled > .asset-note,
+.asset-view.is-filled > .status { margin: 12px 20px 0; }
 /* 바탕 고르는 줄. 보기 모드와 같은 자리, 제목 줄 오른쪽 끝에 섭니다. */
 .head-backdrop { display: flex; align-items: center; gap: 8px; }
 .doc-head .head-backdrop { margin-left: auto; align-self: center; }
-.backdrop-label { font-size: 12px; color: var(--text-muted); }
 .backdrop-switch { display: flex; border: 1px solid var(--border-strong); border-radius: 6px; overflow: hidden; }
 .backdrop-switch button {
-  height: 26px;
-  padding: 0 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 28px;
+  padding: 0 9px;
   border: 0;
   background: var(--bg-raised);
   color: inherit;
@@ -1377,36 +1384,72 @@ a.btn { text-decoration: none; color: inherit; display: inline-block; }
 }
 .backdrop-switch button + button { border-inline-start: 1px solid var(--border); }
 .backdrop-switch .is-active { background: var(--accent); color: #fff; }
+/* 어떤 색이 깔리는지 이름만으로는 알 수 없어, 그 색을 그대로 보여 줍니다. */
+.backdrop-chip {
+  width: 11px;
+  height: 11px;
+  border-radius: 2px;
+  border: 1px solid rgb(0 0 0 / 30%);
+}
+/* 눌린 단추는 바탕이 강조색이라, 옅은 테두리로는 색조각이 묻힙니다. */
+.backdrop-switch .is-active .backdrop-chip { border-color: rgb(255 255 255 / 65%); }
 
 /*
- * 그림을 놓는 자리.
+ * 그림을 놓는 자리. 여백도 테두리도 없이 칸을 가득 채웁니다.
+ * 가장자리에 다른 색이 남으면 어느 것이 고른 바탕인지 헷갈립니다.
  *
  * 밝게·중간·어둡게는 테마를 따르지 않습니다. 따르게 하면 테마와 색이 비슷한 그림이
  * 묻히는데, 그것을 피하려고 만든 자리입니다. 고정된 색이라야 그림을 살립니다.
  */
+.asset-canvas, .backdrop-chip {
+  --img-light: #fff;
+  --img-mid: #74777d;
+  --img-dark: #1b1d22;
+}
 .asset-canvas {
+  position: relative;
   flex: 1 1 auto;
   min-height: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 12px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
+  padding: 16px;
 }
 /* 손대지 않은 본디 모습. 이것만 테마를 따릅니다. */
-.asset-canvas.is-theme { background-color: var(--bg); }
-.asset-canvas.is-light { background-color: #fff; }
-/* 밝게와 어둡게의 가운데. 어느 쪽으로도 치우치지 않은 그림에 씁니다. */
-.asset-canvas.is-mid { background-color: #8b8e94; }
-.asset-canvas.is-dark { background-color: #1b1d22; }
+.asset-canvas.is-theme, .backdrop-chip.is-theme { background-color: var(--bg); }
+.asset-canvas.is-light, .backdrop-chip.is-light { background-color: var(--img-light); }
+.asset-canvas.is-mid, .backdrop-chip.is-mid { background-color: var(--img-mid); }
+.asset-canvas.is-dark, .backdrop-chip.is-dark { background-color: var(--img-dark); }
 
+/* 그림의 본디 크기. 창에 맞춰 줄어 있으므로 숫자로 알려 줍니다. */
+.asset-size {
+  position: absolute;
+  inset-block-start: 10px;
+  inset-inline-end: 12px;
+  padding: 2px 7px;
+  border-radius: 4px;
+  /* 어떤 바탕 위에 얹힐지 모르므로 제 색을 지고 갑니다. */
+  background: rgb(0 0 0 / 55%);
+  color: #fff;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
+/*
+ * 그림의 가장자리.
+ *
+ * 투명한 그림은 어디까지가 그림인지 보이지 않습니다. 바탕색이 네 가지라 한 가지
+ * 색으로는 어딘가에서 묻히므로, 어두운 금과 밝은 테를 겹쳐 둘렀습니다.
+ * 밝은 바탕에서는 안쪽 금이, 어두운 바탕에서는 바깥 테가 보입니다.
+ */
 .asset-image {
   max-width: 100%;
   max-height: 100%;
   object-fit: contain;
   align-self: center;
-  border-radius: 6px;
+  outline: 1px solid rgb(0 0 0 / 55%);
+  box-shadow: 0 0 0 2px rgb(255 255 255 / 45%);
 }
 .asset-frame {
   flex: 1;

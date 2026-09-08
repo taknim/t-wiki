@@ -26,6 +26,8 @@ export function AssetView({ root, path, size, imagePreview, backdrop }: AssetVie
   const [url, setUrl] = useState<string | null>(null)
   const [text, setText] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  // 그림의 본디 크기. 그려 놓고 보면 창에 맞춰 줄어 있어, 원래 크기를 알 길이 없습니다.
+  const [pixels, setPixels] = useState<{ width: number; height: number } | null>(null)
   const objectUrl = useRef<string | null>(null)
   const kind = attachmentKind(path)
 
@@ -37,6 +39,7 @@ export function AssetView({ root, path, size, imagePreview, backdrop }: AssetVie
     setUrl(null)
     setText(null)
     setError(null)
+    setPixels(null)
   }
 
   // 꺼 두었으면 이미지는 읽지 않습니다. 안 보여 줄 것을 메모리에 올릴 까닭이 없습니다.
@@ -85,8 +88,11 @@ export function AssetView({ root, path, size, imagePreview, backdrop }: AssetVie
   const name = path.split('/').pop() ?? path
   const tooBig = isAttachment(path) && size > MAX_ATTACHMENT_BYTES
 
+  const filling = kind === 'image' && !skipped
+
   return (
-    <div className="asset-view">
+    // 그림은 바탕을 칸 끝까지 깔아야 합니다. 여백이 남으면 거기만 테마 색이라 어수선합니다.
+    <div className={filling ? 'asset-view is-filled' : 'asset-view'}>
       {tooBig && (
         <p className="asset-note">
           {formatBytes(MAX_ATTACHMENT_BYTES)} 가 넘어 동기화하지 않습니다. 이 컴퓨터에만 있습니다.
@@ -110,7 +116,21 @@ export function AssetView({ root, path, size, imagePreview, backdrop }: AssetVie
       */}
       {kind === 'image' && !skipped && url && (
         <div className={`asset-canvas is-${backdrop}`}>
-          <img className="asset-image" src={url} alt={name} />
+          <img
+            className="asset-image"
+            src={url}
+            alt={name}
+            onLoad={(event) => {
+              const { naturalWidth, naturalHeight } = event.currentTarget
+              // 크기를 밝히지 않은 SVG 는 0 으로 옵니다. 0 x 0 이라고 적어 봐야 헛말입니다.
+              setPixels(naturalWidth > 0 && naturalHeight > 0
+                ? { width: naturalWidth, height: naturalHeight }
+                : null)
+            }}
+          />
+          {pixels && (
+            <span className="asset-size">{pixels.width}px × {pixels.height}px</span>
+          )}
         </div>
       )}
 

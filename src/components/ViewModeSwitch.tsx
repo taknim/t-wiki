@@ -16,8 +16,8 @@ const MODES: { key: ViewMode; label: string; tip: string }[] = [
 /**
  * 문서 제목 옆에 섭니다. 보여 줄 것이 있는 문서에서만 나옵니다.
  *
- * 아이콘만 세우므로 이름은 aria-label 로 남깁니다.
- * 그러지 않으면 읽어 주는 화면에서 단추 셋을 구분할 길이 없습니다.
+ * 아이콘 옆에 이름을 함께 적습니다. 그림만으로는 어느 것이 어느 모드인지
+ * 눌러 봐야 알고, 세 아이콘은 서로 닮았습니다.
  */
 export function ViewModeSwitch({ mode, onChange }: ViewModeSwitchProps) {
   return (
@@ -33,6 +33,7 @@ export function ViewModeSwitch({ mode, onChange }: ViewModeSwitchProps) {
           onClick={() => onChange(entry.key)}
         >
           {entry.key === 'edit' ? <PencilIcon /> : entry.key === 'split' ? <ColumnsIcon /> : <EyeIcon />}
+          {entry.label}
         </button>
       ))}
     </div>
