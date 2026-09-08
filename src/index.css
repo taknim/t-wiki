@@ -1353,6 +1353,57 @@ a.btn { text-decoration: none; color: inherit; display: inline-block; }
   background: var(--bg);
   overflow: auto;
 }
+/* 바탕 고르는 줄. 그림 위에 붙습니다. */
+.asset-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  align-self: flex-end;
+}
+.asset-tools-label { font-size: 12px; color: var(--text-muted); }
+.backdrop-switch { display: flex; border: 1px solid var(--border-strong); border-radius: 6px; overflow: hidden; }
+.backdrop-switch button {
+  height: 26px;
+  padding: 0 10px;
+  border: 0;
+  background: var(--bg-raised);
+  color: inherit;
+  cursor: pointer;
+  font-size: 12px;
+}
+.backdrop-switch button + button { border-inline-start: 1px solid var(--border); }
+.backdrop-switch .is-active { background: var(--accent); color: #fff; }
+
+/*
+ * 그림을 놓는 자리.
+ *
+ * 바탕색은 테마를 따르지 않습니다. 따르게 하면 테마와 색이 비슷한 그림이 묻히는데,
+ * 그것을 피하려고 만든 자리입니다. 세 벌 모두 고정된 색으로 둡니다.
+ */
+.asset-canvas {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+/* 투명한 자리를 드러내는 바둑판. 두 겹을 반 칸 어긋나게 깔아 만듭니다. */
+.asset-canvas.is-checker {
+  --square: 10px;
+  background-color: #fff;
+  background-image:
+    linear-gradient(45deg, #e4e4e4 25%, transparent 25%, transparent 75%, #e4e4e4 75%),
+    linear-gradient(45deg, #e4e4e4 25%, transparent 25%, transparent 75%, #e4e4e4 75%);
+  background-size: calc(var(--square) * 2) calc(var(--square) * 2);
+  background-position: 0 0, var(--square) var(--square);
+}
+.asset-canvas.is-light { background-color: #fff; }
+.asset-canvas.is-dark { background-color: #1b1d22; }
+
 .asset-image {
   max-width: 100%;
   max-height: 100%;

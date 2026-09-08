@@ -149,6 +149,23 @@ try {
   step('5. 첫 폴더 설정은 그대로다')
   await closeVault()
   await openVault('first')
+
+  /*
+   * 그림 뒤에 깔 바탕부터 고쳐 둡니다. 아래에서 이미지 미리보기를 꺼 버리므로,
+   * 그 뒤에는 고를 줄 자체가 화면에 없습니다.
+   */
+  await page.click('.sidebar-tablist button:has-text("폴더")')
+  await page.waitForSelector('.tree', { timeout: 8000 })
+  // 이미 펴져 있는 폴더를 또 누르면 도로 접힙니다.
+  if (!(await page.locator('.tree-row:has-text("도표")').count())) {
+    await page.click('.tree-row:has-text("첨부")')
+    await page.waitForTimeout(300)
+  }
+  await page.click('.tree-row:has-text("도표")')
+  await page.waitForSelector('.backdrop-switch', { timeout: 8000 })
+  await page.click('.backdrop-switch button:text-is("어둡게")')
+  await page.waitForTimeout(300)
+
   await openSettings()
   await page.click('.settings-nav button:has-text("GitHub 동기화")')
   await page.waitForTimeout(400)
@@ -204,6 +221,23 @@ try {
    */
   await closeVault()
   await openVault('first')
+
+  /*
+   * 그림 뒤에 깔 바탕부터 고쳐 둡니다. 아래에서 이미지 미리보기를 꺼 버리므로,
+   * 그 뒤에는 고를 줄 자체가 화면에 없습니다.
+   */
+  await page.click('.sidebar-tablist button:has-text("폴더")')
+  await page.waitForSelector('.tree', { timeout: 8000 })
+  // 이미 펴져 있는 폴더를 또 누르면 도로 접힙니다.
+  if (!(await page.locator('.tree-row:has-text("도표")').count())) {
+    await page.click('.tree-row:has-text("첨부")')
+    await page.waitForTimeout(300)
+  }
+  await page.click('.tree-row:has-text("도표")')
+  await page.waitForSelector('.backdrop-switch', { timeout: 8000 })
+  await page.click('.backdrop-switch button:text-is("어둡게")')
+  await page.waitForTimeout(300)
+
   await openSettings()
   await page.click('.settings-nav button:has-text("GitHub 동기화")')
   await page.fill('#gh-token', '토큰2')

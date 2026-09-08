@@ -31,16 +31,16 @@ import { DEFAULT_VIEW_MODE, loadSession, saveSession } from './lib/session'
 import { formatTidyFor, textPreviewKind, trimWhitespace } from './lib/textPreview'
 import {
   clampSidebarWidth, DEFAULT_SIDEBAR_WIDTH, maxSidebarWidth, MIN_SIDEBAR_WIDTH,
-  readImagePreview, readSaveOptions, readSidebarOpen, readSidebarTab, readSidebarWidth,
-  readSplitRatio, writeImagePreview, writeSidebarOpen, writeSidebarTab, writeSidebarWidth,
-  writeSplitRatio,
+  readImageBackdrop, readImagePreview, readSaveOptions, readSidebarOpen, readSidebarTab,
+  readSidebarWidth, readSplitRatio, writeImageBackdrop, writeImagePreview, writeSidebarOpen,
+  writeSidebarTab, writeSidebarWidth, writeSplitRatio,
 } from './lib/saveOptions'
 import { displayPath, FAVORITES_FILE, fileNameOf } from './lib/paths'
 import { loadFavorites } from './lib/store'
 import { favoritesFileBody, readFavoritesFile } from './lib/favorites'
 import { vaultKeyFor } from './lib/vaultKey'
 import type { CSSProperties } from 'react'
-import type { SidebarTab, ViewMode, VaultNode } from './types'
+import type { ImageBackdrop, SidebarTab, ViewMode, VaultNode } from './types'
 
 
 const AUTOSAVE_DELAY = 800
@@ -377,6 +377,17 @@ export default function App() {
   const applyImagePreview = useCallback((on: boolean) => {
     setImagePreview(on)
     writeImagePreview(on)
+  }, [])
+
+  /*
+   * 그림 뒤에 깔 바탕. 고르는 곳은 그림 위지만 설정 꾸러미에도 실리므로
+   * 이미지 미리보기와 같은 자리에서 들고 있습니다.
+   */
+  const [imageBackdrop, setImageBackdrop] = useState<ImageBackdrop>(readImageBackdrop)
+
+  const applyImageBackdrop = useCallback((next: ImageBackdrop) => {
+    setImageBackdrop(next)
+    writeImageBackdrop(next)
   }, [])
 
   /*
@@ -1114,6 +1125,8 @@ export default function App() {
                   path={selection.path}
                   size={selection.size}
                   imagePreview={imagePreview}
+                  backdrop={imageBackdrop}
+                  onBackdrop={applyImageBackdrop}
                 />
               ) : (
                 <FolderView
@@ -1217,6 +1230,8 @@ export default function App() {
           onSplitRatio={applySplitRatio}
           imagePreview={imagePreview}
           onImagePreview={applyImagePreview}
+          imageBackdrop={imageBackdrop}
+          onImageBackdrop={applyImageBackdrop}
           onShowHistory={() => setHistoryOpen(true)}
           onClose={() => setSettingsTab(null)}
         />

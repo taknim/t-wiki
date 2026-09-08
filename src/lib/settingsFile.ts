@@ -2,11 +2,11 @@ import {
   DEFAULT_SETTINGS, FONTS, LEADINGS, SIZES, THEMES, WIDTHS, type ThemeSettings,
 } from './theme'
 import {
-  clampSidebarWidth, clampSplitRatio, DEFAULT_SAVE_OPTIONS, DEFAULT_SIDEBAR_TAB,
-  DEFAULT_SIDEBAR_WIDTH, DEFAULT_SPLIT_RATIO, type SaveOptions,
+  clampSidebarWidth, clampSplitRatio, DEFAULT_IMAGE_BACKDROP, DEFAULT_SAVE_OPTIONS,
+  DEFAULT_SIDEBAR_TAB, DEFAULT_SIDEBAR_WIDTH, DEFAULT_SPLIT_RATIO, type SaveOptions,
 } from './saveOptions'
 import { DEFAULT_GITHUB_CONFIG } from '../hooks/useGitHubSync'
-import type { GitHubConfig, SidebarTab } from '../types'
+import type { GitHubConfig, ImageBackdrop, SidebarTab } from '../types'
 
 /**
  * 설정을 파일 하나로 주고받습니다.
@@ -32,6 +32,7 @@ export interface SettingsBundle {
     splitRatio: number
     sidebarTab: SidebarTab
     imagePreview: boolean
+    imageBackdrop: ImageBackdrop
     includeToken: boolean
   } & SaveOptions
   github: GitHubConfig | null
@@ -46,6 +47,7 @@ export interface ExportInput {
   splitRatio: number
   sidebarTab: SidebarTab
   imagePreview: boolean
+  imageBackdrop: ImageBackdrop
   saveOptions: SaveOptions
   github: GitHubConfig | null
   /** 액세스 토큰까지 담을지. 파일에 그대로 적히므로 기본은 담지 않습니다. */
@@ -66,6 +68,7 @@ export function buildBundle(input: ExportInput): SettingsBundle {
       splitRatio: input.splitRatio,
       sidebarTab: input.sidebarTab,
       imagePreview: input.imagePreview,
+      imageBackdrop: input.imageBackdrop,
       includeToken: input.includeToken,
       ...input.saveOptions,
     },
@@ -139,6 +142,10 @@ export function parseBundle(raw: string): SettingsBundle | null {
       sidebarTab: general.sidebarTab === 'favorites' ? 'favorites' : DEFAULT_SIDEBAR_TAB,
       // 이 값을 모르던 판에서 온 파일이면 켜진 것으로 봅니다. 기본이 그쪽입니다.
       imagePreview: bool(general.imagePreview, true),
+      // 모르는 값이면 바둑판으로 둡니다. 이 값을 모르던 판에서 온 파일도 그쪽입니다.
+      imageBackdrop: general.imageBackdrop === 'light' || general.imageBackdrop === 'dark'
+        ? general.imageBackdrop
+        : DEFAULT_IMAGE_BACKDROP,
       includeToken: bool(general.includeToken, false),
       trimWhitespace: bool(general.trimWhitespace, DEFAULT_SAVE_OPTIONS.trimWhitespace),
       tidyFormat: bool(general.tidyFormat, DEFAULT_SAVE_OPTIONS.tidyFormat),

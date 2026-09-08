@@ -1,4 +1,4 @@
-import type { SidebarTab } from '../types'
+import type { ImageBackdrop, SidebarTab } from '../types'
 
 /**
  * 저장할 때 문서에 손을 댈지 말지.
@@ -146,6 +146,36 @@ export function readImagePreview(): boolean {
 export function writeImagePreview(on: boolean): void {
   try {
     localStorage.setItem(IMAGE_PREVIEW, on ? 'on' : 'off')
+  } catch {
+    // 저장이 막혀 있어도 이번에는 그대로 적용됩니다.
+  }
+}
+
+/*
+ * 이미지 미리보기의 바탕.
+ *
+ * 그림마다 알맞은 바탕이 다릅니다. 흰 로고는 어두운 바탕에서, 검은 도표는 밝은
+ * 바탕에서 드러납니다. 어느 쪽인지 알아맞히려 들면 틀리는 날이 있으므로,
+ * 고를 수 있게 두고 고른 것을 기억합니다.
+ * 기본은 바둑판입니다. 투명한 자리가 어디인지 한눈에 보입니다.
+ */
+const IMAGE_BACKDROP = 'mdwiki:image-backdrop'
+export const DEFAULT_IMAGE_BACKDROP: ImageBackdrop = 'checker'
+
+export function readImageBackdrop(): ImageBackdrop {
+  try {
+    const saved = localStorage.getItem(IMAGE_BACKDROP)
+    return saved === 'light' || saved === 'dark' || saved === 'checker'
+      ? saved
+      : DEFAULT_IMAGE_BACKDROP
+  } catch {
+    return DEFAULT_IMAGE_BACKDROP
+  }
+}
+
+export function writeImageBackdrop(value: ImageBackdrop): void {
+  try {
+    localStorage.setItem(IMAGE_BACKDROP, value)
   } catch {
     // 저장이 막혀 있어도 이번에는 그대로 적용됩니다.
   }

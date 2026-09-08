@@ -42,6 +42,23 @@ const setPreview = async (on) => {
   await page.waitForTimeout(400)
 }
 
+/** 그림 뒤에 깔린 바탕. */
+const canvas = () => page.evaluate(() => {
+  const box = document.querySelector('.asset-canvas')
+  if (!box) return null
+  const style = getComputedStyle(box)
+  const page = getComputedStyle(document.querySelector('.asset-view'))
+  return {
+    kind: [...box.classList].find((name) => name.startsWith('is-')) ?? null,
+    color: style.backgroundColor,
+    checkered: style.backgroundImage.includes('linear-gradient'),
+    sameAsPage: style.backgroundColor === page.backgroundColor,
+    pressed: [...document.querySelectorAll('.backdrop-switch button')]
+      .filter((button) => button.getAttribute('aria-pressed') === 'true')
+      .map((button) => button.textContent),
+  }
+})
+
 /** 그림 자리에 무엇이 있는지. */
 const shown = () => page.evaluate(() => {
   const img = document.querySelector('.asset-image')
@@ -113,6 +130,39 @@ try {
   expect('그림이 돌아옴', back.image === 'blob:', JSON.stringify(back))
   expect('안내는 사라짐', back.note === null, JSON.stringify(back))
   await page.screenshot({ path: join(HERE, '..', 'shots', 'imagepreview', '02-on.png') })
+
+  step('7. 그림 뒤에는 바둑판이 깔린다')
+  const board = await canvas()
+  console.log('  ' + JSON.stringify(board))
+  expect('바둑판이 기본', board?.kind === 'is-checker', JSON.stringify(board))
+  expect('투명한 자리가 드러남', board?.checkered === true, JSON.stringify(board))
+  expect('고른 것이 눌린 채로 보임', board?.pressed.join() === '바둑판', JSON.stringify(board))
+
+  step('8. 어둡게로 돌리면 어두운 바탕이 깔린다')
+  await page.click('.backdrop-switch button:text-is("어둡게")')
+  await page.waitForTimeout(300)
+  const dark = await canvas()
+  console.log('  ' + JSON.stringify(dark))
+  expect('어두운 바탕으로 바뀜', dark?.kind === 'is-dark', JSON.stringify(dark))
+  expect('바둑판은 걷힘', dark?.checkered === false, JSON.stringify(dark))
+  // 테마 바탕과 같은 색이면 묻히는 그림을 살릴 수 없습니다. 그러라고 만든 자리입니다.
+  expect('화면 바탕과 다른 색', dark?.sameAsPage === false, JSON.stringify(dark))
+  await page.screenshot({ path: join(HERE, '..', 'shots', 'imagepreview', '03-dark.png') })
+
+  step('9. 새로고침해도 고른 바탕이 남는다')
+  await page.reload({ waitUntil: 'domcontentloaded' })
+  await openVault()
+  await pickImage()
+  const stillDark = await canvas()
+  console.log('  ' + JSON.stringify(stillDark))
+  expect('어둡게가 그대로', stillDark?.kind === 'is-dark', JSON.stringify(stillDark))
+
+  step('10. 미리보기를 끄면 바탕 고르는 줄도 사라진다')
+  await setPreview(false)
+  await pickImage()
+  const gone = await page.locator('.backdrop-switch').count()
+  expect('줄이 사라짐', gone === 0, String(gone))
+  await setPreview(true)
 } catch (cause) {
   fail('묶음이 도중에 멈춤', cause instanceof Error ? (cause.stack ?? cause.message) : String(cause))
 } finally {

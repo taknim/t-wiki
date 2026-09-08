@@ -111,5 +111,13 @@ export interface SyncRun {
 /** 문서를 원문만, 나란히, 결과만 중 어떻게 보여 줄지. */
 export type ViewMode = 'edit' | 'split' | 'preview'
 
+/**
+ * 이미지 미리보기의 바탕.
+ *
+ * 투명한 그림이나 화면과 색이 비슷한 그림은 배경에 묻혀 보이지 않습니다.
+ * 바둑판은 투명한 자리를 드러내고, 밝게·어둡게는 그림과 반대쪽으로 돌려 봅니다.
+ */
+export type ImageBackdrop = 'checker' | 'light' | 'dark'
+
 /** 옆줄에 즐겨찾기와 폴더 트리 중 어느 쪽을 펴 두었는지. */
 export type SidebarTab = 'favorites' | 'tree'

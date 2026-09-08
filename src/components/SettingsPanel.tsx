@@ -11,7 +11,7 @@ import {
 } from '../lib/saveOptions'
 import { removeEntry } from '../lib/fsAccess'
 import { buildBundle, bundleFileName, parseBundle } from '../lib/settingsFile'
-import type { SidebarTab } from '../types'
+import type { ImageBackdrop, SidebarTab } from '../types'
 import { useEscapeClose } from '../hooks/useEscapeClose'
 import { useTheme } from './themeContext'
 import { useDialogs } from './dialogContext'
@@ -46,6 +46,8 @@ interface SettingsPanelProps {
   onSidebarTab: (tab: SidebarTab) => void
   /** 고른 이미지를 그려 볼지. 본문이 바로 따라오도록 값은 App 이 들고 있습니다. */
   imagePreview: boolean
+  imageBackdrop: ImageBackdrop
+  onImageBackdrop: (next: ImageBackdrop) => void
   onImagePreview: (on: boolean) => void
 }
 
@@ -61,7 +63,7 @@ export function SettingsPanel({
   onClose, sync, onShowHistory, vaultName, vaultRoot,
   sidebarOpen, onSidebarOpen, sidebarWidth, onSidebarWidth, sidebarTab, onSidebarTab,
   splitRatio, onSplitRatio,
-  imagePreview, onImagePreview,
+  imagePreview, onImagePreview, imageBackdrop, onImageBackdrop,
   initialTab = 'general',
 }: SettingsPanelProps) {
   const { settings, isDark, update } = useTheme()
@@ -103,6 +105,7 @@ export function SettingsPanel({
       splitRatio,
       sidebarTab,
       imagePreview,
+      imageBackdrop,
       saveOptions,
       github: sync.isConfigured || sync.config.token ? sync.config : null,
       includeToken,
@@ -221,6 +224,7 @@ export function SettingsPanel({
     onSplitRatio(bundle.general.splitRatio)
     onSidebarTab(bundle.general.sidebarTab)
     onImagePreview(bundle.general.imagePreview)
+    onImageBackdrop(bundle.general.imageBackdrop)
     setIncludeToken(bundle.general.includeToken)
     writeIncludeToken(bundle.general.includeToken)
     const next = {
