@@ -42,6 +42,32 @@ const setPreview = async (on) => {
   await page.waitForTimeout(400)
 }
 
+/**
+ * 바탕 고르는 단추마다 제 색을 입었는지, 그 위의 글자가 읽히는지.
+ * 대비비는 WCAG 셈법 그대로입니다. 4.5 아래면 작은 글씨가 바탕에 묻힙니다.
+ */
+const backdropButtons = () => page.evaluate(() =>
+  [...document.querySelectorAll('.backdrop-switch button')].map((button) => {
+    const style = getComputedStyle(button)
+    const lum = (color) => {
+      const [r, g, b] = color.match(/\d+(\.\d+)?/g).slice(0, 3).map(Number)
+      const one = (v) => {
+        const x = v / 255
+        return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4
+      }
+      return 0.2126 * one(r) + 0.7152 * one(g) + 0.0722 * one(b)
+    }
+    const back = lum(style.backgroundColor)
+    const front = lum(style.color)
+    const ratio = (Math.max(back, front) + 0.05) / (Math.min(back, front) + 0.05)
+    return {
+      label: button.textContent.trim(),
+      back: style.backgroundColor,
+      picked: button.getAttribute('aria-pressed') === 'true',
+      ratio: Math.round(ratio * 10) / 10,
+    }
+  }))
+
 /** 그림 뒤에 깔린 바탕. 고르는 줄은 제목 줄에 있습니다. */
 const canvas = () => page.evaluate(() => {
   const box = document.querySelector('.asset-canvas')
@@ -158,8 +184,6 @@ try {
       gaps: [b.top - a.top, b.left - a.left, a.right - b.right, a.bottom - b.bottom]
         .map((one) => Math.round(one)),
       border: getComputedStyle(box).borderTopWidth,
-      swatches: [...document.querySelectorAll('.backdrop-switch .backdrop-chip')]
-        .map((chip) => getComputedStyle(chip).backgroundColor),
       labels: [...document.querySelectorAll('.backdrop-switch button')]
         .map((button) => button.textContent.trim()),
       // 색조각 넷만 서 있으면 무엇을 고르는 자리인지 알 수 없습니다.
@@ -169,10 +193,14 @@ try {
   console.log('  ' + JSON.stringify(filled))
   expect('칸을 가득 채움', filled.gaps.every((gap) => gap === 0), JSON.stringify(filled.gaps))
   expect('테두리 없음', filled.border === '0px', filled.border)
-  expect('단추마다 색조각이 붙음', filled.swatches.length === 4, JSON.stringify(filled.swatches))
+  const buttons = await backdropButtons()
+  console.log('  ' + JSON.stringify(buttons))
+  expect('단추가 넷', buttons.length === 4, JSON.stringify(buttons))
   // 기존은 테마 색이라 밝은 테마에서는 밝게와 같은 흰색일 수 있습니다. 나머지 셋만 봅니다.
-  expect('색조각이 저마다 다름', new Set(filled.swatches.slice(1)).size === 3,
-    JSON.stringify(filled.swatches))
+  expect('단추마다 제 바탕색을 입음',
+    new Set(buttons.slice(1).map((one) => one.back)).size === 3, JSON.stringify(buttons))
+  expect('글자가 그 바탕 위에서 읽힘',
+    buttons.every((one) => one.ratio >= 4.5), JSON.stringify(buttons))
   expect('이름도 함께 적힘', filled.labels.join() === '기존,밝게,중간,어둡게',
     JSON.stringify(filled.labels))
   expect('앞에 무엇을 고르는지 적힘', filled.lead === '배경', String(filled.lead))
@@ -236,6 +264,13 @@ try {
   console.log('  ' + JSON.stringify(inDark))
   expect('어둡게 바탕이 그대로', inDark?.color === painted['어둡게']?.color,
     inDark?.color + ' vs ' + painted['어둡게']?.color)
+  // 테마가 바뀌면 "기존" 단추의 바탕도 따라 어두워집니다. 글자가 따라가지 않으면 묻힙니다.
+  const darkButtons = await backdropButtons()
+  console.log('  ' + JSON.stringify(darkButtons))
+  expect('어두운 테마에서도 글자가 읽힘',
+    darkButtons.every((one) => one.ratio >= 4.5), JSON.stringify(darkButtons))
+  expect('기존 단추도 함께 어두워짐',
+    darkButtons[0].back !== buttons[0].back, JSON.stringify(darkButtons[0]))
 
   step('10. 기존을 고르면 어두워진 화면을 그대로 따른다')
   await page.click('.backdrop-switch button:text-is("기존")')

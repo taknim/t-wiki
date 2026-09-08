@@ -29,13 +29,12 @@ export function BackdropSwitch({ backdrop, onChange }: BackdropSwitchProps) {
           <button
             key={entry.key}
             type="button"
-            className={backdrop === entry.key ? 'is-active' : ''}
+            /* 단추 자신이 그 바탕색을 입습니다. 무슨 색인지 이름보다 빠릅니다. */
+            className={`is-${entry.key}${backdrop === entry.key ? ' is-active' : ''}`}
             data-tip={entry.tip}
             aria-pressed={backdrop === entry.key}
             onClick={() => onChange(entry.key)}
           >
-            {/* 어떤 색이 깔리는지는 이름보다 색조각이 빠릅니다. */}
-            <span className={`backdrop-chip is-${entry.key}`} aria-hidden="true" />
             {entry.label}
           </button>
         ))}

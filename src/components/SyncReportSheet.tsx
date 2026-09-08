@@ -10,9 +10,13 @@ interface SyncReportSheetProps {
   config: GitHubConfig
   onClose: () => void
   onConfirm: () => void
+  /** 오간 파일을 눌렀을 때. 창을 걷고 그 파일을 엽니다. */
+  onOpen: (path: string) => void
 }
 
-export function SyncReportSheet({ report, config, onClose, onConfirm }: SyncReportSheetProps) {
+export function SyncReportSheet({
+  report, config, onClose, onConfirm, onOpen,
+}: SyncReportSheetProps) {
   // 설정 창 위에 떠 있을 때가 많습니다. Esc 는 위에 있는 이쪽부터 닫습니다.
   useEscapeClose(onClose)
 
@@ -134,7 +138,12 @@ export function SyncReportSheet({ report, config, onClose, onConfirm }: SyncRepo
                 {report.log.length}건 처리
                 {failures.length > 0 && ` · 실패 ${failures.length}건`}
               </h3>
-              <LogRows lines={report.log} commitSha={report.commitSha} config={config} />
+              <LogRows
+                lines={report.log}
+                commitSha={report.commitSha}
+                config={config}
+                onOpen={onOpen}
+              />
             </section>
           )}
         </div>

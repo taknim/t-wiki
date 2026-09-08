@@ -833,6 +833,21 @@ mark { background: var(--mark); color: inherit; border-radius: 2px; }
 .plan li:last-child { border-bottom: 0; }
 .plan-action { color: var(--text-muted); }
 .plan-path { font-family: var(--mono); word-break: break-all; }
+/* 지우지 않은 줄은 그 파일로 가는 길입니다. 눌리는 자리로 보이게 밑줄을 예비해 둡니다. */
+.plan-open {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font-size: inherit;
+  text-align: start;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  text-underline-offset: 2px;
+}
+.plan-open:hover { text-decoration-color: currentcolor; }
+.plan-open:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
 .plan-reason { color: var(--text-muted); text-align: end; overflow-wrap: anywhere; }
 .plan-conflict .plan-action, .plan-error .plan-action { color: var(--danger); font-weight: 600; }
 .plan-delete-local .plan-action, .plan-delete-remote .plan-action { color: var(--warn); font-weight: 600; }
@@ -1371,29 +1386,36 @@ a.btn { text-decoration: none; color: inherit; display: inline-block; }
 .asset-view.is-filled > .status { margin: 12px 20px 0; }
 /* 바탕 고르는 줄. 보기 모드와 같은 자리, 제목 줄 오른쪽 끝에 섭니다. */
 .backdrop-switch { display: flex; border: 1px solid var(--border-strong); border-radius: 6px; overflow: hidden; }
+/*
+ * 단추마다 제가 깔 바탕색을 그대로 입습니다. 색조각을 따로 달면 11px 짜리 네모라
+ * 무슨 색인지 잘 보이지 않습니다.
+ *
+ * 그러면 글자가 그 색에 묻힐 수 있으므로, 글자색도 바탕에 맞춰 함께 갑니다.
+ * 기존은 테마를 따라가므로 테마의 글자색을 그대로 씁니다.
+ */
 .backdrop-switch button {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
   height: 28px;
-  padding: 0 9px;
+  padding: 0 10px;
   border: 0;
-  background: var(--bg-raised);
-  color: inherit;
   cursor: pointer;
   font-size: 12px;
 }
 .backdrop-switch button + button { border-inline-start: 1px solid var(--border); }
-.backdrop-switch .is-active { background: var(--accent); color: #fff; }
-/* 어떤 색이 깔리는지 이름만으로는 알 수 없어, 그 색을 그대로 보여 줍니다. */
-.backdrop-chip {
-  width: 11px;
-  height: 11px;
-  border-radius: 2px;
-  border: 1px solid rgb(0 0 0 / 30%);
+.backdrop-switch button.is-theme { background: var(--bg); color: var(--text); }
+.backdrop-switch button.is-light { background: var(--img-light); color: #1b1d22; }
+.backdrop-switch button.is-mid { background: var(--img-mid); color: #fff; }
+.backdrop-switch button.is-dark { background: var(--img-dark); color: #fff; }
+/*
+ * 고른 단추. 바탕은 이미 제 색으로 차 있으므로 색을 덧칠할 수 없어,
+ * 안쪽에 강조색 테를 두르고 글자를 굵게 합니다.
+ */
+.backdrop-switch button.is-active {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+  font-weight: 700;
 }
-/* 눌린 단추는 바탕이 강조색이라, 옅은 테두리로는 색조각이 묻힙니다. */
-.backdrop-switch .is-active .backdrop-chip { border-color: rgb(255 255 255 / 65%); }
 
 /*
  * 그림을 놓는 자리. 여백도 테두리도 없이 칸을 가득 채웁니다.
@@ -1402,9 +1424,13 @@ a.btn { text-decoration: none; color: inherit; display: inline-block; }
  * 밝게·중간·어둡게는 테마를 따르지 않습니다. 따르게 하면 테마와 색이 비슷한 그림이
  * 묻히는데, 그것을 피하려고 만든 자리입니다. 고정된 색이라야 그림을 살립니다.
  */
-.asset-canvas, .backdrop-chip {
+.asset-canvas, .backdrop-switch {
   --img-light: #fff;
-  --img-mid: #74777d;
+  /*
+   * 밝게와 어둡게의 가운데. 흰 글자가 4.5:1 을 넘도록 조금 더 어둡게 잡았습니다.
+   * 단추가 이 색을 그대로 입으므로, 바탕색이 곧 글자가 앉을 자리입니다.
+   */
+  --img-mid: #6f7278;
   --img-dark: #1b1d22;
 }
 .asset-canvas {
@@ -1417,10 +1443,10 @@ a.btn { text-decoration: none; color: inherit; display: inline-block; }
   padding: 16px;
 }
 /* 손대지 않은 본디 모습. 이것만 테마를 따릅니다. */
-.asset-canvas.is-theme, .backdrop-chip.is-theme { background-color: var(--bg); }
-.asset-canvas.is-light, .backdrop-chip.is-light { background-color: var(--img-light); }
-.asset-canvas.is-mid, .backdrop-chip.is-mid { background-color: var(--img-mid); }
-.asset-canvas.is-dark, .backdrop-chip.is-dark { background-color: var(--img-dark); }
+.asset-canvas.is-theme { background-color: var(--bg); }
+.asset-canvas.is-light { background-color: var(--img-light); }
+.asset-canvas.is-mid { background-color: var(--img-mid); }
+.asset-canvas.is-dark { background-color: var(--img-dark); }
 
 /* 그림의 본디 크기. 창에 맞춰 줄어 있으므로 숫자로 알려 줍니다. */
 .asset-size {

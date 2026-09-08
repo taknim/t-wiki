@@ -137,6 +137,28 @@ const stuffHistory = (count) => page.evaluate(async (n) => {
   return total
 }, count)
 
+/** 손으로 지은 회차 하나를 맨 앞에 끼워 넣습니다. 지운 줄까지 갖춘 회차를 만들려면 이 편이 빠릅니다. */
+const seedRun = (run) => page.evaluate(async (one) => {
+  const db = await new Promise((res, rej) => {
+    const request = indexedDB.open('keyval-store')
+    request.onsuccess = () => res(request.result)
+    request.onerror = () => rej(request.error)
+  })
+  const store = await new Promise((res, rej) => {
+    const request = db.transaction('keyval', 'readonly').objectStore('keyval').get('mdwiki:sync-history')
+    request.onsuccess = () => res(request.result)
+    request.onerror = () => rej(request.error)
+  })
+  const key = Object.keys(store)[0]
+  store[key] = [one, ...store[key]]
+  await new Promise((res, rej) => {
+    const tx = db.transaction('keyval', 'readwrite')
+    tx.objectStore('keyval').put(store, 'mdwiki:sync-history')
+    tx.oncomplete = () => res()
+    tx.onerror = () => rej(tx.error)
+  })
+}, run)
+
 try {
   await page.goto(process.env.APP_URL ?? 'http://localhost:5173', { waitUntil: 'domcontentloaded' })
 
@@ -277,10 +299,58 @@ try {
     reach !== null && reach.bottom <= reach.edge, JSON.stringify(reach))
   await page.screenshot({ path: join(HERE, '..', 'shots', 'synchistory', '03-capped.png') })
 
-  step('10. 폴더가 다르면 기록도 남남이다')
+  /*
+   * 지운 줄까지 갖춘 회차가 있어야 하는데, 여기까지 오는 동안 지운 파일이 없습니다.
+   * 손으로 한 회차를 지어 끼워 넣고 폴더를 다시 엽니다.
+   */
+  step('10. 오간 파일은 눌러서 열고, 지운 파일에는 길을 걸지 않는다')
   await closeSheet()
   await page.click('[aria-label="설정"] .sheet-close')
   await page.waitForTimeout(300)
+  await seedRun({
+    at: Date.now(),
+    trigger: 'manual',
+    commitSha: null,
+    error: null,
+    cut: 0,
+    log: [
+      { path: '개발 환경.md', action: 'upload-update', status: 'ok', detail: '로컬에서 수정' },
+      { path: '지운 문서.md', action: 'delete-remote', status: 'ok', detail: '로컬에서 지움' },
+    ],
+  })
+  await closeVault()
+  await openVault('first')
+  await openSync()
+  await openHistory()
+  await page.click('.run:first-child .run-open')
+  await page.waitForTimeout(300)
+  const paths = await page.evaluate(() => ({
+    rows: document.querySelectorAll('.run .plan li').length,
+    links: [...document.querySelectorAll('.run .plan .plan-open')].map((one) => one.textContent),
+    flat: [...document.querySelectorAll('.run .plan li')]
+      .filter((li) => li.querySelector('.plan-open') === null)
+      .map((li) => li.querySelector('.plan-path').textContent),
+  }))
+  console.log('  ' + JSON.stringify(paths))
+  expect('두 줄 가운데 하나만 눌림', paths.rows === 2 && paths.links.length === 1,
+    JSON.stringify(paths))
+  expect('눌리는 쪽이 오간 파일', paths.links[0] === '/개발 환경.md', JSON.stringify(paths))
+  expect('지운 줄은 그냥 글자', paths.flat.join() === '/지운 문서.md', JSON.stringify(paths))
+
+  await page.click('.run .plan .plan-open')
+  await page.waitForTimeout(700)
+  const landed = await page.evaluate(() => ({
+    sheets: document.querySelectorAll('.overlay').length,
+    path: document.querySelector('.info-path')?.textContent ?? null,
+    editor: document.querySelectorAll('.editor').length,
+  }))
+  console.log('  ' + JSON.stringify(landed))
+  expect('겹쳐 뜬 창이 모두 닫힘', landed.sheets === 0, JSON.stringify(landed))
+  expect('그 문서가 열림', landed.path === '/개발 환경.md', JSON.stringify(landed))
+  expect('편집기까지 떠 있음', landed.editor === 1, JSON.stringify(landed))
+  await page.screenshot({ path: join(HERE, '..', 'shots', 'synchistory', '04-opened.png') })
+
+  step('11. 폴더가 다르면 기록도 남남이다')
   await closeVault()
   await openVault('other')
   await openSync()

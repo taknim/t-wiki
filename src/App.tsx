@@ -282,6 +282,25 @@ export default function App() {
     [commit, vault.index],
   )
 
+  /*
+   * 동기화 결과에서 파일 이름을 눌렀을 때.
+   *
+   * 겹쳐 뜬 창을 모두 걷습니다. 한 겹만 걷으면 방금 연 문서가 그 뒤에 가려,
+   * 눌렀는데 아무 일도 없는 것처럼 보입니다.
+   * 그 사이에 사라진 파일이면 창을 그대로 두고 알리기만 합니다.
+   */
+  const openFromSync = useCallback((path: string) => {
+    const isDoc = vault.index.has(path)
+    if (!isDoc && !vault.assets.has(path)) {
+      flash('그 파일은 이제 이 폴더에 없습니다')
+      return
+    }
+    setHistoryOpen(false)
+    setReportOpen(false)
+    setSettingsTab(null)
+    void (isDoc ? openDoc(path) : openAsset(path))
+  }, [flash, openAsset, openDoc, vault.assets, vault.index])
+
   // 볼트를 다시 스캔한 뒤에도 열려 있던 문서의 내용을 최신으로 맞춥니다.
   useEffect(() => {
     if (!selectedPath) return
@@ -1247,6 +1266,7 @@ export default function App() {
           runs={sync.history}
           config={sync.config}
           onClose={() => setHistoryOpen(false)}
+          onOpen={openFromSync}
         />
       )}
 
@@ -1259,6 +1279,7 @@ export default function App() {
             setReportOpen(false)
             void sync.confirmTarget()
           }}
+          onOpen={openFromSync}
         />
       )}
     </div>
