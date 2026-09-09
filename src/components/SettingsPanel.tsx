@@ -49,14 +49,62 @@ interface SettingsPanelProps {
   imageBackdrop: ImageBackdrop
   onImageBackdrop: (next: ImageBackdrop) => void
   onImagePreview: (on: boolean) => void
+  /** 워드·엑셀을 그려 볼지. */
+  officePreview: boolean
+  onOfficePreview: (on: boolean) => void
 }
 
 type TabId = 'general' | 'appearance' | 'sync'
 
-const TABS: { id: TabId; name: string; hint: string }[] = [
-  { id: 'general', name: '일반', hint: '마지막 화면 상태·이미지 미리보기·저장 방식으로 이동' },
-  { id: 'appearance', name: '모양', hint: '테마와 글꼴로 이동' },
-  { id: 'sync', name: 'GitHub 동기화', hint: '저장소와 자동 동기화 설정으로 이동' },
+/*
+ * 왼쪽 메뉴는 묶음과 그 안의 갈래로 이룹니다.
+ *
+ * 설정이 늘면서 묶음 셋만으로는 굴려 찾아야 했습니다. 갈래 이름을 펼쳐 두면
+ * 무엇이 어디 있는지 한눈에 보이고, 눌러 곧바로 갈 수 있습니다.
+ * 갈래의 id 는 그 자리 화면 요소의 id 이기도 합니다. 둘이 어긋나면 눌러도
+ * 아무 데도 가지 않으므로, 새 갈래를 더할 때는 section 에도 같은 id 를 답니다.
+ */
+const TABS: { id: TabId; name: string; hint: string; items: { id: string; name: string }[] }[] = [
+  {
+    id: 'general',
+    name: '일반',
+    hint: '마지막 화면 상태·미리보기·저장 방식으로 이동',
+    items: [
+      { id: 'set-session', name: '마지막 화면 상태' },
+      { id: 'set-image-preview', name: '이미지 미리보기' },
+      { id: 'set-office-preview', name: '오피스 미리보기' },
+      { id: 'set-tidy', name: '저장할 때 정돈' },
+      { id: 'set-transfer', name: '설정 주고받기' },
+    ],
+  },
+  {
+    id: 'appearance',
+    name: '모양',
+    hint: '테마와 글꼴로 이동',
+    items: [
+      { id: 'set-theme', name: '테마' },
+      { id: 'set-mode', name: '밝기' },
+      { id: 'set-font', name: '본문 글꼴' },
+      { id: 'set-size', name: '글자 크기' },
+      { id: 'set-leading', name: '줄 간격' },
+      { id: 'set-width', name: '본문 너비' },
+      { id: 'set-image-align', name: '이미지 정렬' },
+      { id: 'set-image-width', name: '이미지 최대 너비' },
+    ],
+  },
+  {
+    id: 'sync',
+    name: 'GitHub 동기화',
+    hint: '저장소와 자동 동기화 설정으로 이동',
+    items: [
+      { id: 'set-token', name: '액세스 토큰' },
+      { id: 'set-repo', name: '저장소와 브랜치' },
+      { id: 'set-conflict', name: '충돌 처리 방식' },
+      { id: 'set-auto', name: '자동 동기화' },
+      { id: 'set-run', name: '동기화 실행' },
+      { id: 'set-reset', name: '이 폴더의 설정' },
+    ],
+  },
 ]
 
 export function SettingsPanel({
@@ -64,6 +112,7 @@ export function SettingsPanel({
   sidebarOpen, onSidebarOpen, sidebarWidth, onSidebarWidth, sidebarTab, onSidebarTab,
   splitRatio, onSplitRatio,
   imagePreview, onImagePreview, imageBackdrop, onImageBackdrop,
+  officePreview, onOfficePreview,
   initialTab = 'general',
 }: SettingsPanelProps) {
   const { settings, isDark, update } = useTheme()
@@ -106,6 +155,7 @@ export function SettingsPanel({
       sidebarTab,
       imagePreview,
       imageBackdrop,
+      officePreview,
       saveOptions,
       github: sync.isConfigured || sync.config.token ? sync.config : null,
       includeToken,
@@ -225,6 +275,7 @@ export function SettingsPanel({
     onSidebarTab(bundle.general.sidebarTab)
     onImagePreview(bundle.general.imagePreview)
     onImageBackdrop(bundle.general.imageBackdrop)
+    onOfficePreview(bundle.general.officePreview)
     setIncludeToken(bundle.general.includeToken)
     writeIncludeToken(bundle.general.includeToken)
     const next = {
@@ -270,9 +321,25 @@ export function SettingsPanel({
   // 메뉴를 눌러 움직이는 동안에는 스크롤 위치로 강조를 바꾸지 않습니다.
   const jumpingTo = useRef<TabId | null>(null)
   const releaseTimer = useRef(0)
+  /** 지금 보고 있는 갈래. 왼쪽 나무에서 그 줄만 짙게 그립니다. */
+  const [field, setField] = useState<string | null>(null)
+
+  /** 갈래 한 줄로 곧장 갑니다. 묶음 안에서 다시 굴려 찾지 않아도 됩니다. */
+  const jumpToField = useCallback((tabId: TabId, fieldId: string) => {
+    setTab(tabId)
+    setField(fieldId)
+    jumpingTo.current = tabId
+    document.getElementById(fieldId)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+
+    window.clearTimeout(releaseTimer.current)
+    releaseTimer.current = window.setTimeout(() => {
+      jumpingTo.current = null
+    }, 800)
+  }, [])
 
   const jumpTo = useCallback((id: TabId) => {
     setTab(id)
+    setField(null)
     jumpingTo.current = id
     sectionRefs[id].current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 
@@ -299,12 +366,22 @@ export function SettingsPanel({
       if (element && element.getBoundingClientRect().top - top <= THRESHOLD) current = id
     }
 
+    // 갈래도 같은 잣대로 가립니다. 위쪽 경계를 넘긴 마지막 갈래가 지금 보는 줄입니다.
+    let here: string | null = null
+    for (const group of TABS) {
+      for (const item of group.items) {
+        const element = document.getElementById(item.id)
+        if (element && element.getBoundingClientRect().top - top <= THRESHOLD) here = item.id
+      }
+    }
+
     // 부드럽게 움직이는 중이면 목적지에 닿았을 때만 놓아 줍니다.
     if (jumpingTo.current) {
       if (jumpingTo.current === current) jumpingTo.current = null
       return
     }
     setTab(current)
+    setField(here)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -430,24 +507,37 @@ export function SettingsPanel({
 
         <div className="sheet-body settings-layout">
           <nav className="settings-nav" aria-label="설정 묶음">
-            {TABS.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                aria-current={tab === item.id ? 'location' : undefined}
-                className={tab === item.id ? 'is-active' : ''}
-                data-tip={item.hint}
-                onClick={() => jumpTo(item.id)}
-              >
-                {item.name}
-              </button>
+            {TABS.map((group) => (
+              <div key={group.id} className="settings-nav-group">
+                <button
+                  type="button"
+                  aria-current={tab === group.id && field === null ? 'location' : undefined}
+                  className={tab === group.id ? 'is-active' : ''}
+                  data-tip={group.hint}
+                  onClick={() => jumpTo(group.id)}
+                >
+                  {group.name}
+                </button>
+                {/* 갈래를 펼쳐 두면 무엇이 어디 있는지 굴려 보지 않아도 압니다. */}
+                {group.items.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    className={field === item.id ? 'settings-nav-item is-here' : 'settings-nav-item'}
+                    aria-current={field === item.id ? 'location' : undefined}
+                    onClick={() => jumpToField(group.id, item.id)}
+                  >
+                    {item.name}
+                  </button>
+                ))}
+              </div>
             ))}
           </nav>
 
           <div className="settings-content" ref={contentRef} onScroll={onScroll}>
             <section className="settings-section" ref={sectionRefs.general}>
               <h3 className="settings-heading">일반</h3>
-            <section className="field">
+            <section className="field" id="set-session">
               <label>마지막 화면 상태</label>
               <label className="checkbox">
                 <input
@@ -488,7 +578,7 @@ export function SettingsPanel({
               </p>
             </section>
 
-            <section className="field">
+            <section className="field" id="set-image-preview">
               <label>이미지 미리보기</label>
               <label className="checkbox">
                 <input
@@ -505,7 +595,26 @@ export function SettingsPanel({
               </label>
             </section>
 
-            <section className="field">
+            <section className="field" id="set-office-preview">
+              <label>오피스 미리보기</label>
+              <label className="checkbox">
+                <input
+                  type="checkbox"
+                  checked={officePreview}
+                  onChange={(event) => onOfficePreview(event.target.checked)}
+                />
+                워드·엑셀 문서를 화면에 그리기
+                <span className="hint">
+                  트리에서 <code>docx</code>·<code>xlsx</code>·<code>xls</code> 를 고르면
+                  엑셀은 표로, 워드는 글로 풀어 보여 줍니다.
+                  읽는 벌이 큰 편이라 그 파일을 열 때 한 번 내려받습니다.
+                  끄면 파일을 읽지도, 벌을 내려받지도 않고 안내만 내놓습니다.
+                  어느 쪽이든 파일은 그대로 폴더에 있고, 동기화에도 영향이 없습니다.
+                </span>
+              </label>
+            </section>
+
+            <section className="field" id="set-tidy">
               <label>저장할 때 정돈</label>
               <p className="hint" style={{ marginTop: 0 }}>
                 아무것도 켜지 않으면 <strong>쓴 그대로</strong> 저장합니다.
@@ -542,7 +651,7 @@ export function SettingsPanel({
               </label>
             </section>
 
-            <section className="field">
+            <section className="field" id="set-transfer">
               <label>설정 주고받기</label>
               <p className="hint" style={{ marginTop: 0 }}>
                 모양·저장 방식과 <strong>지금 열려 있는 폴더</strong>의 저장소 설정을 파일 하나로 담습니다.
@@ -613,7 +722,7 @@ export function SettingsPanel({
             <section className="settings-section" ref={sectionRefs.appearance}>
               <h3 className="settings-heading">모양</h3>
 
-          <section className="field">
+          <section className="field" id="set-theme">
             <label>테마</label>
             <div className="theme-grid">
               {THEMES.map((theme) => {
@@ -643,7 +752,7 @@ export function SettingsPanel({
             </div>
           </section>
 
-          <section className="field">
+          <section className="field" id="set-mode">
             <label>밝기</label>
             <div className="segmented" role="group" aria-label="밝기">
               {MODES.map((mode) => (
@@ -661,7 +770,7 @@ export function SettingsPanel({
             </div>
           </section>
 
-          <section className="field">
+          <section className="field" id="set-font">
             <label>본문 글꼴</label>
             <div className="segmented" role="group" aria-label="본문 글꼴">
               {FONTS.map((font) => (
@@ -681,7 +790,7 @@ export function SettingsPanel({
             <p className="hint">편집기는 코드를 다루기 좋게 고정폭을 그대로 씁니다.</p>
           </section>
 
-          <section className="field">
+          <section className="field" id="set-size">
             <label>글자 크기</label>
             <div className="segmented" role="group" aria-label="글자 크기">
               {SIZES.map((size) => (
@@ -699,7 +808,7 @@ export function SettingsPanel({
             </div>
           </section>
 
-          <section className="field">
+          <section className="field" id="set-leading">
             <label>줄 간격</label>
             <div className="segmented" role="group" aria-label="줄 간격">
               {LEADINGS.map((leading) => (
@@ -722,7 +831,7 @@ export function SettingsPanel({
             </p>
           </section>
 
-          <section className="field">
+          <section className="field" id="set-width">
             <label>본문 너비</label>
             <div className="segmented" role="group" aria-label="본문 너비">
               {WIDTHS.map((width) => (
@@ -744,7 +853,7 @@ export function SettingsPanel({
             </div>
           </section>
 
-          <section className="field">
+          <section className="field" id="set-image-align">
             <label>이미지 정렬</label>
             <div className="segmented" role="group" aria-label="이미지 정렬">
               {IMAGE_ALIGNS.map((align) => (
@@ -766,7 +875,7 @@ export function SettingsPanel({
             </p>
           </section>
 
-          <section className="field">
+          <section className="field" id="set-image-width">
             <label>이미지 최대 너비</label>
             <div className="segmented" role="group" aria-label="이미지 최대 너비">
               {IMAGE_WIDTHS.map((width) => (

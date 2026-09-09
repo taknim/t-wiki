@@ -252,7 +252,7 @@ try {
   await page.click('[aria-label="이미지 최대 너비"] button:text-is("보통")')
   await page.click('.settings-nav button:has-text("일반")')
   // 이 화면에서 켜고 끌 수 있는 것을 모두 뒤집어 둡니다.
-  for (const label of ['마지막 상태로', '고른 이미지를', '줄 끝 공백', '들여쓰기 다시 잡기']) {
+  for (const label of ['마지막 상태로', '고른 이미지를', '워드·엑셀', '줄 끝 공백', '들여쓰기 다시 잡기']) {
     await page.click(`.checkbox:has-text("${label}") input`)
   }
   await page.waitForTimeout(400)

@@ -152,6 +152,31 @@ export function writeImagePreview(on: boolean): void {
 }
 
 /*
+ * 오피스 문서(워드·엑셀)를 그려 볼지.
+ *
+ * 읽는 벌이 큰 편이라, 열 때마다 내려받는 것이 달갑지 않은 사람이 있습니다.
+ * 꺼 두면 파일을 읽지도, 벌을 내려받지도 않고 안내만 내놓습니다.
+ * 이미지 미리보기와 같은 성격이라 나란히 둡니다. 기본은 켜짐입니다.
+ */
+const OFFICE_PREVIEW = 'mdwiki:office-preview'
+
+export function readOfficePreview(): boolean {
+  try {
+    return localStorage.getItem(OFFICE_PREVIEW) !== 'off'
+  } catch {
+    return true
+  }
+}
+
+export function writeOfficePreview(on: boolean): void {
+  try {
+    localStorage.setItem(OFFICE_PREVIEW, on ? 'on' : 'off')
+  } catch {
+    // 저장이 막혀 있어도 이번에는 그대로 적용됩니다.
+  }
+}
+
+/*
  * 이미지 미리보기의 바탕.
  *
  * 그림마다 알맞은 바탕이 다릅니다. 흰 로고는 어두운 바탕에서, 검은 도표는 밝은

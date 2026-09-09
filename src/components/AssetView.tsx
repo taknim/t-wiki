@@ -12,6 +12,8 @@ interface AssetViewProps {
   size: number
   /** 이미지를 그려 볼지. 꺼 두면 파일을 읽지도 않고 안내만 내놓습니다. */
   imagePreview: boolean
+  /** 워드·엑셀을 그려 볼지. 꺼 두면 읽는 벌도 내려받지 않습니다. */
+  officePreview: boolean
   /** 그림 뒤에 깔 바탕. 고르는 자리는 제목 줄입니다. */
   backdrop: ImageBackdrop
 }
@@ -23,7 +25,9 @@ const TEXT_PREVIEW_LIMIT = 200_000
  * 마크다운이 아닌 파일은 고쳐 쓸 수 없으므로 보여 주기만 합니다.
  * 이미지와 PDF 는 그대로 띄우고, 텍스트 계열은 내용을 읽어 보여 줍니다.
  */
-export function AssetView({ root, path, size, imagePreview, backdrop }: AssetViewProps) {
+export function AssetView({
+  root, path, size, imagePreview, officePreview, backdrop,
+}: AssetViewProps) {
   const [url, setUrl] = useState<string | null>(null)
   const [text, setText] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -58,6 +62,8 @@ export function AssetView({ root, path, size, imagePreview, backdrop }: AssetVie
   }
 
   const office = kind === 'sheet' || kind === 'word'
+  // 꺼 두었으면 벌을 내려받는 자리(OfficePreview)를 아예 그리지 않습니다.
+  const officeOff = office && !officePreview
 
   useEffect(() => {
     if (skipped || office) return
@@ -112,7 +118,7 @@ export function AssetView({ root, path, size, imagePreview, backdrop }: AssetVie
   const tooBig = isAttachment(path) && size > MAX_ATTACHMENT_BYTES
 
   // 그림은 바탕을 칸 끝까지, 오피스 미리보기는 제 여백을 지고 옵니다. 둘 다 바깥 여백을 걷습니다.
-  const filling = (kind === 'image' && !skipped) || office
+  const filling = (kind === 'image' && !skipped) || (office && !officeOff)
 
   return (
     // 그림은 바탕을 칸 끝까지 깔아야 합니다. 여백이 남으면 거기만 테마 색이라 어수선합니다.
@@ -184,9 +190,17 @@ export function AssetView({ root, path, size, imagePreview, backdrop }: AssetVie
         </pre>
       )}
 
-      {kind === 'sheet' && <SheetPreview root={root} path={path} />}
+      {officeOff && (
+        <p className="asset-note">
+          오피스 미리보기를 꺼 두셨습니다.
+          보시려면 <strong>설정 → 일반 → 오피스 미리보기</strong>를 켜 주세요.
+          파일은 그대로 폴더에 있습니다.
+        </p>
+      )}
 
-      {kind === 'word' && <WordPreview root={root} path={path} />}
+      {kind === 'sheet' && !officeOff && <SheetPreview root={root} path={path} />}
+
+      {kind === 'word' && !officeOff && <WordPreview root={root} path={path} />}
 
       {kind === 'binary' && (
         <p className="asset-note">

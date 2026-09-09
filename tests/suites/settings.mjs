@@ -226,7 +226,79 @@ try {
   await page.keyboard.press('Escape')
   await page.waitForTimeout(400)
 
-  step('11. 닫기 단추는 끌기에 잡히지 않는다')
+  /*
+   * 설정이 늘면서 묶음 셋만으로는 굴려 찾아야 했습니다. 갈래를 펼쳐 두고
+   * 눌러 곧바로 가게 했으니, 이름과 자리가 어긋나지 않는지 봅니다.
+   */
+  step('11. 왼쪽 메뉴가 묶음과 갈래로 갈라져 있다')
+  if (!(await page.locator('.settings-nav').count())) {
+    await page.click('button[aria-label="설정"]')
+    await page.waitForSelector('.settings-nav')
+    await page.waitForTimeout(300)
+  }
+  const menu = await page.evaluate(() => ({
+    groups: [...document.querySelectorAll('.settings-nav-group > button:not(.settings-nav-item)')]
+      .map((one) => one.textContent),
+    items: [...document.querySelectorAll('.settings-nav-item')].map((one) => one.textContent),
+    // 갈래 이름마다 갈 자리가 실제로 있어야 합니다.
+    lost: [...document.querySelectorAll('.settings-nav-item')]
+      .map((one) => one.textContent)
+      .filter((name, at, all) => all.indexOf(name) !== at),
+  }))
+  console.log('  ' + JSON.stringify(menu))
+  expect('묶음이 셋', menu.groups.join() === '일반,모양,GitHub 동기화', JSON.stringify(menu.groups))
+  expect('갈래가 펼쳐져 있음', menu.items.length >= 15, String(menu.items.length))
+  expect('오피스 미리보기도 있음', menu.items.includes('오피스 미리보기'), JSON.stringify(menu.items))
+  expect('이름이 겹치지 않음', menu.lost.length === 0, JSON.stringify(menu.lost))
+
+  step('12. 갈래를 누르면 그 자리로 곧바로 간다')
+  const landed = []
+  for (const name of ['줄 간격', '이미지 최대 너비', '이미지 미리보기']) {
+    await page.click(`.settings-nav .settings-nav-item:text-is("${name}")`)
+    await page.waitForTimeout(800)
+    landed.push(await page.evaluate((want) => {
+      const nav = [...document.querySelectorAll('.settings-nav-item')]
+        .find((one) => one.textContent === want)
+      const box = document.querySelector('.settings-content').getBoundingClientRect()
+      // 그 갈래의 제목이 창 위쪽에 와 있어야 '갔다' 고 할 수 있습니다.
+      const label = [...document.querySelectorAll('.settings-content .field > label')]
+        .find((one) => one.textContent === want)
+      return {
+        name: want,
+        here: nav?.classList.contains('is-here') ?? false,
+        top: label ? Math.round(label.getBoundingClientRect().top - box.top) : null,
+      }
+    }, name))
+  }
+  console.log('  ' + JSON.stringify(landed))
+  expect('누른 갈래가 짙어짐', landed.every((one) => one.here), JSON.stringify(landed))
+  expect('그 자리가 창 위쪽에 옴',
+    landed.every((one) => one.top !== null && one.top >= -4 && one.top < 60), JSON.stringify(landed))
+
+  /*
+   * 맨 아래 갈래는 위쪽까지 끌어올 수 없습니다. 굴림이 끝에 닿기 때문입니다.
+   * 그때는 화면 안에 들어오기만 하면 된 것으로 봅니다.
+   */
+  await page.click('.settings-nav .settings-nav-item:text-is("자동 동기화")')
+  await page.waitForTimeout(800)
+  const bottom = await page.evaluate(() => {
+    const box = document.querySelector('.settings-content').getBoundingClientRect()
+    const label = [...document.querySelectorAll('.settings-content .field > label')]
+      .find((one) => one.textContent === '자동 동기화')
+    const at = label.getBoundingClientRect()
+    return { top: Math.round(at.top - box.top), height: Math.round(box.height) }
+  })
+  console.log('  ' + JSON.stringify(bottom))
+  expect('맨 아래 갈래도 화면 안에 들어옴',
+    bottom.top >= -4 && bottom.top < bottom.height, JSON.stringify(bottom))
+  await page.screenshot({ path: join(HERE, '..', 'shots', 'settings', '03-nav.png'),
+    clip: { x: 280, y: 120, width: 840, height: 660 } })
+
+  // 다음 걸음은 닫힌 자리에서 시작합니다.
+  await page.click('.sheet-close')
+  await page.waitForTimeout(300)
+
+  step('13. 닫기 단추는 끌기에 잡히지 않는다')
   await open()
   await page.click('.sheet-close')
   await page.waitForTimeout(400)

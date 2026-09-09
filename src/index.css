@@ -1348,7 +1348,7 @@ a.btn { text-decoration: none; color: inherit; display: inline-block; }
 }
 
 .settings-nav {
-  flex: 0 0 150px;
+  flex: 0 0 168px;
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -1370,6 +1370,20 @@ a.btn { text-decoration: none; color: inherit; display: inline-block; }
 }
 .settings-nav button:hover { background: var(--bg-raised); }
 .settings-nav .is-active {
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+}
+/* 묶음과 그 갈래를 한 덩어리로 묶습니다. 사이가 벌어지면 어느 묶음의 갈래인지 흐려집니다. */
+.settings-nav-group { display: flex; flex-direction: column; gap: 1px; margin-bottom: 8px; }
+/* 갈래는 한 칸 들여 적습니다. 묶음보다 작고 옅어 눈이 먼저 묶음을 봅니다. */
+.settings-nav .settings-nav-item {
+  padding: 5px 8px 5px 20px;
+  font-size: 12px;
+  color: var(--text-muted);
+  font-weight: 400;
+}
+.settings-nav .settings-nav-item.is-here {
   background: var(--accent-soft);
   color: var(--accent);
   font-weight: 600;

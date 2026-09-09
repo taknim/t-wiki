@@ -95,7 +95,52 @@ try {
   expect('바꿀 형식을 일러 줌', (legacy ?? '').includes('docx'), String(legacy))
   expect('파일은 그대로라고 밝힘', (legacy ?? '').includes('폴더에 있습니다'), String(legacy))
 
-  step('5. 트리에도 오피스 파일이 보인다')
+  step('5. 설정에서 끄면 읽지 않고 안내만 내놓는다')
+  await page.click('button[aria-label="설정"]')
+  await page.waitForSelector('.settings-nav')
+  await page.click('.settings-nav .settings-nav-item:text-is("오피스 미리보기")')
+  await page.waitForTimeout(500)
+  await page.click('.checkbox:has-text("워드·엑셀") input')
+  await page.waitForTimeout(300)
+  await page.click('.sheet-close')
+  await page.waitForTimeout(400)
+
+  await page.click('.tree-row:has-text("판매표")')
+  await page.waitForTimeout(600)
+  const off = await page.evaluate(() => ({
+    note: document.querySelector('.asset-note')?.textContent.replace(/\s+/g, ' ').trim() ?? null,
+    table: document.querySelectorAll('.data-table').length,
+  }))
+  console.log('  ' + JSON.stringify(off))
+  expect('표 대신 안내가 나옴', off.table === 0, JSON.stringify(off))
+  expect('다시 켜는 길을 일러 줌', (off.note ?? '').includes('설정 → 일반 → 오피스 미리보기'),
+    String(off.note))
+
+  step('6. 새로고침해도 꺼진 채로 열린다')
+  await page.reload({ waitUntil: 'domcontentloaded' })
+  await page.click('button:has-text("폴더 열기")')
+  await page.waitForSelector('.tree', { timeout: 10000 })
+  await page.click('.tree-row:has-text("안내문")')
+  await page.waitForTimeout(600)
+  const still = await page.evaluate(() => ({
+    note: document.querySelectorAll('.asset-note').length,
+    body: document.querySelectorAll('.text-preview.markdown-body').length,
+  }))
+  console.log('  ' + JSON.stringify(still))
+  expect('워드도 꺼진 채', still.note === 1 && still.body === 0, JSON.stringify(still))
+
+  step('7. 다시 켜면 돌아온다')
+  await page.click('button[aria-label="설정"]')
+  await page.waitForSelector('.settings-nav')
+  await page.click('.checkbox:has-text("워드·엑셀") input')
+  await page.waitForTimeout(300)
+  await page.click('.sheet-close')
+  await page.waitForSelector('.text-preview.markdown-body', { timeout: 15000 })
+  const back = await page.evaluate(() =>
+    document.querySelector('.text-preview.markdown-body h1')?.textContent ?? null)
+  expect('워드가 다시 그려짐', back === '워드 제목', String(back))
+
+  step('8. 트리에도 오피스 파일이 보인다')
   const listed = await page.evaluate(() =>
     [...document.querySelectorAll('.tree-name')].map((one) => one.textContent))
   expect('셋 다 트리에 있음',

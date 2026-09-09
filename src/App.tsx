@@ -33,9 +33,9 @@ import { DEFAULT_VIEW_MODE, loadSession, saveSession } from './lib/session'
 import { formatTidyFor, textPreviewKind, trimWhitespace } from './lib/textPreview'
 import {
   clampSidebarWidth, DEFAULT_SIDEBAR_WIDTH, maxSidebarWidth, MIN_SIDEBAR_WIDTH,
-  readImageBackdrop, readImagePreview, readSaveOptions, readSidebarOpen, readSidebarTab,
-  readSidebarWidth, readSplitRatio, writeImageBackdrop, writeImagePreview, writeSidebarOpen,
-  writeSidebarTab, writeSidebarWidth, writeSplitRatio,
+  readImageBackdrop, readImagePreview, readOfficePreview, readSaveOptions, readSidebarOpen,
+  readSidebarTab, readSidebarWidth, readSplitRatio, writeImageBackdrop, writeImagePreview,
+  writeOfficePreview, writeSidebarOpen, writeSidebarTab, writeSidebarWidth, writeSplitRatio,
 } from './lib/saveOptions'
 import { displayPath, FAVORITES_FILE, fileNameOf, isAppFile } from './lib/paths'
 import { loadFavorites } from './lib/store'
@@ -439,6 +439,17 @@ export default function App() {
   const applyImageBackdrop = useCallback((next: ImageBackdrop) => {
     setImageBackdrop(next)
     writeImageBackdrop(next)
+  }, [])
+
+  /*
+   * 워드·엑셀을 그려 볼지. 읽는 벌이 커서 열 때마다 내려받는 것이 달갑지 않을 수 있습니다.
+   * 이미지 미리보기와 같은 자리에서 들고 있습니다.
+   */
+  const [officePreview, setOfficePreview] = useState(readOfficePreview)
+
+  const applyOfficePreview = useCallback((on: boolean) => {
+    setOfficePreview(on)
+    writeOfficePreview(on)
   }, [])
 
   /*
@@ -1222,6 +1233,7 @@ export default function App() {
                   path={selection.path}
                   size={selection.size}
                   imagePreview={imagePreview}
+                  officePreview={officePreview}
                   backdrop={imageBackdrop}
                 />
               ) : (
@@ -1328,6 +1340,8 @@ export default function App() {
           onImagePreview={applyImagePreview}
           imageBackdrop={imageBackdrop}
           onImageBackdrop={applyImageBackdrop}
+          officePreview={officePreview}
+          onOfficePreview={applyOfficePreview}
           onShowHistory={() => setHistoryOpen(true)}
           onClose={() => setSettingsTab(null)}
         />

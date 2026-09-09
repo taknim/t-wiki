@@ -59,7 +59,7 @@ export function GitHubSettings({ sync, onShowHistory }: GitHubSettingsProps) {
 
   return (
     <>
-      <section className="field">
+      <section className="field" id="set-token">
         <label htmlFor="gh-token">액세스 토큰</label>
         <div className="row">
           <input
@@ -114,7 +114,7 @@ export function GitHubSettings({ sync, onShowHistory }: GitHubSettingsProps) {
         </section>
       )}
 
-      <section className="field">
+      <section className="field" id="set-repo">
         <label htmlFor="gh-owner">저장소와 브랜치</label>
         <div className="row">
           <input
@@ -182,7 +182,7 @@ export function GitHubSettings({ sync, onShowHistory }: GitHubSettingsProps) {
         </p>
       </section>
 
-      <section className="field">
+      <section className="field" id="set-conflict">
         <label htmlFor="gh-conflict">충돌 처리 방식</label>
         <select
           id="gh-conflict"
@@ -209,7 +209,7 @@ export function GitHubSettings({ sync, onShowHistory }: GitHubSettingsProps) {
         </label>
       </section>
 
-      <section className="field">
+      <section className="field" id="set-auto">
         <label>자동 동기화</label>
         <label className="checkbox">
           <input
@@ -246,7 +246,7 @@ export function GitHubSettings({ sync, onShowHistory }: GitHubSettingsProps) {
         </div>
       </section>
 
-      <section className="field">
+      <section className="field" id="set-run">
         <div className="row">
           <button
             type="button"
@@ -294,7 +294,7 @@ export function GitHubSettings({ sync, onShowHistory }: GitHubSettingsProps) {
         </p>
       </section>
 
-      <section className="field">
+      <section className="field" id="set-reset">
         <label>이 폴더의 설정</label>
         <p className="hint" style={{ marginTop: 0 }}>
           저장소 설정과 액세스 토큰은 <strong>지금 열려 있는 폴더</strong>에만 딸려 있습니다.
