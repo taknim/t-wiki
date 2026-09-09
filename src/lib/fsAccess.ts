@@ -173,13 +173,17 @@ export async function movePath(
   root: FileSystemDirectoryHandle,
   from: string,
   to: string,
+  /** 같은 이름이 있을 때 지우고 옮길지. 묻고 나서 부르는 자리에서만 켭니다. */
+  overwrite = false,
 ): Promise<void> {
   if (from === to) return
   if (to === from || to.startsWith(`${from}/`)) {
     throw new Error('폴더를 자기 자신의 하위로 옮길 수 없습니다.')
   }
   if (await exists(root, to)) {
-    throw new Error(`"${to}" 가 이미 있습니다.`)
+    if (!overwrite) throw new Error(`"${to}" 가 이미 있습니다.`)
+    // 폴더라면 안엣것까지 함께 사라집니다. 묻는 자리에서 그렇게 밝혀 두었습니다.
+    await removeEntry(root, to)
   }
 
   const kind = await entryKind(root, from)

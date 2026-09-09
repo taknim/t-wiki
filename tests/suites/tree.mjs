@@ -16,7 +16,36 @@ const page = await browser.newPage({ viewport: { width: 1400, height: 920 } })
 const errors = []
 page.on('pageerror', (e) => errors.push('pageerror: ' + e.message))
 await page.addInitScript(readFileSync(join(HERE, '..', 'mock-fs.js'), 'utf8'))
-await page.addInitScript(() => window.__installMockFs())
+await page.addInitScript(() => {
+  window.__installMockFs()
+  // 같은 이름을 두 폴더에 심어 둡니다. 옮길 때 부딪히는 자리를 만들려면 필요합니다.
+  const root = window.__mockRoot
+  const sample = root._children.get('개발 환경.md')
+  const put = (dir, name, data) => root._children.get(dir)._children.set(name, Object.assign(
+    Object.create(Object.getPrototypeOf(sample)),
+    { kind: 'file', name, _data: data, _lastModified: Date.now() },
+  ))
+  put('회사', '메모.md', '# 메모\n\n회사 쪽 메모입니다.\n')
+  put('회고', '메모.md', '# 메모\n\n회고 쪽 메모입니다.\n')
+
+  // 폴더끼리 부딪히는 자리도 하나 만들어 둡니다. 폴더는 안엣것까지 걸린 일입니다.
+  const folder = (parent, name, child, data) => {
+    const dir = Object.create(Object.getPrototypeOf(root))
+    Object.assign(dir, { kind: 'directory', name, _children: new Map() })
+    dir._children.set(child, Object.assign(
+      Object.create(Object.getPrototypeOf(sample)),
+      { kind: 'file', name: child, _data: data, _lastModified: Date.now() },
+    ))
+    root._children.get(parent)._children.set(name, dir)
+  }
+  folder('회사', '자료', '표.md', '# 표\n\n회사 쪽 자료입니다.\n')
+  folder('회고', '자료', '표.md', '# 표\n\n회고 쪽 자료입니다.\n')
+})
+
+/** 그 폴더 안에 든 줄. 같은 이름이 여러 폴더에 있으므로 자리로 짚습니다. */
+const rowIn = (folder, name) => page.locator(
+  `.tree-branch:has(> .tree-row:has-text("${folder}")) > .tree-children .tree-row:has-text("${name}")`,
+).first()
 
 /** 지금 트리와 화면이 어떤 꼴인지. */
 const shape = () => page.evaluate(() => ({
@@ -99,6 +128,84 @@ try {
   const doc = await shape()
   console.log('  ' + JSON.stringify(doc.path))
   expect('한 번 눌러 열림', doc.path === '/회사/온보딩.md', String(doc.path))
+  /*
+   * 끌어다 놓기는 마우스를 손으로 움직여서는 일어나지 않습니다. dragTo 를 씁니다.
+   * 옮겨 갈 자리에 같은 이름이 있으면 묻고, 고른 대로 해야 합니다.
+   */
+  step('6. 같은 이름이 없으면 그냥 옮겨진다')
+  await page.click('.tree-row:has-text("첨부") .tree-caret')
+  await page.waitForTimeout(300)
+  await page.locator('.tree-row:has-text("도표.svg")')
+    .dragTo(page.locator('.tree-row:has-text("회고")'))
+  await page.waitForTimeout(700)
+  const moved = await page.evaluate(() => ({
+    dialog: document.querySelectorAll('.dialog').length,
+    there: window.__vaultText('회고/도표.svg') !== null,
+  }))
+  console.log('  ' + JSON.stringify(moved))
+  expect('묻지 않고 옮김', moved.dialog === 0, JSON.stringify(moved))
+  expect('옮긴 자리에 있음', await page.evaluate(() => window.__vaultText('회고/도표.svg')) !== null)
+
+  step('7. 같은 이름이 있으면 묻고, 취소하면 둘 다 그대로다')
+  await page.click('.tree-row:has-text("회고") .tree-caret')
+  await page.waitForTimeout(300)
+  await rowIn('회고', '메모.md').dragTo(page.locator('.tree-row:has-text("회사")'))
+  await page.waitForSelector('.dialog', { timeout: 5000 })
+  const asked = await page.evaluate(() => ({
+    title: document.querySelector('.dialog h2, .dialog .dialog-title')?.textContent
+      ?? document.querySelector('.dialog')?.getAttribute('aria-label') ?? null,
+    label: document.querySelector('.dialog-label')?.textContent.replace(/\s+/g, ' ').trim() ?? null,
+    confirm: [...document.querySelectorAll('.dialog-actions button')].map((one) => one.textContent),
+  }))
+  console.log('  ' + JSON.stringify(asked))
+  expect('같은 이름이 있다고 알림', (asked.title ?? '').includes('같은 이름'), String(asked.title))
+  expect('되돌릴 수 없다고 밝힘', (asked.label ?? '').includes('되돌릴 수 없습니다'), String(asked.label))
+  expect('덮어쓰기와 취소를 고르게 함',
+    asked.confirm.join().includes('취소') && asked.confirm.join().includes('덮어쓰기'),
+    JSON.stringify(asked.confirm))
+
+  await page.click('.dialog-actions button:has-text("취소")')
+  await page.waitForTimeout(600)
+  const kept = await page.evaluate(async () => ({
+    target: await window.__vaultText('회사/메모.md'),
+    source: await window.__vaultText('회고/메모.md'),
+  }))
+  console.log('  ' + JSON.stringify(kept))
+  expect('덮어쓰지 않음', (kept.target ?? '').includes('회사 쪽'), String(kept.target))
+  expect('옮기지도 않음', (kept.source ?? '').includes('회고 쪽'), String(kept.source))
+
+  step('8. 덮어쓰기를 고르면 그때 덮어쓴다')
+  await rowIn('회고', '메모.md').dragTo(page.locator('.tree-row:has-text("회사")'))
+  await page.waitForSelector('.dialog', { timeout: 5000 })
+  await page.click('.dialog-actions button:has-text("덮어쓰기")')
+  await page.waitForTimeout(800)
+  const done = await page.evaluate(async () => ({
+    target: await window.__vaultText('회사/메모.md'),
+    source: await window.__vaultText('회고/메모.md'),
+  }))
+  console.log('  ' + JSON.stringify(done))
+  expect('옮긴 내용으로 바뀜', (done.target ?? '').includes('회고 쪽'), String(done.target))
+  expect('있던 자리에서는 사라짐', done.source === null, String(done.source))
+  await page.screenshot({ path: join(HERE, '..', 'shots', 'tree', '02-move.png'),
+    clip: { x: 0, y: 40, width: 440, height: 340 } })
+  step('9. 폴더를 덮어쓸 때는 안엣것까지 사라진다고 밝힌다')
+  await rowIn('회고', '자료').dragTo(page.locator('.tree-row:has-text("회사")'))
+  await page.waitForSelector('.dialog', { timeout: 5000 })
+  const warned = await page.evaluate(() =>
+    document.querySelector('.dialog-label')?.textContent.replace(/\s+/g, ' ').trim() ?? null)
+  console.log('  ' + String(warned))
+  expect('폴더라고 알림', (warned ?? '').includes('같은 이름의 폴더가'), String(warned))
+  expect('안엣것도 사라진다고 밝힘', (warned ?? '').includes('안에 든 것이 모두 사라지고'),
+    String(warned))
+  await page.click('.dialog-actions button:has-text("덮어쓰기")')
+  await page.waitForTimeout(900)
+  const swapped = await page.evaluate(async () => ({
+    target: await window.__vaultText('회사/자료/표.md'),
+    source: await window.__vaultText('회고/자료/표.md'),
+  }))
+  console.log('  ' + JSON.stringify(swapped))
+  expect('옮긴 폴더의 내용으로 바뀜', (swapped.target ?? '').includes('회고 쪽'), String(swapped.target))
+  expect('있던 자리에서는 사라짐', swapped.source === null, String(swapped.source))
 } catch (cause) {
   fail('묶음이 도중에 멈춤', cause instanceof Error ? (cause.stack ?? cause.message) : String(cause))
 } finally {

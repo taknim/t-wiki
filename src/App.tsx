@@ -27,7 +27,7 @@ import {
   MAX_ATTACHMENT_BYTES,
 } from './lib/attachments'
 import { extractHeadings, parseFrontmatter } from './lib/markdown'
-import { readFile } from './lib/fsAccess'
+import { entryKind, readFile } from './lib/fsAccess'
 import { DEFAULT_VIEW_MODE, loadSession, saveSession } from './lib/session'
 import { formatTidyFor, textPreviewKind, trimWhitespace } from './lib/textPreview'
 import {
@@ -748,14 +748,39 @@ export default function App() {
       if (currentDirOfNode === targetDir) return
       try {
         await commit()
-        const next = await vault.move(from, targetDir)
+
+        /*
+         * 옮겨 갈 자리에 같은 이름이 이미 있으면 묻습니다.
+         *
+         * 예전에는 "이미 있습니다" 한 줄을 띄우고 말았습니다. 그러면 덮어쓰려는 사람은
+         * 옮길 길이 없고, 실수로 끌어다 놓은 사람은 무슨 일이 벌어졌는지 알기 어렵습니다.
+         * 폴더를 덮어쓰면 그 안엣것까지 사라지므로 그 말을 창에 그대로 적어 둡니다.
+         */
+        const name = from.split('/').pop() ?? from
+        const target = targetDir ? `${targetDir}/${name}` : name
+        const standing = vault.root ? await entryKind(vault.root, target) : null
+
+        if (standing !== null) {
+          const ok = await dialogs.confirm({
+            title: '같은 이름이 이미 있습니다',
+            label: `${displayPath(target)} 자리에 ${standing === 'dir' ? '같은 이름의 폴더가' : '같은 이름의 파일이'} 있습니다.\n`
+              + (standing === 'dir'
+                ? '덮어쓰면 그 폴더와 안에 든 것이 모두 사라지고 되돌릴 수 없습니다.'
+                : '덮어쓰면 그 파일은 사라지고 되돌릴 수 없습니다.'),
+            confirmText: '덮어쓰기',
+            danger: true,
+          })
+          if (!ok) return
+        }
+
+        const next = await vault.move(from, targetDir, standing !== null)
         if (selectedPath === from) setSelectedPath(next)
         applyFavorites(movedFavorites(favorites, from, next))
       } catch (cause) {
         report(cause)
       }
     },
-    [applyFavorites, commit, favorites, report, selectedPath, vault],
+    [applyFavorites, commit, dialogs, favorites, report, selectedPath, vault],
   )
 
   const handleOpenLink = useCallback(

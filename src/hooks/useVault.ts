@@ -28,7 +28,8 @@ export interface Vault {
   createDoc: (dirPath: string, name: string) => Promise<string>
   createFolder: (dirPath: string, name: string) => Promise<void>
   rename: (path: string, nextName: string) => Promise<string>
-  move: (path: string, targetDir: string) => Promise<string>
+  /** 옮깁니다. 같은 이름이 있으면 overwrite 를 켠 자리에서만 덮어씁니다. */
+  move: (path: string, targetDir: string, overwrite?: boolean) => Promise<string>
   remove: (path: string) => Promise<void>
   addFiles: (dirPath: string, files: File[]) => Promise<AddResult>
 }
@@ -279,11 +280,11 @@ export function useVault(): Vault {
   )
 
   const move = useCallback(
-    async (path: string, targetDir: string) => {
+    async (path: string, targetDir: string, overwrite = false) => {
       const root = requireRoot()
       const name = path.split('/').pop()!
       const target = joinPath(targetDir, name)
-      await fs.movePath(root, path, target)
+      await fs.movePath(root, path, target, overwrite)
       await refresh()
       return target
     },
