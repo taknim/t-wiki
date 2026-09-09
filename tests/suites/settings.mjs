@@ -191,10 +191,11 @@ try {
   await page.waitForTimeout(500)
   expect('한 번 더 누르면 설정도 닫힘', !(await isOpen()), '아직 열려 있습니다')
 
-  step('10. 마지막 묶음 아래에 빈 칸이 남지 않는다')
+  step('10. 마지막 갈래까지 눌러서 갈 수 있다')
   /*
-   * 마지막 묶음도 메뉴로 뛰면 맨 위까지 올라와야 합니다. 그렇다고 한 화면만큼을
-   * 여백으로 붙여 두면, 이미 긴 묶음 아래에 아무것도 없는 칸만 남습니다.
+   * 마지막 묶음도, 그 안의 마지막 갈래도 메뉴로 뛰면 맨 위까지 올라와야 합니다.
+   * 그러려면 본문 끝에 빈 자리가 있어야 하는데, 한 화면을 통째로 비우면
+   * 아무것도 없는 칸만 남습니다. 필요한 만큼만 두었는지 함께 봅니다.
    */
   await open()
   await page.click('.settings-nav button:has-text("GitHub 동기화")')
@@ -208,19 +209,29 @@ try {
   console.log('  머리가 위에서 ' + jumped + 'px')
   expect('메뉴로 뛰면 머리가 위에 붙음', jumped >= 0 && jumped < 60, String(jumped))
 
+  /*
+   * 마지막 갈래도 눌러서 위까지 올라와야 합니다. 그러려면 아래에 빈 자리가 있어야
+   * 하는데, 한 화면을 통째로 비우면 아무것도 없는 칸만 남습니다. 둘을 함께 봅니다.
+   */
+  await page.click('.settings-nav .settings-nav-item:text-is("이 폴더의 설정")')
+  await page.waitForTimeout(900)
   const tail = await page.evaluate(() => {
     const pane = document.querySelector('.settings-content')
+    const head = [...document.querySelectorAll('.field-group-title')]
+      .find((one) => one.textContent === '이 폴더의 설정')
+    const top = Math.round(head.getBoundingClientRect().top - pane.getBoundingClientRect().top)
+
     pane.scrollTop = pane.scrollHeight
-    /*
-     * 묶음이 아니라 그 안의 마지막 줄에서 잽니다. 여백을 묶음 안쪽에 붙여 두면
-     * 묶음의 아래 끝은 화면 끝에 닿아 있어, 빈 칸이 있어도 없는 것으로 보입니다.
-     */
-    const last = document.querySelector('.settings-section:last-child > :last-child')
-    return Math.round(pane.getBoundingClientRect().bottom - last.getBoundingClientRect().bottom)
+    const last = document.querySelector('.settings-section:last-child .field-group:last-child')
+    return {
+      top,
+      blank: Math.round(pane.getBoundingClientRect().bottom - last.getBoundingClientRect().bottom),
+      pane: Math.round(pane.getBoundingClientRect().height),
+    }
   })
-  console.log('  끝까지 내린 뒤 아래 빈 칸: ' + tail + 'px')
-  // 칸 바깥 여백(18) 과 마지막 줄의 아래 간격(20) 만 남아야 합니다. 한 화면이 남으면 안 됩니다.
-  expect('바닥에 빈 칸이 남지 않음', tail <= 48, String(tail))
+  console.log('  마지막 갈래: ' + JSON.stringify(tail))
+  expect('마지막 갈래도 위에 붙음', tail.top >= 0 && tail.top < 60, JSON.stringify(tail))
+  expect('빈 칸이 한 화면을 넘지 않음', tail.blank < tail.pane, JSON.stringify(tail))
   await page.screenshot({ path: join(HERE, '..', 'shots', 'settings', '04-bottom.png'),
     clip: { x: 280, y: 120, width: 840, height: 660 } })
   await page.keyboard.press('Escape')

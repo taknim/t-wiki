@@ -1667,7 +1667,18 @@ a.btn { text-decoration: none; color: inherit; display: inline-block; }
  * 남습니다. 대신 키를 한 화면으로 받쳐 둡니다. 그보다 긴 묶음은 그대로 두고,
  * 짧은 묶음만 늘어납니다.
  */
-.settings-section:last-child { min-height: calc(100% - 18px); }
+/*
+ * 본문 끝에 두는 빈 자리.
+ *
+ * 이것이 없으면 마지막 갈래(동기화 실행·이 폴더의 설정)는 굴림이 끝에 닿아 있어,
+ * 메뉴에서 눌러도 화면이 꿈쩍하지 않습니다. 눌렀는데 아무 일도 없는 것처럼 보입니다.
+ * 한 화면을 통째로 비우지는 않습니다. 마지막 갈래가 위쪽까지 올라올 만큼만 둡니다.
+ */
+.settings-content::after {
+  content: '';
+  display: block;
+  height: min(420px, 48vh);
+}
 
 .settings-heading {
   margin: 0 0 14px;
