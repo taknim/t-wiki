@@ -62,8 +62,14 @@ type TabId = 'general' | 'appearance' | 'sync'
  *
  * 설정이 늘면서 묶음 셋만으로는 굴려 찾아야 했습니다. 갈래 이름을 펼쳐 두면
  * 무엇이 어디 있는지 한눈에 보이고, 눌러 곧바로 갈 수 있습니다.
- * 갈래의 id 는 그 자리 화면 요소의 id 이기도 합니다. 둘이 어긋나면 눌러도
- * 아무 데도 가지 않으므로, 새 갈래를 더할 때는 section 에도 같은 id 를 답니다.
+ *
+ * 갈래는 설정 하나가 아니라 **한 갈래에 드는 설정 몇 개**를 가리킵니다.
+ * '미리보기' 는 이미지와 오피스 둘을, '본문' 은 글꼴·크기·줄 간격·너비를 데리고 갑니다.
+ * 설정마다 한 줄씩 세우면 메뉴가 화면보다 길어져, 목록을 굴려 찾던 처음으로 돌아갑니다.
+ * id 는 그 갈래의 **첫 설정**을 가리킵니다. 눌러 첫 설정에 닿으면 나머지는 그 아래
+ * 이어져 있으므로, 굴리는 동안 그 갈래가 계속 짙게 남습니다.
+ * 둘이 어긋나면 눌러도 아무 데도 가지 않으므로, 새 갈래를 더할 때는 section 에도
+ * 같은 id 를 답니다.
  */
 const TABS: { id: TabId; name: string; hint: string; items: { id: string; name: string }[] }[] = [
   {
@@ -72,8 +78,7 @@ const TABS: { id: TabId; name: string; hint: string; items: { id: string; name: 
     hint: '마지막 화면 상태·미리보기·저장 방식으로 이동',
     items: [
       { id: 'set-session', name: '마지막 화면 상태' },
-      { id: 'set-image-preview', name: '이미지 미리보기' },
-      { id: 'set-office-preview', name: '오피스 미리보기' },
+      { id: 'set-image-preview', name: '미리보기' },
       { id: 'set-tidy', name: '저장할 때 정돈' },
       { id: 'set-transfer', name: '설정 주고받기' },
     ],
@@ -84,13 +89,8 @@ const TABS: { id: TabId; name: string; hint: string; items: { id: string; name: 
     hint: '테마와 글꼴로 이동',
     items: [
       { id: 'set-theme', name: '테마' },
-      { id: 'set-mode', name: '밝기' },
-      { id: 'set-font', name: '본문 글꼴' },
-      { id: 'set-size', name: '글자 크기' },
-      { id: 'set-leading', name: '줄 간격' },
-      { id: 'set-width', name: '본문 너비' },
-      { id: 'set-image-align', name: '이미지 정렬' },
-      { id: 'set-image-width', name: '이미지 최대 너비' },
+      { id: 'set-font', name: '본문' },
+      { id: 'set-image-align', name: '이미지' },
     ],
   },
   {
@@ -98,10 +98,8 @@ const TABS: { id: TabId; name: string; hint: string; items: { id: string; name: 
     name: 'GitHub 동기화',
     hint: '저장소와 자동 동기화 설정으로 이동',
     items: [
-      { id: 'set-token', name: '액세스 토큰' },
-      { id: 'set-repo', name: '저장소와 브랜치' },
-      { id: 'set-conflict', name: '충돌 처리 방식' },
-      { id: 'set-auto', name: '자동 동기화' },
+      { id: 'set-token', name: '저장소 연결' },
+      { id: 'set-conflict', name: '동기화 방식' },
       { id: 'set-run', name: '동기화 실행' },
       { id: 'set-reset', name: '이 폴더의 설정' },
     ],

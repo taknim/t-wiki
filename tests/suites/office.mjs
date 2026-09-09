@@ -98,7 +98,7 @@ try {
   step('5. 설정에서 끄면 읽지 않고 안내만 내놓는다')
   await page.click('button[aria-label="설정"]')
   await page.waitForSelector('.settings-nav')
-  await page.click('.settings-nav .settings-nav-item:text-is("오피스 미리보기")')
+  await page.click('.settings-nav .settings-nav-item:text-is("미리보기")')
   await page.waitForTimeout(500)
   await page.click('.checkbox:has-text("워드·엑셀") input')
   await page.waitForTimeout(300)

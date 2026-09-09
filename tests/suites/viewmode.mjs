@@ -43,10 +43,21 @@ const closeVault = async () => {
   await page.waitForSelector('button:has-text("폴더 열기")', { timeout: 8000 })
   await page.waitForTimeout(300)
 }
+/*
+ * 폴더를 다시 연 직후에는 트리가 한 번 더 그려집니다. 그 틈에 누르면 눌린 줄이
+ * 새 줄로 바뀌어 아무것도 열리지 않습니다. 열리지 않았으면 한 번 더 누릅니다.
+ */
 const openDoc = async (label) => {
-  await page.click(`.tree-row:has-text("${label}") .tree-name`)
-  await page.waitForSelector('.mode-switch', { timeout: 8000 })
-  await page.waitForTimeout(300)
+  for (let tries = 0; tries < 3; tries += 1) {
+    await page.click(`.tree-row:has-text("${label}") .tree-name`)
+    const opened = await page.waitForSelector('.mode-switch', { timeout: 3000 }).catch(() => null)
+    if (opened) {
+      await page.waitForTimeout(300)
+      return
+    }
+    await page.waitForTimeout(400)
+  }
+  throw new Error(`"${label}" 를 열지 못했습니다`)
 }
 /** 지금 눌려 있는 모드. 화면이 실제로 무엇을 그리고 있는지도 함께 봅니다. */
 const current = () => page.evaluate(() => {

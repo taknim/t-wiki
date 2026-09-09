@@ -247,28 +247,33 @@ try {
   }))
   console.log('  ' + JSON.stringify(menu))
   expect('묶음이 셋', menu.groups.join() === '일반,모양,GitHub 동기화', JSON.stringify(menu.groups))
-  expect('갈래가 펼쳐져 있음', menu.items.length >= 15, String(menu.items.length))
-  expect('오피스 미리보기도 있음', menu.items.includes('오피스 미리보기'), JSON.stringify(menu.items))
+  expect('갈래가 펼쳐져 있음', menu.items.length >= 8, String(menu.items.length))
+  // 설정 하나에 한 줄씩 세우면 메뉴가 화면보다 길어집니다. 갈래로 묶어 둡니다.
+  expect('갈래로 묶여 있음', menu.items.length <= 12, String(menu.items.length))
+  expect('미리보기가 한 갈래로 묶임',
+    menu.items.includes('미리보기') && !menu.items.includes('오피스 미리보기'),
+    JSON.stringify(menu.items))
   expect('이름이 겹치지 않음', menu.lost.length === 0, JSON.stringify(menu.lost))
 
   step('12. 갈래를 누르면 그 자리로 곧바로 간다')
+  // 갈래를 누르면 그 갈래의 첫 설정이 창 위쪽에 옵니다.
+  const FIRST = { 본문: '본문 글꼴', 이미지: '이미지 정렬', 미리보기: '이미지 미리보기' }
   const landed = []
-  for (const name of ['줄 간격', '이미지 최대 너비', '이미지 미리보기']) {
+  for (const [name, first] of Object.entries(FIRST)) {
     await page.click(`.settings-nav .settings-nav-item:text-is("${name}")`)
     await page.waitForTimeout(800)
-    landed.push(await page.evaluate((want) => {
+    landed.push(await page.evaluate(([want, label]) => {
       const nav = [...document.querySelectorAll('.settings-nav-item')]
         .find((one) => one.textContent === want)
       const box = document.querySelector('.settings-content').getBoundingClientRect()
-      // 그 갈래의 제목이 창 위쪽에 와 있어야 '갔다' 고 할 수 있습니다.
-      const label = [...document.querySelectorAll('.settings-content .field > label')]
-        .find((one) => one.textContent === want)
+      const head = [...document.querySelectorAll('.settings-content .field > label')]
+        .find((one) => one.textContent === label)
       return {
         name: want,
         here: nav?.classList.contains('is-here') ?? false,
-        top: label ? Math.round(label.getBoundingClientRect().top - box.top) : null,
+        top: head ? Math.round(head.getBoundingClientRect().top - box.top) : null,
       }
-    }, name))
+    }, [name, first]))
   }
   console.log('  ' + JSON.stringify(landed))
   expect('누른 갈래가 짙어짐', landed.every((one) => one.here), JSON.stringify(landed))
@@ -279,12 +284,12 @@ try {
    * 맨 아래 갈래는 위쪽까지 끌어올 수 없습니다. 굴림이 끝에 닿기 때문입니다.
    * 그때는 화면 안에 들어오기만 하면 된 것으로 봅니다.
    */
-  await page.click('.settings-nav .settings-nav-item:text-is("자동 동기화")')
+  await page.click('.settings-nav .settings-nav-item:text-is("동기화 방식")')
   await page.waitForTimeout(800)
   const bottom = await page.evaluate(() => {
     const box = document.querySelector('.settings-content').getBoundingClientRect()
     const label = [...document.querySelectorAll('.settings-content .field > label')]
-      .find((one) => one.textContent === '자동 동기화')
+      .find((one) => one.textContent === '충돌 처리 방식')
     const at = label.getBoundingClientRect()
     return { top: Math.round(at.top - box.top), height: Math.round(box.height) }
   })
@@ -310,10 +315,10 @@ try {
   await page.waitForTimeout(400)
   const shut = await shown()
   console.log('  접은 뒤: ' + JSON.stringify(shut.open) + ' · ' + shut.items.length + '줄')
-  expect('그 묶음 갈래가 사라짐', !shut.items.includes('테마') && !shut.items.includes('줄 간격'),
+  expect('그 묶음 갈래가 사라짐', !shut.items.includes('테마') && !shut.items.includes('본문'),
     JSON.stringify(shut.items))
-  expect('다른 묶음은 그대로', shut.items.includes('액세스 토큰') && shut.items.includes('테마') === false,
-    JSON.stringify(shut.items))
+  expect('다른 묶음은 그대로',
+    shut.items.includes('저장소 연결') && shut.items.includes('미리보기'), JSON.stringify(shut.items))
   expect('접혔다고 밝힘', shut.open.join() === 'true,false,true', JSON.stringify(shut.open))
 
   // 접은 김에 아래쪽 묶음이 위로 올라옵니다. 접는 까닭이 그것입니다.
