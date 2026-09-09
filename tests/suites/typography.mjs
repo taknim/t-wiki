@@ -196,7 +196,7 @@ try {
   expect('미리보기도 그대로', kept.preview === 2.2, String(kept.preview))
 
   step('6. 첨부 미리보기에도 걸린다')
-  await page.click('.tree-row:has-text("첨부")')
+  await page.click('.tree-row:has-text("첨부") .tree-caret')
   await page.waitForTimeout(300)
   await page.click('.tree-row:has-text("도표")')
   await page.waitForTimeout(600)

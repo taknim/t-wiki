@@ -158,7 +158,7 @@ try {
   await page.waitForSelector('.tree', { timeout: 8000 })
   // 이미 펴져 있는 폴더를 또 누르면 도로 접힙니다.
   if (!(await page.locator('.tree-row:has-text("도표")').count())) {
-    await page.click('.tree-row:has-text("첨부")')
+    await page.click('.tree-row:has-text("첨부") .tree-caret')
     await page.waitForTimeout(300)
   }
   await page.click('.tree-row:has-text("도표")')
@@ -230,7 +230,7 @@ try {
   await page.waitForSelector('.tree', { timeout: 8000 })
   // 이미 펴져 있는 폴더를 또 누르면 도로 접힙니다.
   if (!(await page.locator('.tree-row:has-text("도표")').count())) {
-    await page.click('.tree-row:has-text("첨부")')
+    await page.click('.tree-row:has-text("첨부") .tree-caret')
     await page.waitForTimeout(300)
   }
   await page.click('.tree-row:has-text("도표")')

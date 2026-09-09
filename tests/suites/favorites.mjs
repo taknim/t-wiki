@@ -190,7 +190,7 @@ try {
   await page.setViewportSize({ width: 1400, height: 400 })
   // 담을 것이 넉넉해야 넘칩니다. 폴더를 펴서 안쪽 문서까지 꺼내 둡니다.
   for (const label of ['첨부', '회고', '회사']) {
-    await page.click(`.tree-row:has-text("${label}")`).catch(() => {})
+    await page.click(`.tree-row:has-text("${label}") .tree-caret`).catch(() => {})
     await page.waitForTimeout(150)
   }
   const names = await page.evaluate(() =>
@@ -307,7 +307,7 @@ try {
   // 폴더가 펴져 있는지는 앞 걸음에 따라 다릅니다. 아이가 보일 때까지 두드립니다.
   for (let tries = 0; tries < 3; tries += 1) {
     if (await page.locator('.tree-row:has-text("온보딩")').count()) break
-    await page.click('.tree-row:has-text("회사")')
+    await page.click('.tree-row:has-text("회사") .tree-caret')
     await page.waitForTimeout(400)
   }
   await star('온보딩')

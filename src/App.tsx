@@ -47,9 +47,13 @@ import type { ImageBackdrop, SidebarTab, ViewMode, VaultNode } from './types'
 const AUTOSAVE_DELAY = 800
 
 /** 옆줄의 두 탭. 접힌 옆줄의 단추도 같은 목록으로 그립니다. */
+/*
+ * 폴더가 앞에 섭니다. 처음 온 사람에게는 담아 둔 즐겨찾기가 없고, 기본으로 펴는 쪽도
+ * 폴더입니다. 기본이 뒤에 서 있으면 고른 탭과 서 있는 자리가 어긋나 보입니다.
+ */
 const SIDEBAR_TABS: { id: SidebarTab; name: string; hint: string }[] = [
-  { id: 'favorites', name: '즐겨찾기', hint: '담아 둔 문서·첨부·폴더만 봅니다' },
   { id: 'tree', name: '폴더', hint: '폴더 트리와 문서 검색을 봅니다' },
+  { id: 'favorites', name: '즐겨찾기', hint: '담아 둔 문서·첨부·폴더만 봅니다' },
 ]
 
 export default function App() {

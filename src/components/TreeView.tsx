@@ -30,6 +30,7 @@ interface TreeViewProps extends TreeActions {
   root: VaultNode
   /** 뿌리 줄에 보여 줄 폴더 이름. */
   rootName: string
+  /** 지금 고른 것. 문서든 폴더든 이 하나로 옵니다. */
   selectedPath: string | null
   expanded: Set<string>
   onToggle: (path: string) => void
@@ -159,18 +160,39 @@ function TreeRow({ node, depth, selectedPath, expanded, onToggle, ...actions }: 
           if (from && from !== node.path) actions.onMove(from, dropDir)
         }}
         onClick={() => {
-          // 폴더는 펼치기와 고르기를 함께 합니다.
-          if (isDir) {
-            onToggle(node.path)
-            actions.onSelectDir(node.path)
-          } else {
+          if (!isDir) {
             actions.onSelect(node.path)
+            return
           }
+          /*
+           * 폴더는 한 번에 한 가지만 합니다.
+           *
+           * 고르기와 펼치기를 함께 걸어 두면, 안을 들여다보려고 누를 때마다 오른쪽
+           * 화면이 폴더 정보로 바뀌고, 폴더를 고르려고 누를 때마다 트리가 접혔다
+           * 펴집니다. 먼저 고르고, 이미 골라 둔 폴더를 다시 눌렀을 때 폅니다.
+           * 고르지 않고 펴 보고 싶으면 왼쪽 꺾쇠를 누릅니다.
+           */
+          if (isSelected) onToggle(node.path)
+          else actions.onSelectDir(node.path)
         }}
       >
-        <span className={isOpen ? 'tree-caret is-open' : 'tree-caret'}>
-          {isDir && <ChevronIcon />}
-        </span>
+        {isDir ? (
+          <button
+            type="button"
+            className={isOpen ? 'tree-caret is-open' : 'tree-caret'}
+            aria-label={`${node.name} ${isOpen ? '접기' : '펼치기'}`}
+            aria-expanded={isOpen}
+            // 꺾쇠는 고르기와 상관없이 폈다 접기만 합니다.
+            onClick={(event) => {
+              event.stopPropagation()
+              onToggle(node.path)
+            }}
+          >
+            <ChevronIcon />
+          </button>
+        ) : (
+          <span className="tree-caret" />
+        )}
         {isFavorite && <StarIcon className="tree-star" filled />}
         <span className={`tree-icon is-${kindOf(node)}`}>
           {isDir ? <FolderIcon /> : kindOf(node) === 'image' ? <ImageIcon /> : <DocIcon />}

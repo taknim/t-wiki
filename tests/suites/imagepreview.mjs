@@ -41,7 +41,8 @@ const openVault = async () => {
 /** 씨앗으로 심어 둔 그림. 폴더를 펴야 보입니다. */
 const pickImage = async () => {
   if (!(await page.locator('.tree-row:has-text("도표")').count())) {
-    await page.click('.tree-row:has-text("첨부")')
+    // 폴더 줄은 고르기만 합니다. 펴는 것은 앞의 꺾쇠입니다.
+    await page.click('.tree-row:has-text("첨부") .tree-caret')
     await page.waitForTimeout(300)
   }
   await page.click('.tree-row:has-text("도표")')
