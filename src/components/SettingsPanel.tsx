@@ -575,8 +575,9 @@ export function SettingsPanel({
           <div className="settings-content" ref={contentRef} onScroll={onScroll}>
             <section className="settings-section" ref={sectionRefs.general}>
               <h3 className="settings-heading">일반</h3>
-            <section className="field" id="set-session">
-              <label>마지막 화면 상태</label>
+            <div className="field-group" id="set-session">
+              <h4 className="field-group-title">마지막 화면 상태</h4>
+            <section className="field">
               <label className="checkbox">
                 <input
                   type="checkbox"
@@ -616,7 +617,11 @@ export function SettingsPanel({
               </p>
             </section>
 
-            <section className="field" id="set-image-preview">
+            </div>
+
+            <div className="field-group" id="set-image-preview">
+              <h4 className="field-group-title">미리보기</h4>
+            <section className="field">
               <label>이미지 미리보기</label>
               <label className="checkbox">
                 <input
@@ -633,7 +638,7 @@ export function SettingsPanel({
               </label>
             </section>
 
-            <section className="field" id="set-office-preview">
+            <section className="field">
               <label>오피스 미리보기</label>
               <label className="checkbox">
                 <input
@@ -652,8 +657,11 @@ export function SettingsPanel({
               </label>
             </section>
 
-            <section className="field" id="set-tidy">
-              <label>저장할 때 정돈</label>
+            </div>
+
+            <div className="field-group" id="set-tidy">
+              <h4 className="field-group-title">저장할 때 정돈</h4>
+            <section className="field">
               <p className="hint" style={{ marginTop: 0 }}>
                 아무것도 켜지 않으면 <strong>쓴 그대로</strong> 저장합니다.
                 미리보기는 설정과 상관없이 늘 형식에 맞춰 보여 주지만, 그때는 파일을 건드리지 않습니다.
@@ -689,8 +697,11 @@ export function SettingsPanel({
               </label>
             </section>
 
-            <section className="field" id="set-transfer">
-              <label>설정 주고받기</label>
+            </div>
+
+            <div className="field-group" id="set-transfer">
+              <h4 className="field-group-title">설정 주고받기</h4>
+            <section className="field">
               <p className="hint" style={{ marginTop: 0 }}>
                 모양·저장 방식과 <strong>지금 열려 있는 폴더</strong>의 저장소 설정을 파일 하나로 담습니다.
                 다른 기기에서는 폴더를 먼저 연 뒤 가져오면 그 폴더에 들어갑니다.
@@ -754,14 +765,16 @@ export function SettingsPanel({
                 }}
               />
             </section>
+            </div>
             </section>
 
 
             <section className="settings-section" ref={sectionRefs.appearance}>
               <h3 className="settings-heading">모양</h3>
 
-          <section className="field" id="set-theme">
-            <label>테마</label>
+          <div className="field-group" id="set-theme">
+            <h4 className="field-group-title">테마</h4>
+          <section className="field">
             <div className="theme-grid">
               {THEMES.map((theme) => {
                 const palette = isDark ? theme.dark : theme.light
@@ -790,7 +803,7 @@ export function SettingsPanel({
             </div>
           </section>
 
-          <section className="field" id="set-mode">
+          <section className="field">
             <label>밝기</label>
             <div className="segmented" role="group" aria-label="밝기">
               {MODES.map((mode) => (
@@ -808,7 +821,11 @@ export function SettingsPanel({
             </div>
           </section>
 
-          <section className="field" id="set-font">
+          </div>
+
+          <div className="field-group" id="set-font">
+            <h4 className="field-group-title">본문</h4>
+          <section className="field">
             <label>본문 글꼴</label>
             <div className="segmented" role="group" aria-label="본문 글꼴">
               {FONTS.map((font) => (
@@ -828,7 +845,7 @@ export function SettingsPanel({
             <p className="hint">편집기는 코드를 다루기 좋게 고정폭을 그대로 씁니다.</p>
           </section>
 
-          <section className="field" id="set-size">
+          <section className="field">
             <label>글자 크기</label>
             <div className="segmented" role="group" aria-label="글자 크기">
               {SIZES.map((size) => (
@@ -846,7 +863,7 @@ export function SettingsPanel({
             </div>
           </section>
 
-          <section className="field" id="set-leading">
+          <section className="field">
             <label>줄 간격</label>
             <div className="segmented" role="group" aria-label="줄 간격">
               {LEADINGS.map((leading) => (
@@ -869,7 +886,7 @@ export function SettingsPanel({
             </p>
           </section>
 
-          <section className="field" id="set-width">
+          <section className="field">
             <label>본문 너비</label>
             <div className="segmented" role="group" aria-label="본문 너비">
               {WIDTHS.map((width) => (
@@ -891,7 +908,11 @@ export function SettingsPanel({
             </div>
           </section>
 
-          <section className="field" id="set-image-align">
+          </div>
+
+          <div className="field-group" id="set-image-align">
+            <h4 className="field-group-title">이미지</h4>
+          <section className="field">
             <label>이미지 정렬</label>
             <div className="segmented" role="group" aria-label="이미지 정렬">
               {IMAGE_ALIGNS.map((align) => (
@@ -913,7 +934,7 @@ export function SettingsPanel({
             </p>
           </section>
 
-          <section className="field" id="set-image-width">
+          <section className="field">
             <label>이미지 최대 너비</label>
             <div className="segmented" role="group" aria-label="이미지 최대 너비">
               {IMAGE_WIDTHS.map((width) => (
@@ -938,6 +959,8 @@ export function SettingsPanel({
               본문 너비보다 커지는 일도 없습니다. 둘 가운데 좁은 쪽을 씁니다.
             </p>
           </section>
+
+          </div>
 
           <section className="field">
             <p className="hint">

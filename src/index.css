@@ -833,6 +833,20 @@ mark { background: var(--mark); color: inherit; border-radius: 2px; }
 }
 
 .field { margin-bottom: 20px; }
+/*
+ * 설정 한 갈래. 왼쪽 메뉴의 갈래와 같은 이름, 같은 묶음입니다.
+ * 메뉴에서만 묶고 본문은 늘어놓으면, 눌러 온 자리에 그 이름이 어디에도 없습니다.
+ */
+.field-group { margin-bottom: 26px; }
+.field-group-title {
+  margin: 0 0 12px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+  font-size: 14px;
+}
+/* 갈래 안에서는 설정끼리 조금 더 붙습니다. 한 덩어리로 보여야 합니다. */
+.field-group .field { margin-bottom: 16px; }
+.field-group .field:last-child { margin-bottom: 0; }
 .field > label { display: block; font-weight: 600; margin-bottom: 6px; font-size: 13px; }
 .field h3 { font-size: 13px; margin: 0 0 8px; }
 

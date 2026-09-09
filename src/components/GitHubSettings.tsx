@@ -59,7 +59,9 @@ export function GitHubSettings({ sync, onShowHistory }: GitHubSettingsProps) {
 
   return (
     <>
-      <section className="field" id="set-token">
+      <div className="field-group" id="set-token">
+        <h4 className="field-group-title">저장소 연결</h4>
+      <section className="field">
         <label htmlFor="gh-token">액세스 토큰</label>
         <div className="row">
           <input
@@ -114,7 +116,7 @@ export function GitHubSettings({ sync, onShowHistory }: GitHubSettingsProps) {
         </section>
       )}
 
-      <section className="field" id="set-repo">
+      <section className="field">
         <label htmlFor="gh-owner">저장소와 브랜치</label>
         <div className="row">
           <input
@@ -182,7 +184,11 @@ export function GitHubSettings({ sync, onShowHistory }: GitHubSettingsProps) {
         </p>
       </section>
 
-      <section className="field" id="set-conflict">
+      </div>
+
+      <div className="field-group" id="set-conflict">
+        <h4 className="field-group-title">동기화 방식</h4>
+      <section className="field">
         <label htmlFor="gh-conflict">충돌 처리 방식</label>
         <select
           id="gh-conflict"
@@ -209,7 +215,7 @@ export function GitHubSettings({ sync, onShowHistory }: GitHubSettingsProps) {
         </label>
       </section>
 
-      <section className="field" id="set-auto">
+      <section className="field">
         <label>자동 동기화</label>
         <label className="checkbox">
           <input
@@ -246,7 +252,11 @@ export function GitHubSettings({ sync, onShowHistory }: GitHubSettingsProps) {
         </div>
       </section>
 
-      <section className="field" id="set-run">
+      </div>
+
+      <div className="field-group" id="set-run">
+        <h4 className="field-group-title">동기화 실행</h4>
+      <section className="field">
         <div className="row">
           <button
             type="button"
@@ -294,8 +304,11 @@ export function GitHubSettings({ sync, onShowHistory }: GitHubSettingsProps) {
         </p>
       </section>
 
-      <section className="field" id="set-reset">
-        <label>이 폴더의 설정</label>
+      </div>
+
+      <div className="field-group" id="set-reset">
+        <h4 className="field-group-title">이 폴더의 설정</h4>
+      <section className="field">
         <p className="hint" style={{ marginTop: 0 }}>
           저장소 설정과 액세스 토큰은 <strong>지금 열려 있는 폴더</strong>에만 딸려 있습니다.
           다른 폴더를 열면 그 폴더의 설정이 따로 있습니다.
@@ -323,7 +336,7 @@ export function GitHubSettings({ sync, onShowHistory }: GitHubSettingsProps) {
           )}
         </div>
       </section>
-
+      </div>
     </>
   )
 }

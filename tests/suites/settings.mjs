@@ -254,26 +254,34 @@ try {
     menu.items.includes('미리보기') && !menu.items.includes('오피스 미리보기'),
     JSON.stringify(menu.items))
   expect('이름이 겹치지 않음', menu.lost.length === 0, JSON.stringify(menu.lost))
+  /*
+   * 메뉴에서만 묶고 본문은 늘어놓으면, 눌러 온 자리에 그 이름이 어디에도 없습니다.
+   * 본문의 갈래 머리와 메뉴의 갈래가 이름도 차례도 같아야 합니다.
+   */
+  const bodyHeads = await page.evaluate(() =>
+    [...document.querySelectorAll('.field-group-title')].map((one) => one.textContent))
+  console.log('  본문 머리: ' + JSON.stringify(bodyHeads))
+  expect('본문도 메뉴와 똑같이 묶임', bodyHeads.join() === menu.items.join(),
+    JSON.stringify(bodyHeads))
 
   step('12. 갈래를 누르면 그 자리로 곧바로 간다')
-  // 갈래를 누르면 그 갈래의 첫 설정이 창 위쪽에 옵니다.
-  const FIRST = { 본문: '본문 글꼴', 이미지: '이미지 정렬', 미리보기: '이미지 미리보기' }
+  // 갈래를 누르면 본문에서 같은 이름의 머리가 창 위쪽에 옵니다.
   const landed = []
-  for (const [name, first] of Object.entries(FIRST)) {
+  for (const name of ['본문', '이미지', '미리보기']) {
     await page.click(`.settings-nav .settings-nav-item:text-is("${name}")`)
     await page.waitForTimeout(800)
-    landed.push(await page.evaluate(([want, label]) => {
+    landed.push(await page.evaluate((want) => {
       const nav = [...document.querySelectorAll('.settings-nav-item')]
         .find((one) => one.textContent === want)
       const box = document.querySelector('.settings-content').getBoundingClientRect()
-      const head = [...document.querySelectorAll('.settings-content .field > label')]
-        .find((one) => one.textContent === label)
+      const head = [...document.querySelectorAll('.field-group-title')]
+        .find((one) => one.textContent === want)
       return {
         name: want,
         here: nav?.classList.contains('is-here') ?? false,
         top: head ? Math.round(head.getBoundingClientRect().top - box.top) : null,
       }
-    }, [name, first]))
+    }, name))
   }
   console.log('  ' + JSON.stringify(landed))
   expect('누른 갈래가 짙어짐', landed.every((one) => one.here), JSON.stringify(landed))
@@ -288,9 +296,9 @@ try {
   await page.waitForTimeout(800)
   const bottom = await page.evaluate(() => {
     const box = document.querySelector('.settings-content').getBoundingClientRect()
-    const label = [...document.querySelectorAll('.settings-content .field > label')]
-      .find((one) => one.textContent === '충돌 처리 방식')
-    const at = label.getBoundingClientRect()
+    const head = [...document.querySelectorAll('.field-group-title')]
+      .find((one) => one.textContent === '동기화 방식')
+    const at = head.getBoundingClientRect()
     return { top: Math.round(at.top - box.top), height: Math.round(box.height) }
   })
   console.log('  ' + JSON.stringify(bottom))

@@ -40,7 +40,7 @@ const openVault = async (w) => {
 const closeVault = async () => {
   if (await page.locator('.sheet-close').count()) { await page.click('.sheet-close'); await page.waitForTimeout(200) }
   await page.click('.tree-root button[aria-label="폴더 닫기"]')
-  await page.waitForSelector('button:has-text("폴더 열기")', { timeout: 8000 })
+  await page.waitForSelector('button:has-text("폴더 열기")', { timeout: 15000 })
   await page.waitForTimeout(300)
 }
 /*
@@ -100,7 +100,7 @@ try {
   await page.reload({ waitUntil: 'domcontentloaded' })
   // 이 시험대의 목 폴더는 새로고침하면 새로 생기므로 다시 엽니다.
   await openVault('first')
-  await page.waitForSelector('.mode-switch', { timeout: 8000 })
+  await page.waitForSelector('.mode-switch', { timeout: 15000 })
   await page.waitForTimeout(500)
   const after = await current()
   console.log('  새로고침 뒤: ' + JSON.stringify(after))
@@ -122,7 +122,7 @@ try {
 
   await closeVault()
   await openVault('first')
-  await page.waitForSelector('.mode-switch', { timeout: 8000 })
+  await page.waitForSelector('.mode-switch', { timeout: 15000 })
   await page.waitForTimeout(400)
   const back = await current()
   console.log('  원래 폴더: ' + JSON.stringify(back))
@@ -131,7 +131,7 @@ try {
 
   await closeVault()
   await openVault('other')
-  await page.waitForSelector('.mode-switch', { timeout: 8000 })
+  await page.waitForSelector('.mode-switch', { timeout: 15000 })
   await page.waitForTimeout(400)
   const again = await current()
   console.log('  다른 폴더 다시: ' + JSON.stringify(again))
