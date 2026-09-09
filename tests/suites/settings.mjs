@@ -232,6 +232,29 @@ try {
   console.log('  마지막 갈래: ' + JSON.stringify(tail))
   expect('마지막 갈래도 위에 붙음', tail.top >= 0 && tail.top < 60, JSON.stringify(tail))
   expect('빈 칸이 한 화면을 넘지 않음', tail.blank < tail.pane, JSON.stringify(tail))
+
+  /*
+   * 끝까지 내려온 자리에서는 마지막 갈래가 짙어야 합니다. 더 내려갈 데가 없어
+   * 그 머리는 영영 위쪽 경계를 넘지 못하므로, 자리만 보고 고르면 앞엣것이 남습니다.
+   */
+  const atBottom = await page.evaluate(async () => {
+    const pane = document.querySelector('.settings-content')
+    pane.scrollTop = pane.scrollHeight
+    await new Promise((done) => setTimeout(done, 400))
+    return document.querySelector('.settings-nav .is-here')?.textContent ?? null
+  })
+  console.log('  맨 아래에서 짙은 갈래: ' + String(atBottom))
+  expect('끝까지 내리면 마지막 갈래가 짙어짐', atBottom === '이 폴더의 설정', String(atBottom))
+
+  // 창의 둥근 끝을 왼쪽 메뉴의 바탕색이 각진 채로 덮지 않아야 합니다.
+  const corner = await page.evaluate(() => {
+    const sheet = document.querySelector('.sheet:has(.settings-layout)')
+    const style = getComputedStyle(sheet)
+    return { overflow: style.overflowX, radius: style.borderBottomLeftRadius }
+  })
+  console.log('  ' + JSON.stringify(corner))
+  expect('아래 모서리도 창을 따라 둥긂',
+    corner.overflow === 'hidden' && parseFloat(corner.radius) > 0, JSON.stringify(corner))
   await page.screenshot({ path: join(HERE, '..', 'shots', 'settings', '04-bottom.png'),
     clip: { x: 280, y: 120, width: 840, height: 660 } })
   await page.keyboard.press('Escape')

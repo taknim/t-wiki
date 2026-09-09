@@ -350,9 +350,20 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vault.index, vault.assets, selectedPath])
 
-  // 같은 폴더를 다시 열면 지난번 화면 상태로 되돌립니다.
-  // 폴더마다 한 번씩만 복원하고, 그 뒤의 변경은 사용자의 조작으로 봅니다.
+  /*
+   * 같은 폴더를 다시 열면 지난번 화면 상태로 되돌립니다.
+   * 폴더마다 한 번씩만 복원하고, 그 뒤의 변경은 사용자의 조작으로 봅니다.
+   *
+   * 색인과 여는 절차는 의존성에 두지 않고 ref 로 봅니다. 둘은 렌더마다 새것이 되는데,
+   * 그때마다 이 효과가 다시 돌면 앞서 시작한 복원이 취소되고, 다시 돈 쪽은 아래
+   * 표에 걸려 그대로 물러납니다. 그러면 복원이 통째로 사라집니다.
+   * 실제로 폴더를 다시 열 때 열에 넷쯤은 지난 화면이 돌아오지 않았습니다.
+   */
   const restoredFor = useRef<FileSystemDirectoryHandle | null>(null)
+  const latest = useRef({ vault, openAsset })
+  useEffect(() => {
+    latest.current = { vault, openAsset }
+  })
 
   useEffect(() => {
     const root = vault.root
@@ -375,20 +386,21 @@ export default function App() {
       const path = saved.selectedPath
       if (!path) return
 
-      if (vault.index.has(path)) {
+      const { vault: now, openAsset: open } = latest.current
+      if (now.index.has(path)) {
         setSelectedPath(path)
-        setDraft(vault.index.get(path)?.content ?? '')
+        setDraft(now.index.get(path)?.content ?? '')
         setDirty(false)
         return
       }
       // 첨부는 문서 색인에 없으므로 여는 절차를 그대로 씁니다.
-      if (vault.assets.has(path)) await openAsset(path)
+      if (now.assets.has(path)) await open(path)
     })()
 
     return () => {
       cancelled = true
     }
-  }, [vault.status, vault.root, vault.index, vault.assets, openAsset])
+  }, [vault.status, vault.root])
 
   // 펼친 폴더와 고른 항목이 바뀔 때마다 기억해 둡니다.
   // 사용자가 클릭할 때만 일어나는 변화라 그때그때 써도 부담이 없습니다.

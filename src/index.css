@@ -1351,6 +1351,12 @@ a.btn { text-decoration: none; color: inherit; display: inline-block; }
 .sheet:has(.settings-layout) {
   width: min(840px, 100%);
   height: min(660px, 88vh);
+  /*
+   * 아래 두 모서리도 창을 따라 둥글어야 합니다. 왼쪽 메뉴가 제 바탕색을 지고 있어,
+   * 그대로 두면 창의 둥근 끝 위로 각진 채 삐져나옵니다.
+   * 안내 글은 딴 자리에 그려지므로 여기서 잘리지 않습니다.
+   */
+  overflow: hidden;
 }
 
 .settings-layout {
@@ -1672,12 +1678,13 @@ a.btn { text-decoration: none; color: inherit; display: inline-block; }
  *
  * 이것이 없으면 마지막 갈래(동기화 실행·이 폴더의 설정)는 굴림이 끝에 닿아 있어,
  * 메뉴에서 눌러도 화면이 꿈쩍하지 않습니다. 눌렀는데 아무 일도 없는 것처럼 보입니다.
- * 한 화면을 통째로 비우지는 않습니다. 마지막 갈래가 위쪽까지 올라올 만큼만 둡니다.
+ * 끝까지 내렸을 때 왼쪽에서 짙어지는 갈래도 이 자리가 있어야 마지막 것이 됩니다.
+ * 그렇다고 한 화면을 통째로 비우지는 않습니다. 마지막 갈래가 위쪽까지 올라올 만큼만입니다.
  */
 .settings-content::after {
   content: '';
   display: block;
-  height: min(420px, 48vh);
+  height: min(520px, 60vh);
 }
 
 .settings-heading {
