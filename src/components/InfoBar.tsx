@@ -84,7 +84,12 @@ export function InfoBar({
       )}
 
       <div className="info-bar">
-        <span className={`info-kind info-kind-${info.kind}`}>{KIND_LABEL[info.kind]}</span>
+        <span
+          className={`info-kind info-kind-${info.kind}`}
+          data-tip={`고른 것의 갈래 · ${KIND_LABEL[info.kind]}`}
+        >
+          {KIND_LABEL[info.kind]}
+        </span>
         {/* 눌러서 베낍니다. 긴 경로를 손으로 골라 잡는 것은 번거롭습니다. */}
         <button
           type="button"
@@ -98,16 +103,42 @@ export function InfoBar({
 
         <span className="info-sep" />
 
+        {/*
+          숫자만 놓여 있으면 무엇을 센 것인지 알 수 없습니다. 손을 얹으면 말로 밝힙니다.
+          크기는 반올림해 보여 주므로, 안내에는 바이트 그대로도 함께 적습니다.
+        */}
         {info.kind === 'dir' ? (
-          <span className="info-meta">
-            파일 {info.fileCount ?? 0}개 · {formatBytes(info.size)}
-          </span>
+          <>
+            <span className="info-meta" data-tip="이 폴더 아래에 있는 파일 수입니다. 하위 폴더까지 셉니다">
+              파일 {info.fileCount ?? 0}개
+            </span>
+            <span
+              className="info-meta"
+              data-tip={`폴더 크기 · 이 폴더 아래 파일을 모두 더해 ${info.size.toLocaleString('ko-KR')}바이트입니다`}
+            >
+              {formatBytes(info.size)}
+            </span>
+          </>
         ) : (
-          <span className="info-meta">{formatBytes(info.size)}</span>
+          <span
+            className="info-meta"
+            data-tip={`파일 크기 · ${info.size.toLocaleString('ko-KR')}바이트`}
+          >
+            {formatBytes(info.size)}
+          </span>
         )}
 
         {info.lastModified !== null && (
-          <span className="info-meta">
+          <span
+            className="info-meta"
+            /*
+             * 만든 시각은 적을 수 없습니다. 브라우저가 파일에서 내주는 시각은
+             * 마지막으로 고친 때 하나뿐입니다. 헷갈리지 않도록 그렇게 밝힙니다.
+             */
+            data-tip={`마지막으로 고친 시각 · ${new Date(info.lastModified).toLocaleString('ko-KR', {
+              dateStyle: 'full', timeStyle: 'medium',
+            })}`}
+          >
             {new Date(info.lastModified).toLocaleString('ko-KR', {
               year: 'numeric', month: '2-digit', day: '2-digit',
               hour: '2-digit', minute: '2-digit',

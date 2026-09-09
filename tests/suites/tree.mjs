@@ -291,6 +291,52 @@ try {
   expect('폴더 경로도 베껴짐', dirCopy.clip === '내 위키/회고', String(dirCopy.clip))
   expect('폴더라고 알림', dirCopy.toast === '폴더 경로를 클립보드에 복사했습니다.', String(dirCopy.toast))
 
+  /*
+   * 아래 표시줄의 숫자는 그냥 놓여 있으면 무엇을 센 것인지 알 수 없습니다.
+   * 손을 얹으면 말로 밝혀야 합니다.
+   */
+  step('12. 표시줄의 숫자에 손을 얹으면 무엇인지 알려 준다')
+  await page.click('.tree-row:has-text("개발 환경") .tree-name')
+  await page.waitForTimeout(500)
+  const fileTips = await page.evaluate(() =>
+    [...document.querySelectorAll('.info-bar [data-tip]')].map((one) => ({
+      text: one.textContent.trim(),
+      tip: one.getAttribute('data-tip'),
+    })))
+  console.log('  ' + JSON.stringify(fileTips))
+  expect('크기에 설명이 붙음',
+    fileTips.some((one) => (one.tip ?? '').startsWith('파일 크기 ·')), JSON.stringify(fileTips))
+  // 반올림해 보여 주므로 안내에는 바이트 그대로도 적습니다.
+  expect('바이트 그대로도 적힘',
+    fileTips.some((one) => /파일 크기 · [\d,]+바이트/.test(one.tip ?? '')), JSON.stringify(fileTips))
+  expect('시각은 고친 때라고 밝힘',
+    fileTips.some((one) => (one.tip ?? '').startsWith('마지막으로 고친 시각 ·')),
+    JSON.stringify(fileTips))
+
+  // 손을 얹으면 실제로 뜨는지도 봅니다. 붙여 두기만 하고 안 뜨면 소용없습니다.
+  const sizeCell = page.locator('.info-bar [data-tip^="파일 크기"]')
+  await sizeCell.hover()
+  await page.waitForTimeout(700)
+  const shownTip = await page.evaluate(() =>
+    document.querySelector('.tooltip')?.textContent ?? null)
+  console.log('  뜬 안내: ' + String(shownTip))
+  expect('손을 얹으면 뜸', (shownTip ?? '').startsWith('파일 크기 ·'), String(shownTip))
+
+  step('13. 폴더는 파일 수와 크기를 따로 밝힌다')
+  await page.click('.tree-row:has-text("회고")')
+  await page.waitForTimeout(500)
+  const dirTips = await page.evaluate(() =>
+    [...document.querySelectorAll('.info-bar [data-tip]')].map((one) => ({
+      text: one.textContent.trim(),
+      tip: one.getAttribute('data-tip'),
+    })))
+  console.log('  ' + JSON.stringify(dirTips))
+  expect('파일 수에 설명이 붙음',
+    dirTips.some((one) => one.text.includes('개') && (one.tip ?? '').includes('파일 수')),
+    JSON.stringify(dirTips))
+  expect('폴더 크기에도 설명이 붙음',
+    dirTips.some((one) => (one.tip ?? '').startsWith('폴더 크기 ·')), JSON.stringify(dirTips))
+
 } catch (cause) {
   fail('묶음이 도중에 멈춤', cause instanceof Error ? (cause.stack ?? cause.message) : String(cause))
 } finally {
