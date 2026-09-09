@@ -10,8 +10,14 @@ export const IMAGE_EXTENSIONS = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'av
 
 export const DOCUMENT_EXTENSIONS = [
   'pdf', 'txt', 'csv', 'tsv', 'json', 'yaml', 'yml', 'xml', 'html', 'htm',
-  'docx', 'xlsx', 'pptx', 'hwp', 'hwpx',
+  'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'hwp', 'hwpx',
 ]
+
+/** 표로 그릴 수 있는 엑셀. 옛 이진 형식(xls)도 읽습니다. */
+const SHEET_EXTENSIONS = ['xlsx', 'xlsm', 'xls', 'csv2']
+
+/** 글로 풀어 볼 수 있는 워드. 옛 이진 형식(doc)은 브라우저에서 읽을 방법이 없습니다. */
+const WORD_EXTENSIONS = ['docx']
 
 /** 글자로 되어 있어 편집기에서 고쳐 쓸 수 있는 형식. */
 const TEXT_EXTENSIONS = ['txt', 'csv', 'tsv', 'json', 'yaml', 'yml', 'xml', 'html', 'htm']
@@ -29,7 +35,7 @@ export const ACCEPT_ATTRIBUTE = ['md', ...IMAGE_EXTENSIONS, ...DOCUMENT_EXTENSIO
   .map((extension) => `.${extension}`)
   .join(',')
 
-export type AttachmentKind = 'image' | 'pdf' | 'text' | 'binary'
+export type AttachmentKind = 'image' | 'pdf' | 'text' | 'sheet' | 'word' | 'binary'
 
 export function extensionOf(path: string): string {
   const name = path.split('/').pop() ?? path
@@ -67,7 +73,20 @@ export function attachmentKind(path: string): AttachmentKind {
   if (IMAGE_EXTENSIONS.includes(extension)) return 'image'
   if (extension === 'pdf') return 'pdf'
   if (TEXT_EXTENSIONS.includes(extension)) return 'text'
+  if (SHEET_EXTENSIONS.includes(extension)) return 'sheet'
+  if (WORD_EXTENSIONS.includes(extension)) return 'word'
   return 'binary'
+}
+
+/**
+ * 옛 오피스 이진 형식인지. doc·ppt 는 브라우저에서 풀 방법이 사실상 없습니다.
+ * 못 여는 까닭을 밝히고 무엇으로 바꾸면 되는지 일러 주려고 따로 가립니다.
+ */
+export function legacyOffice(path: string): string | null {
+  const extension = extensionOf(path)
+  if (extension === 'doc') return 'docx'
+  if (extension === 'ppt') return 'pptx'
+  return null
 }
 
 const UNITS = ['B', 'KB', 'MB', 'GB']

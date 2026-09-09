@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import {
-  attachmentKind, formatBytes, isAttachment, MAX_ATTACHMENT_BYTES, withMime,
+  attachmentKind, formatBytes, isAttachment, legacyOffice, MAX_ATTACHMENT_BYTES, withMime,
 } from '../lib/attachments'
 import { readBinaryFile } from '../lib/fsAccess'
+import { SheetPreview, WordPreview } from './OfficePreview'
 import type { ImageBackdrop } from '../types'
 
 interface AssetViewProps {
@@ -56,8 +57,10 @@ export function AssetView({ root, path, size, imagePreview, backdrop }: AssetVie
     if (skipped) setUrl(null)
   }
 
+  const office = kind === 'sheet' || kind === 'word'
+
   useEffect(() => {
-    if (skipped) return
+    if (skipped || office) return
     let cancelled = false
 
     void (async () => {
@@ -87,7 +90,7 @@ export function AssetView({ root, path, size, imagePreview, backdrop }: AssetVie
         objectUrl.current = null
       }
     }
-  }, [root, path, kind, skipped])
+  }, [root, path, kind, skipped, office])
 
   /*
    * 그려진 크기는 창을 늘이거나 설정을 바꿀 때마다 달라집니다.
@@ -108,7 +111,8 @@ export function AssetView({ root, path, size, imagePreview, backdrop }: AssetVie
   const name = path.split('/').pop() ?? path
   const tooBig = isAttachment(path) && size > MAX_ATTACHMENT_BYTES
 
-  const filling = kind === 'image' && !skipped
+  // 그림은 바탕을 칸 끝까지, 오피스 미리보기는 제 여백을 지고 옵니다. 둘 다 바깥 여백을 걷습니다.
+  const filling = (kind === 'image' && !skipped) || office
 
   return (
     // 그림은 바탕을 칸 끝까지 깔아야 합니다. 여백이 남으면 거기만 테마 색이라 어수선합니다.
@@ -180,9 +184,19 @@ export function AssetView({ root, path, size, imagePreview, backdrop }: AssetVie
         </pre>
       )}
 
+      {kind === 'sheet' && <SheetPreview root={root} path={path} />}
+
+      {kind === 'word' && <WordPreview root={root} path={path} />}
+
       {kind === 'binary' && (
         <p className="asset-note">
-          이 형식은 미리보기를 지원하지 않습니다. 파일은 그대로 폴더에 있습니다.
+          {/*
+            doc·ppt 는 브라우저에서 풀 방법이 사실상 없습니다. 못 연다고만 하면
+            무엇을 해야 할지 알 수 없으니, 어느 형식으로 바꾸면 되는지 함께 적습니다.
+          */}
+          {legacyOffice(path)
+            ? `옛 오피스 형식이라 여기서는 열어 볼 수 없습니다. ${legacyOffice(path)} 로 저장하면 미리보기가 됩니다. 파일은 그대로 폴더에 있습니다.`
+            : '이 형식은 미리보기를 지원하지 않습니다. 파일은 그대로 폴더에 있습니다.'}
         </p>
       )}
     </div>

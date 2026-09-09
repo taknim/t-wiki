@@ -1,5 +1,6 @@
 import { chromium } from 'playwright'
 import { createGitHubMock } from '../github-mock.mjs'
+import { DOCX_B64, XLSX_B64 } from '../office-fixtures.mjs'
 import { createServer } from 'node:http'
 import { execSync } from 'node:child_process'
 import { readFileSync, existsSync, mkdirSync } from 'node:fs'
@@ -70,7 +71,7 @@ const errors = []
 page.on('pageerror', (e) => errors.push('pageerror: ' + e.message))
 await page.route('https://api.github.com/**', github.handler)
 await page.addInitScript(readFileSync(join(HERE, '..', 'mock-fs.js'), 'utf8'))
-await page.addInitScript(() => {
+await page.addInitScript(({ xlsx, docx }) => {
   window.__installMockFs()
   const root = window.__mockRoot
   const sample = root._children.get('개발 환경.md')
@@ -78,6 +79,10 @@ await page.addInitScript(() => {
     Object.create(Object.getPrototypeOf(sample)),
     { kind: 'file', name, _data: data, _lastModified: Date.now() },
   )
+  // 오피스 미리보기는 벌을 따로 내려받아 돌립니다. 울타리에 걸리는지 여기서 봅니다.
+  const bytes = (b64) => Uint8Array.from(atob(b64), (one) => one.charCodeAt(0))
+  root._children.set('판매표.xlsx', make('판매표.xlsx', bytes(xlsx)))
+  root._children.set('안내문.docx', make('안내문.docx', bytes(docx)))
   // 막힐 만한 것을 한 문서에 모아 둡니다. 그림·다이어그램·수식·문서 안 스타일.
   root._children.set('모둠.md', make('모둠.md',
     '# 모둠\n\n```mermaid\ngraph TD;\n  가-->나;\n```\n\n$$E = mc^2$$\n\n'
@@ -89,7 +94,7 @@ await page.addInitScript(() => {
   document.addEventListener('securitypolicyviolation', (event) => {
     window.__csp.push(`${event.violatedDirective} <- ${event.blockedURI}`)
   })
-})
+}, { xlsx: XLSX_B64, docx: DOCX_B64 })
 
 try {
   step('1. 머리말이 실제로 붙어 나간다')
@@ -139,7 +144,23 @@ try {
    * 동기화는 이 앱의 본일입니다. connect-src 를 잘못 좁히면 여기서만 막히는데,
    * 화면에는 그저 실패로 보입니다. 가짜 저장소를 세워 실제로 한 번 돌려 봅니다.
    */
-  step('5. 저장소와 주고받기도 막히지 않는다')
+  /*
+   * 오피스 미리보기는 큰 벌을 그때그때 내려받습니다. 그 안에서 eval 이나 new Function 을
+   * 쓰면 script-src 에 걸려 조용히 죽습니다. 실제로 열어 봐야 압니다.
+   */
+  step('5. 오피스 미리보기도 울타리 안에서 돈다')
+  await page.click('.tree-row:has-text("판매표")')
+  await page.waitForSelector('.data-table', { timeout: 15000 })
+  const cells = await page.evaluate(() =>
+    document.querySelectorAll('.data-table tbody tr').length)
+  expect('엑셀이 표로 그려짐', cells === 3, String(cells))
+  await page.click('.tree-row:has-text("안내문")')
+  await page.waitForSelector('.text-preview.markdown-body', { timeout: 15000 })
+  const word = await page.evaluate(() =>
+    document.querySelector('.text-preview.markdown-body h1')?.textContent ?? null)
+  expect('워드가 글로 그려짐', word === '워드 제목', String(word))
+
+  step('6. 저장소와 주고받기도 막히지 않는다')
   await page.click('button[aria-label="설정"]')
   await page.waitForSelector('.settings-nav')
   await page.click('.settings-nav button:has-text("GitHub 동기화")')
@@ -165,7 +186,7 @@ try {
   console.log('  저장소: ' + JSON.stringify(landed))
   expect('저장소에 올라감', landed.length > 0, JSON.stringify(landed))
 
-  step('6. 막힌 것이 하나도 없다')
+  step('7. 막힌 것이 하나도 없다')
   const blocked = await page.evaluate(() => window.__csp)
   console.log('  ' + JSON.stringify(blocked))
   expect('CSP 에 걸린 것이 없음', blocked.length === 0, JSON.stringify(blocked))

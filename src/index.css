@@ -1744,6 +1744,25 @@ a.btn { text-decoration: none; color: inherit; display: inline-block; }
   background: var(--bg-sunken);
 }
 
+/* 시트 고르는 줄. 엑셀에서 보던 자리처럼 표 위에 둡니다. */
+.sheet-tabs { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 10px; }
+.sheet-tabs button {
+  padding: 4px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  background: var(--bg-raised);
+  color: inherit;
+  cursor: pointer;
+  font-size: 12px;
+}
+.sheet-tabs .is-active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+/*
+ * 워드에서 풀어낸 글. 마크다운 미리보기의 옷을 그대로 입혀
+ * 제목·목록·표가 다른 문서와 같은 모양으로 보이게 합니다.
+ */
+.text-preview.markdown-body img { display: block; margin: 8px 0; }
+
 .code-preview {
   margin: 0;
   padding: 12px 14px;
