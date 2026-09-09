@@ -1470,20 +1470,28 @@ a.btn { text-decoration: none; color: inherit; display: inline-block; }
 .asset-canvas.is-mid { background-color: var(--img-mid); }
 .asset-canvas.is-dark { background-color: var(--img-dark); }
 
-/* 그림의 본디 크기. 창에 맞춰 줄어 있으므로 숫자로 알려 줍니다. */
+/* 그림 크기. 창에 맞춰 줄어 있으므로 지금 크기와 본디 크기를 함께 알려 줍니다. */
 .asset-size {
   position: absolute;
   inset-block-start: 10px;
   inset-inline-end: 12px;
-  padding: 2px 7px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+  padding: 3px 8px;
   border-radius: 4px;
   /* 어떤 바탕 위에 얹힐지 모르므로 제 색을 지고 갑니다. */
   background: rgb(0 0 0 / 55%);
   color: #fff;
   font-size: 11px;
+  line-height: 1.35;
   font-variant-numeric: tabular-nums;
   pointer-events: none;
 }
+/* 지금 크기가 먼저 눈에 들어와야 합니다. 본디 크기는 곁들이는 말입니다. */
+.asset-size-now { font-weight: 600; }
+.asset-size-origin { font-size: 10px; color: rgb(255 255 255 / 78%); }
 
 /*
  * 그림의 가장자리.

@@ -16,7 +16,22 @@ const page = await browser.newPage({ viewport: { width: 1400, height: 920 } })
 const errors = []
 page.on('pageerror', (e) => errors.push('pageerror: ' + e.message))
 await page.addInitScript(readFileSync(join(HERE, '..', 'mock-fs.js'), 'utf8'))
-await page.addInitScript(() => window.__installMockFs())
+await page.addInitScript(() => {
+  window.__installMockFs()
+  // 줄여 그리는 회차를 보려면 칸보다 넓은 그림이 있어야 합니다.
+  const attach = window.__mockRoot._children.get('첨부')
+  const sample = attach._children.get('도표.svg')
+  attach._children.set('큰그림.svg', Object.assign(
+    Object.create(Object.getPrototypeOf(sample)),
+    {
+      kind: 'file',
+      name: '큰그림.svg',
+      _lastModified: Date.now(),
+      _data: '<svg xmlns="http://www.w3.org/2000/svg" width="2000" height="500">'
+        + '<rect width="2000" height="500" fill="#2f6feb"/></svg>',
+    },
+  ))
+})
 
 const openVault = async () => {
   await page.click('button:has-text("폴더 열기")')
@@ -214,7 +229,8 @@ try {
     return {
       outline: style.outlineWidth,
       ring: style.boxShadow,
-      size: label?.textContent ?? null,
+      size: label?.querySelector('.asset-size-now')?.textContent.trim() ?? null,
+      origin: label?.querySelector('.asset-size-origin')?.textContent.replace(/\s+/g, ' ').trim() ?? null,
       // 칸의 오른쪽 위 구석에 붙어 있어야 합니다.
       corner: at ? Math.round(box.right - at.right) < 30 && Math.round(at.top - box.top) < 30 : false,
     }
@@ -222,8 +238,30 @@ try {
   console.log('  ' + JSON.stringify(marked))
   expect('그림에 테두리가 둘림', marked.outline !== '0px', JSON.stringify(marked))
   expect('밝은 테도 함께 둘림', marked.ring !== 'none', JSON.stringify(marked))
-  expect('크기가 픽셀로 적힘', /^\d+px × \d+px$/.test(marked.size ?? ''), String(marked.size))
+  expect('크기가 픽셀로 적힘', /^\d+ × \d+px$/.test(marked.size ?? ''), String(marked.size))
   expect('오른쪽 위 구석에 있음', marked.corner === true, JSON.stringify(marked))
+  // 줄지 않은 그림에까지 본디 크기를 적으면 같은 숫자가 두 번 적힙니다.
+  expect('줄지 않았으면 본디 크기는 안 적음', marked.origin === null, String(marked.origin))
+
+  step('4-2. 줄여 그린 그림에는 본디 크기와 몇 할인지 함께 적는다')
+  await page.click('.tree-row:has-text("큰그림")')
+  await page.waitForTimeout(800)
+  const big = await page.evaluate(() => {
+    const image = document.querySelector('.asset-image')
+    const now = document.querySelector('.asset-size-now')?.textContent.trim() ?? null
+    const origin = document.querySelector('.asset-size-origin')?.textContent
+      .replace(/\s+/g, ' ').trim() ?? null
+    return { now, origin, width: Math.round(image.getBoundingClientRect().width), natural: image.naturalWidth }
+  })
+  console.log('  ' + JSON.stringify(big))
+  expect('본디 크기가 함께 적힘', /^원본 2000 × 500px · \d+%$/.test(big.origin ?? ''),
+    String(big.origin))
+  expect('지금 크기는 그려진 그대로', big.now === `${big.width} × ${Math.round(big.width / 4)}px`,
+    `${big.now} vs ${big.width}`)
+  expect('본디보다 작게 그려짐', big.width < big.natural, JSON.stringify(big))
+  await page.screenshot({ path: join(HERE, '..', 'shots', 'imagepreview', '04-size.png'),
+    clip: { x: 430, y: 60, width: 970, height: 220 } })
+  await pickImage()
 
   step('8. 밝게·중간·어둡게는 저마다 다른 색을 깐다')
   const painted = {}

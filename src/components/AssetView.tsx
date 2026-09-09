@@ -28,6 +28,9 @@ export function AssetView({ root, path, size, imagePreview, backdrop }: AssetVie
   const [error, setError] = useState<string | null>(null)
   // 그림의 본디 크기. 그려 놓고 보면 창에 맞춰 줄어 있어, 원래 크기를 알 길이 없습니다.
   const [pixels, setPixels] = useState<{ width: number; height: number } | null>(null)
+  // 지금 화면에 그려진 크기. 칸 너비와 설정에 따라 시시각각 달라집니다.
+  const [drawn, setDrawn] = useState<{ width: number; height: number } | null>(null)
+  const imageRef = useRef<HTMLImageElement>(null)
   const objectUrl = useRef<string | null>(null)
   const kind = attachmentKind(path)
 
@@ -40,6 +43,7 @@ export function AssetView({ root, path, size, imagePreview, backdrop }: AssetVie
     setText(null)
     setError(null)
     setPixels(null)
+    setDrawn(null)
   }
 
   // 꺼 두었으면 이미지는 읽지 않습니다. 안 보여 줄 것을 메모리에 올릴 까닭이 없습니다.
@@ -85,6 +89,22 @@ export function AssetView({ root, path, size, imagePreview, backdrop }: AssetVie
     }
   }, [root, path, kind, skipped])
 
+  /*
+   * 그려진 크기는 창을 늘이거나 설정을 바꿀 때마다 달라집니다.
+   * 한 번 재고 마는 대신 그림 자체를 지켜봅니다.
+   */
+  useEffect(() => {
+    const node = imageRef.current
+    if (!node) return
+
+    const watcher = new ResizeObserver(([entry]) => {
+      const box = entry.contentRect
+      setDrawn({ width: Math.round(box.width), height: Math.round(box.height) })
+    })
+    watcher.observe(node)
+    return () => watcher.disconnect()
+  }, [url, skipped, kind])
+
   const name = path.split('/').pop() ?? path
   const tooBig = isAttachment(path) && size > MAX_ATTACHMENT_BYTES
 
@@ -117,6 +137,7 @@ export function AssetView({ root, path, size, imagePreview, backdrop }: AssetVie
       {kind === 'image' && !skipped && url && (
         <div className={`asset-canvas is-${backdrop}`}>
           <img
+            ref={imageRef}
             className="asset-image"
             src={url}
             alt={name}
@@ -129,7 +150,23 @@ export function AssetView({ root, path, size, imagePreview, backdrop }: AssetVie
             }}
           />
           {pixels && (
-            <span className="asset-size">{pixels.width}px × {pixels.height}px</span>
+            /*
+             * 크기는 두 가지가 궁금합니다. 지금 눈에 보이는 크기와 파일이 지닌 크기.
+             * 줄지 않았을 때까지 둘을 늘어놓으면 같은 숫자가 두 번 적혀 되레 읽기
+             * 나쁩니다. 줄어든 회차에만 아래에 본디 크기와 몇 할인지를 붙입니다.
+             */
+            <span className="asset-size">
+              <span className="asset-size-now">
+                {(drawn ?? pixels).width} × {(drawn ?? pixels).height}px
+              </span>
+              {drawn && drawn.width < pixels.width - 1 && (
+                <span className="asset-size-origin">
+                  원본 {pixels.width} × {pixels.height}px
+                  {' · '}
+                  {Math.round((drawn.width / pixels.width) * 100)}%
+                </span>
+              )}
+            </span>
           )}
         </div>
       )}
