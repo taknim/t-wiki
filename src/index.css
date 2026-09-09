@@ -1354,9 +1354,13 @@ a.btn { text-decoration: none; color: inherit; display: inline-block; }
   /*
    * 아래 두 모서리도 창을 따라 둥글어야 합니다. 왼쪽 메뉴가 제 바탕색을 지고 있어,
    * 그대로 두면 창의 둥근 끝 위로 각진 채 삐져나옵니다.
+   *
+   * hidden 이 아니라 clip 입니다. hidden 은 눈에 보이는 굴림대만 없을 뿐 굴릴 수 있는
+   * 칸이라, 메뉴에서 갈래로 뛸 때(scrollIntoView) 브라우저가 이 창까지 밀어 올려
+   * 머리줄이 화면 밖으로 사라졌습니다. clip 은 자르기만 하고 굴리지는 못합니다.
    * 안내 글은 딴 자리에 그려지므로 여기서 잘리지 않습니다.
    */
-  overflow: hidden;
+  overflow: clip;
 }
 
 .settings-layout {

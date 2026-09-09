@@ -253,8 +253,12 @@ try {
     return { overflow: style.overflowX, radius: style.borderBottomLeftRadius }
   })
   console.log('  ' + JSON.stringify(corner))
+  /*
+   * 자르기는 hidden 이 아니라 clip 이어야 합니다. hidden 은 눈에 보이는 굴림대만 없을 뿐
+   * 굴릴 수 있는 칸이라, 갈래로 뛸 때 브라우저가 창까지 밀어 올려 머리줄을 지웠습니다.
+   */
   expect('아래 모서리도 창을 따라 둥긂',
-    corner.overflow === 'hidden' && parseFloat(corner.radius) > 0, JSON.stringify(corner))
+    corner.overflow === 'clip' && parseFloat(corner.radius) > 0, JSON.stringify(corner))
   await page.screenshot({ path: join(HERE, '..', 'shots', 'settings', '04-bottom.png'),
     clip: { x: 280, y: 120, width: 840, height: 660 } })
   await page.keyboard.press('Escape')
@@ -341,7 +345,31 @@ try {
   await page.screenshot({ path: join(HERE, '..', 'shots', 'settings', '03-nav.png'),
     clip: { x: 280, y: 120, width: 840, height: 660 } })
 
-  step('13. 큰 메뉴를 누르면 접히고 펼쳐진다')
+  /*
+   * 창이 작아 본문이 빠듯할 때, 갈래로 뛰면 브라우저가 창 자체를 밀어 올려
+   * 머리줄이 화면 밖으로 사라진 적이 있습니다. 좁은 창에서 다시 봅니다.
+   */
+  step('13. 갈래로 뛰어도 머리줄은 제자리에 있다')
+  await page.setViewportSize({ width: 900, height: 620 })
+  await page.waitForTimeout(400)
+  const fixedHead = await page.evaluate(() =>
+    Math.round(document.querySelector('.sheet-head').getBoundingClientRect().top))
+  const stayed = []
+  for (const name of ['설정 주고받기', '이 폴더의 설정', '미리보기']) {
+    await page.click(`.settings-nav .settings-nav-item:text-is("${name}")`)
+    await page.waitForTimeout(700)
+    stayed.push(await page.evaluate(() => ({
+      head: Math.round(document.querySelector('.sheet-head').getBoundingClientRect().top),
+      sheet: document.querySelector('.sheet:has(.settings-layout)').scrollTop,
+    })))
+  }
+  console.log('  머리줄 ' + fixedHead + ' → ' + JSON.stringify(stayed))
+  expect('머리줄이 그대로 있음', stayed.every((one) => one.head === fixedHead), JSON.stringify(stayed))
+  expect('창 자체는 굴러가지 않음', stayed.every((one) => one.sheet === 0), JSON.stringify(stayed))
+  await page.setViewportSize({ width: 1400, height: 920 })
+  await page.waitForTimeout(400)
+
+  step('14. 큰 메뉴를 누르면 접히고 펼쳐진다')
   const shown = () => page.evaluate(() => ({
     items: [...document.querySelectorAll('.settings-nav-item')].map((one) => one.textContent),
     open: [...document.querySelectorAll('.settings-nav-group > button:not(.settings-nav-item)')]
@@ -381,7 +409,7 @@ try {
   await page.click('.sheet-close')
   await page.waitForTimeout(300)
 
-  step('14. 닫기 단추는 끌기에 잡히지 않는다')
+  step('15. 닫기 단추는 끌기에 잡히지 않는다')
   await open()
   await page.click('.sheet-close')
   await page.waitForTimeout(400)
