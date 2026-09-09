@@ -350,7 +350,7 @@ try {
   }))
   console.log('  ' + JSON.stringify(landed))
   expect('겹쳐 뜬 창이 모두 닫힘', landed.sheets === 0, JSON.stringify(landed))
-  expect('그 문서가 열림', landed.path === '/회사/온보딩.md', JSON.stringify(landed))
+  expect('그 문서가 열림', landed.path.endsWith('/회사/온보딩.md'), JSON.stringify(landed))
   expect('편집기까지 떠 있음', landed.editor === 1, JSON.stringify(landed))
   expect('보통 문서에는 겁주는 글이 없음',
     (await page.locator('.head-warn').count()) === 0)
@@ -373,7 +373,7 @@ try {
   }))
   console.log('  ' + JSON.stringify(folder))
   expect('창이 모두 닫힘', folder.sheets === 0, JSON.stringify(folder))
-  expect('그 폴더가 열림', folder.path === '/회사', JSON.stringify(folder))
+  expect('그 폴더가 열림', folder.path.endsWith('/회사'), JSON.stringify(folder))
   expect('폴더 화면이 뜸', folder.view === 1, JSON.stringify(folder))
   expect('트리에서도 펴짐', folder.opened === 1, JSON.stringify(folder))
 
@@ -439,7 +439,7 @@ try {
     }
   })
   console.log('  ' + JSON.stringify(warned))
-  expect('그 파일이 열림', warned.path === '/_t-wiki.favorites.json', JSON.stringify(warned))
+  expect('그 파일이 열림', warned.path.endsWith('/_t-wiki.favorites.json'), JSON.stringify(warned))
   expect('조심하라고 적힘', (warned.text ?? '').includes('앱이 쓰는 파일'), String(warned.text))
   expect('붉은 글씨', warned.tone !== null && warned.tone[0] > warned.tone[1] + 40
     && warned.tone[0] > warned.tone[2] + 40, JSON.stringify(warned.tone))

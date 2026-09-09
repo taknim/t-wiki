@@ -162,7 +162,7 @@ try {
   await page.fill('.dialog-input', '그림 문서')
   await page.click('.dialog button:has-text("만들기")')
   await page.waitForFunction(() =>
-    document.querySelector('.info-path')?.textContent === '/그림 문서.md', null, { timeout: 8000 })
+    document.querySelector('.info-path')?.textContent.endsWith('/그림 문서.md'), null, { timeout: 8000 })
   await page.fill('.editor', '# 그림\n\n![도표](첨부/도표.svg)\n')
   await page.waitForTimeout(1200)
   const inDoc = await page.evaluate(() => {

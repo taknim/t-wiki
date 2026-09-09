@@ -95,7 +95,7 @@ try {
   expect('안이 펴지지 않음', picked.rows.join() === before.rows.join(), JSON.stringify(picked.rows))
   expect('그 폴더가 골라짐', picked.selected.join() === '회사', JSON.stringify(picked))
   expect('오른쪽에 폴더 화면이 뜸', picked.folderView === 1, JSON.stringify(picked))
-  expect('표시줄도 그 폴더', picked.path === '/회사', String(picked.path))
+  expect('표시줄도 그 폴더', picked.path.endsWith('/회사'), String(picked.path))
 
   step('3. 골라 둔 폴더를 다시 누르면 그때 펴진다')
   await page.click('.tree-row:has-text("회사")')
@@ -136,7 +136,7 @@ try {
   await page.waitForTimeout(500)
   const doc = await shape()
   console.log('  ' + JSON.stringify(doc.path))
-  expect('한 번 눌러 열림', doc.path === '/회사/온보딩.md', String(doc.path))
+  expect('한 번 눌러 열림', doc.path.endsWith('/회사/온보딩.md'), String(doc.path))
   /*
    * 끌어다 놓기는 마우스를 손으로 움직여서는 일어나지 않습니다. dragTo 를 씁니다.
    * 옮겨 갈 자리에 같은 이름이 있으면 묻고, 고른 대로 해야 합니다.
@@ -256,6 +256,41 @@ try {
   console.log('  ' + JSON.stringify(swapped))
   expect('옮긴 폴더의 내용으로 바뀜', (swapped.target ?? '').includes('회고 쪽'), String(swapped.target))
   expect('있던 자리에서는 사라짐', swapped.source === null, String(swapped.source))
+  /*
+   * 아래 표시줄의 경로는 볼트 이름까지 붙여 보여 주고, 누르면 그대로 베낍니다.
+   * 볼트 안 경로만 적어 두면 폴더를 여럿 오갈 때 어느 쪽 것인지 알 수 없습니다.
+   */
+  step('11. 표시줄 경로에 폴더 이름이 붙고, 누르면 베낀다')
+  await page.context().grantPermissions(['clipboard-read', 'clipboard-write'])
+  await page.click('.tree-row:has-text("개발 환경") .tree-name')
+  await page.waitForTimeout(500)
+  const shownPath = (await page.textContent('.info-path')).trim()
+  console.log('  경로: ' + shownPath)
+  expect('볼트 이름이 앞에 붙음', shownPath === '내 위키/개발 환경.md', shownPath)
+
+  await page.click('.info-path')
+  await page.waitForTimeout(500)
+  const copied = await page.evaluate(async () => ({
+    clip: await navigator.clipboard.readText(),
+    toast: document.querySelector('.toast')?.textContent ?? null,
+  }))
+  console.log('  ' + JSON.stringify(copied))
+  expect('경로가 그대로 베껴짐', copied.clip === '내 위키/개발 환경.md', String(copied.clip))
+  expect('베꼈다고 알림', copied.toast === '파일 경로를 클립보드에 복사했습니다.', String(copied.toast))
+
+  // 폴더는 폴더라고 알려야 합니다.
+  await page.click('.tree-row:has-text("회고")')
+  await page.waitForTimeout(400)
+  await page.click('.info-path')
+  await page.waitForTimeout(500)
+  const dirCopy = await page.evaluate(async () => ({
+    clip: await navigator.clipboard.readText(),
+    toast: document.querySelector('.toast')?.textContent ?? null,
+  }))
+  console.log('  ' + JSON.stringify(dirCopy))
+  expect('폴더 경로도 베껴짐', dirCopy.clip === '내 위키/회고', String(dirCopy.clip))
+  expect('폴더라고 알림', dirCopy.toast === '폴더 경로를 클립보드에 복사했습니다.', String(dirCopy.toast))
+
 } catch (cause) {
   fail('묶음이 도중에 멈춤', cause instanceof Error ? (cause.stack ?? cause.message) : String(cause))
 } finally {

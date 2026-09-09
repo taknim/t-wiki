@@ -105,7 +105,7 @@ try {
   const after = await current()
   console.log('  새로고침 뒤: ' + JSON.stringify(after))
   expect('보던 문서가 다시 열림',
-    (await page.textContent('.info-path')).trim() === '/개발 환경.md',
+    (await page.textContent('.info-path')).trim().endsWith('/개발 환경.md'),
     await page.textContent('.info-path'))
   expect('미리보기로 열림', after.mode === '미리보기', JSON.stringify(after))
   expect('나란히로 돌아가지 않음', after.body === 'mode-preview', JSON.stringify(after))

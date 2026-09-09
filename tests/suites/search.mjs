@@ -28,7 +28,7 @@ const make = async (name, body) => {
   await page.fill('.dialog-input', name)
   await page.click('.dialog button:has-text("만들기")')
   await page.waitForFunction((want) =>
-    document.querySelector('.info-path')?.textContent === `/${want}`, name, { timeout: 8000 })
+    document.querySelector('.info-path')?.textContent.endsWith(`/${want}`), name, { timeout: 8000 })
   await page.fill('.editor', body)
   await page.waitForTimeout(900)
 }
@@ -72,7 +72,7 @@ try {
   await page.click('.search-results button:has-text("회사")')
   await page.waitForFunction(() => document.querySelector('.info-kind')?.textContent === '폴더',
     { timeout: 8000 })
-  expect('그 폴더가 열림', (await page.textContent('.info-path')).trim() === '/회사',
+  expect('그 폴더가 열림', (await page.textContent('.info-path')).trim().endsWith('/회사'),
     await page.textContent('.info-path'))
 
   step('3. 첨부 파일 이름으로 찾는다')

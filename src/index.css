@@ -1633,12 +1633,25 @@ a.btn { text-decoration: none; color: inherit; display: inline-block; }
 .info-kind-document { color: var(--warn); }
 .info-kind-dir { color: var(--text-muted); }
 .info-path {
+  padding: 0;
+  border: 0;
+  background: none;
   color: var(--text);
   font-family: var(--mono);
+  font-size: inherit;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
   min-width: 0;
+  cursor: pointer;
+  text-align: start;
+  /* 눌리는 자리라는 것을 손을 얹었을 때만 밝힙니다. 늘 밑줄이 있으면 링크로 읽힙니다. */
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  text-underline-offset: 2px;
 }
+.info-path:hover { text-decoration-color: currentcolor; }
+.info-path:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
 .info-sep { flex: 1; min-width: 8px; }
 .info-meta { flex-shrink: 0; }
 

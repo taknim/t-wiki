@@ -24,7 +24,7 @@ const make = async (name, body) => {
   await page.fill('.dialog-input', name)
   await page.click('.dialog button:has-text("만들기")')
   await page.waitForFunction((want) =>
-    document.querySelector('.info-path')?.textContent === `/${want}`, name, { timeout: 8000 })
+    document.querySelector('.info-path')?.textContent.endsWith(`/${want}`), name, { timeout: 8000 })
   await page.fill('.editor', body)
   await page.waitForTimeout(500)
 }

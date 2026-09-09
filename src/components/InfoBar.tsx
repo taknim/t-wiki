@@ -25,6 +25,10 @@ interface InfoBarProps {
   index: DocIndex
   showToc: boolean
   onOpen: (path: string) => void
+  /** 지금 열어 둔 폴더 이름. 경로 앞에 세워 어느 볼트의 것인지 밝힙니다. */
+  vaultName: string
+  /** 알림 한 줄. 경로를 베낀 뒤 알려 줍니다. */
+  onNotice: (message: string) => void
 }
 
 const KIND_LABEL: Record<SelectionKind, string> = {
@@ -36,15 +40,34 @@ const KIND_LABEL: Record<SelectionKind, string> = {
 
 type Panel = 'toc' | 'backlinks' | null
 
-export function InfoBar({ info, headings, index, showToc, onOpen }: InfoBarProps) {
+export function InfoBar({
+  info, headings, index, showToc, onOpen, vaultName, onNotice,
+}: InfoBarProps) {
   const [panel, setPanel] = useState<Panel>(null)
 
   const backlinkCount = info.kind === 'markdown' ? countBacklinks(info.path, index) : 0
   const tocAvailable = showToc && info.kind === 'markdown' && headings.length >= 2
   const toggle = (next: Panel) => setPanel((current) => (current === next ? null : next))
 
-  // 최상위 폴더는 경로가 비어 있으므로 폴더 이름을 씁니다.
-  const fullPath = displayPath(info.path)
+  /*
+   * 열어 둔 폴더 이름까지 붙인 경로.
+   *
+   * 볼트 안 경로만 보여 주면 폴더를 여럿 오갈 때 어느 쪽 것인지 알 수 없습니다.
+   * 디스크의 절대 경로까지는 붙일 수 없습니다. 브라우저가 폴더 손잡이에 그 값을
+   * 내주지 않습니다. 우리가 아는 가장 바깥이 이 폴더 이름입니다.
+   */
+  const fullPath = `${vaultName}${displayPath(info.path)}`
+
+  const copyPath = async () => {
+    const what = info.kind === 'dir' ? '폴더' : '파일'
+    try {
+      await navigator.clipboard.writeText(fullPath)
+      onNotice(`${what} 경로를 클립보드에 복사했습니다.`)
+    } catch {
+      // 권한이 막혀 있거나 안전한 자리가 아니면 베낄 수 없습니다. 그대로 알립니다.
+      onNotice(`${what} 경로를 복사하지 못했습니다.`)
+    }
+  }
 
   return (
     <div className="info-dock">
@@ -62,9 +85,16 @@ export function InfoBar({ info, headings, index, showToc, onOpen }: InfoBarProps
 
       <div className="info-bar">
         <span className={`info-kind info-kind-${info.kind}`}>{KIND_LABEL[info.kind]}</span>
-        <span className="info-path" title={fullPath}>
+        {/* 눌러서 베낍니다. 긴 경로를 손으로 골라 잡는 것은 번거롭습니다. */}
+        <button
+          type="button"
+          className="info-path"
+          title={fullPath}
+          data-tip="눌러서 경로를 클립보드에 복사합니다"
+          onClick={() => void copyPath()}
+        >
           {fullPath}
-        </span>
+        </button>
 
         <span className="info-sep" />
 

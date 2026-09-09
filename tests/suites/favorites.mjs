@@ -103,13 +103,13 @@ try {
   await showTab('즐겨찾기')
   await page.click('.favorites-item:has-text("개발 환경.md")')
   await page.waitForSelector('.editor', { timeout: 8000 })
-  expect('그 문서가 열림', (await page.textContent('.info-path')).trim() === '/개발 환경.md',
+  expect('그 문서가 열림', (await page.textContent('.info-path')).trim().endsWith('/개발 환경.md'),
     await page.textContent('.info-path'))
   await showTab('즐겨찾기')
   await page.click('.favorites-item:has-text("회사")')
   await page.waitForFunction(() => document.querySelector('.info-kind')?.textContent === '폴더',
     { timeout: 8000 })
-  expect('폴더도 열림', (await page.textContent('.info-path')).trim() === '/회사',
+  expect('폴더도 열림', (await page.textContent('.info-path')).trim().endsWith('/회사'),
     await page.textContent('.info-path'))
 
   step('5. 폴더를 닫았다 다시 열어도 남는다')

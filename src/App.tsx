@@ -1327,6 +1327,8 @@ export default function App() {
               index={vault.index}
               showToc={viewMode !== 'edit'}
               onOpen={(path) => void openDoc(path)}
+              vaultName={vault.vaultName}
+              onNotice={flash}
             />
           )}
         </main>
