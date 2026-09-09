@@ -1376,6 +1376,18 @@ a.btn { text-decoration: none; color: inherit; display: inline-block; }
 }
 /* 묶음과 그 갈래를 한 덩어리로 묶습니다. 사이가 벌어지면 어느 묶음의 갈래인지 흐려집니다. */
 .settings-nav-group { display: flex; flex-direction: column; gap: 1px; margin-bottom: 8px; }
+/* 묶음 이름 앞 꺾쇠. 접혔는지 펴졌는지 눌러 보지 않아도 압니다. */
+.settings-nav-group > button:not(.settings-nav-item) {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.settings-nav-caret { display: inline-flex; color: var(--text-muted); }
+.settings-nav-caret .icon { transition: transform 120ms ease; }
+.settings-nav-caret.is-open .icon { transform: rotate(90deg); }
+@media (prefers-reduced-motion: reduce) {
+  .settings-nav-caret .icon { transition: none; }
+}
 /* 갈래는 한 칸 들여 적습니다. 묶음보다 작고 옅어 눈이 먼저 묶음을 봅니다. */
 .settings-nav .settings-nav-item {
   padding: 5px 8px 5px 20px;

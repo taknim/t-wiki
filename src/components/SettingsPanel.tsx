@@ -5,6 +5,7 @@ import {
 } from '../lib/theme'
 import type { GitHubSync } from '../hooks/useGitHubSync'
 import { GitHubSettings } from './GitHubSettings'
+import { ChevronIcon } from './icons'
 import { clearSessions, isRememberEnabled, setRememberEnabled } from '../lib/session'
 import {
   readIncludeToken, readSaveOptions, writeIncludeToken, writeSaveOptions, type SaveOptions,
@@ -323,6 +324,12 @@ export function SettingsPanel({
   const releaseTimer = useRef(0)
   /** 지금 보고 있는 갈래. 왼쪽 나무에서 그 줄만 짙게 그립니다. */
   const [field, setField] = useState<string | null>(null)
+  /*
+   * 접어 둔 묶음. 접힌 쪽만 들고 있어, 나중에 묶음을 더해도 저절로 펴진 채로 나옵니다.
+   * 창을 닫으면 잊습니다. 설정 창은 잠깐 들르는 자리라, 접어 둔 것을 기억해 두면
+   * 그런 적이 있는 줄 모르는 사람에게는 설정이 사라진 것처럼 보입니다.
+   */
+  const [folded, setFolded] = useState<Set<TabId>>(() => new Set())
 
   /** 갈래 한 줄로 곧장 갑니다. 묶음 안에서 다시 굴려 찾지 않아도 됩니다. */
   const jumpToField = useCallback((tabId: TabId, fieldId: string) => {
@@ -350,6 +357,31 @@ export function SettingsPanel({
     }, 800)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  /**
+   * 묶음 이름을 눌렀을 때.
+   *
+   * 트리의 폴더 줄과 같은 규칙입니다. 처음 누르면 그 자리로 가고, 이미 보고 있는
+   * 묶음을 다시 누르면 접습니다. 누를 때마다 접혔다 펴지면 옆 묶음으로 건너가려던
+   * 사람이 번번이 목록을 잃습니다.
+   * 접힌 묶음은 펴면서 그 자리로 갑니다. 펴는 까닭이 대개 그것입니다.
+   */
+  const tapGroup = useCallback((id: TabId) => {
+    if (folded.has(id)) {
+      setFolded((previous) => {
+        const next = new Set(previous)
+        next.delete(id)
+        return next
+      })
+      jumpTo(id)
+      return
+    }
+    if (tab === id) {
+      setFolded((previous) => new Set(previous).add(id))
+      return
+    }
+    jumpTo(id)
+  }, [folded, jumpTo, tab])
 
   /** 스크롤에 따라 지금 보고 있는 묶음을 강조합니다. */
   const onScroll = useCallback(() => {
@@ -512,14 +544,22 @@ export function SettingsPanel({
                 <button
                   type="button"
                   aria-current={tab === group.id && field === null ? 'location' : undefined}
+                  aria-expanded={!folded.has(group.id)}
                   className={tab === group.id ? 'is-active' : ''}
-                  data-tip={group.hint}
-                  onClick={() => jumpTo(group.id)}
+                  data-tip={
+                    folded.has(group.id)
+                      ? `${group.name} 갈래를 펼치고 그 자리로 갑니다`
+                      : tab === group.id ? `${group.name} 갈래를 접습니다` : group.hint
+                  }
+                  onClick={() => tapGroup(group.id)}
                 >
+                  <span className={folded.has(group.id) ? 'settings-nav-caret' : 'settings-nav-caret is-open'}>
+                    <ChevronIcon />
+                  </span>
                   {group.name}
                 </button>
                 {/* 갈래를 펼쳐 두면 무엇이 어디 있는지 굴려 보지 않아도 압니다. */}
-                {group.items.map((item) => (
+                {!folded.has(group.id) && group.items.map((item) => (
                   <button
                     key={item.id}
                     type="button"

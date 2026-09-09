@@ -294,11 +294,47 @@ try {
   await page.screenshot({ path: join(HERE, '..', 'shots', 'settings', '03-nav.png'),
     clip: { x: 280, y: 120, width: 840, height: 660 } })
 
+  step('13. 큰 메뉴를 누르면 접히고 펼쳐진다')
+  const shown = () => page.evaluate(() => ({
+    items: [...document.querySelectorAll('.settings-nav-item')].map((one) => one.textContent),
+    open: [...document.querySelectorAll('.settings-nav-group > button:not(.settings-nav-item)')]
+      .map((one) => one.getAttribute('aria-expanded')),
+  }))
+  const whole = await shown()
+  // 트리의 폴더 줄과 같습니다. 먼저 그 자리로 가고, 다시 누를 때 접힙니다.
+  await page.click('.settings-nav button:has-text("모양")')
+  await page.waitForTimeout(800)
+  const first = await shown()
+  expect('처음 누르면 접히지 않음', first.items.includes('테마'), JSON.stringify(first.items))
+  await page.click('.settings-nav button:has-text("모양")')
+  await page.waitForTimeout(400)
+  const shut = await shown()
+  console.log('  접은 뒤: ' + JSON.stringify(shut.open) + ' · ' + shut.items.length + '줄')
+  expect('그 묶음 갈래가 사라짐', !shut.items.includes('테마') && !shut.items.includes('줄 간격'),
+    JSON.stringify(shut.items))
+  expect('다른 묶음은 그대로', shut.items.includes('액세스 토큰') && shut.items.includes('테마') === false,
+    JSON.stringify(shut.items))
+  expect('접혔다고 밝힘', shut.open.join() === 'true,false,true', JSON.stringify(shut.open))
+
+  // 접은 김에 아래쪽 묶음이 위로 올라옵니다. 접는 까닭이 그것입니다.
+  await page.click('.settings-nav button:has-text("모양")')
+  await page.waitForTimeout(800)
+  const again = await shown()
+  const landedBack = await page.evaluate(() => {
+    const box = document.querySelector('.settings-content').getBoundingClientRect()
+    const heading = [...document.querySelectorAll('.settings-heading')]
+      .find((one) => one.textContent === '모양')
+    return Math.round(heading.getBoundingClientRect().top - box.top)
+  })
+  console.log('  편 뒤: ' + again.items.length + '줄 · 모양 자리 ' + landedBack)
+  expect('갈래가 다시 나옴', again.items.join() === whole.items.join(), JSON.stringify(again.items))
+  expect('펴면서 그 자리로 감', landedBack >= -4 && landedBack < 60, String(landedBack))
+
   // 다음 걸음은 닫힌 자리에서 시작합니다.
   await page.click('.sheet-close')
   await page.waitForTimeout(300)
 
-  step('13. 닫기 단추는 끌기에 잡히지 않는다')
+  step('14. 닫기 단추는 끌기에 잡히지 않는다')
   await open()
   await page.click('.sheet-close')
   await page.waitForTimeout(400)
