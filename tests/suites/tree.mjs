@@ -40,6 +40,15 @@ await page.addInitScript(() => {
   }
   folder('회사', '자료', '표.md', '# 표\n\n회사 쪽 자료입니다.\n')
   folder('회고', '자료', '표.md', '# 표\n\n회고 쪽 자료입니다.\n')
+
+  // 굴림대가 생길 만큼 줄을 늘려 둡니다. 끝에서 저절로 굴러가는지 보려면 길어야 합니다.
+  for (let at = 1; at <= 30; at += 1) {
+    const name = `쪽지 ${String(at).padStart(2, '0')}.md`
+    root._children.set(name, Object.assign(
+      Object.create(Object.getPrototypeOf(sample)),
+      { kind: 'file', name, _data: `# 쪽지 ${at}\n`, _lastModified: Date.now() },
+    ))
+  }
 })
 
 /** 그 폴더 안에 든 줄. 같은 이름이 여러 폴더에 있으므로 자리로 짚습니다. */
@@ -188,7 +197,48 @@ try {
   expect('있던 자리에서는 사라짐', done.source === null, String(done.source))
   await page.screenshot({ path: join(HERE, '..', 'shots', 'tree', '02-move.png'),
     clip: { x: 0, y: 40, width: 440, height: 340 } })
-  step('9. 폴더를 덮어쓸 때는 안엣것까지 사라진다고 밝힌다')
+  /*
+   * 목록이 길어지면 맨 아래 것을 맨 위로 옮길 길이 없습니다. 집어 든 채로는 굴림대를
+   * 만질 수 없기 때문입니다. 끌기는 자동화로 흉내 내기 어려우므로, 끄는 동안 브라우저가
+   * 올려 주는 사건(dragover)을 그 자리에 그대로 지어 보냅니다.
+   */
+  step('9. 끌고 가다 끝에 닿으면 저절로 굴러간다')
+  await page.setViewportSize({ width: 1400, height: 420 })
+  await page.waitForTimeout(300)
+  const rolled = await page.evaluate(async () => {
+    const box = document.querySelector('.sidebar-scroll')
+    const view = box.getBoundingClientRect()
+    const send = (y) => box.dispatchEvent(
+      new DragEvent('dragover', { bubbles: true, cancelable: true, clientY: y, clientX: view.left + 40 }),
+    )
+    const wait = (ms) => new Promise((done) => setTimeout(done, ms))
+
+    const tall = box.scrollHeight > box.clientHeight + 20
+    // 아래 끝에 손을 대면 내려갑니다.
+    send(view.bottom - 6)
+    await wait(400)
+    const down = box.scrollTop
+    // 위 끝으로 옮기면 되올라갑니다.
+    send(view.top + 6)
+    await wait(400)
+    const up = box.scrollTop
+    // 끌기가 끝나면 멈춥니다.
+    send(view.bottom - 6)
+    await wait(120)
+    document.dispatchEvent(new DragEvent('dragend', { bubbles: true }))
+    const stopped = box.scrollTop
+    await wait(300)
+    return { tall, down, up, stopped, after: box.scrollTop }
+  })
+  console.log('  ' + JSON.stringify(rolled))
+  expect('굴릴 만큼 길어짐', rolled.tall === true, JSON.stringify(rolled))
+  expect('아래 끝에서 내려감', rolled.down > 0, JSON.stringify(rolled))
+  expect('위 끝에서 되올라감', rolled.up < rolled.down, JSON.stringify(rolled))
+  expect('끌기가 끝나면 멈춤', rolled.after === rolled.stopped, JSON.stringify(rolled))
+  await page.setViewportSize({ width: 1400, height: 920 })
+  await page.waitForTimeout(300)
+
+  step('10. 폴더를 덮어쓸 때는 안엣것까지 사라진다고 밝힌다')
   await rowIn('회고', '자료').dragTo(page.locator('.tree-row:has-text("회사")'))
   await page.waitForSelector('.dialog', { timeout: 5000 })
   const warned = await page.evaluate(() =>

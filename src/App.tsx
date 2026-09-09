@@ -19,6 +19,7 @@ import { BackdropSwitch } from './components/BackdropSwitch'
 import { SyncReportSheet } from './components/SyncReportSheet'
 import { SyncHistorySheet } from './components/SyncHistorySheet'
 import { TreeView } from './components/TreeView'
+import { useEdgeScroll } from './hooks/useEdgeScroll'
 import { useGitHubSync } from './hooks/useGitHubSync'
 import { useTextIndex } from './hooks/useTextIndex'
 import { useVault } from './hooks/useVault'
@@ -567,6 +568,12 @@ export default function App() {
 
   const filePicker = useRef<HTMLInputElement>(null)
 
+  /*
+   * 옆줄의 굴림 칸. 끌고 가다 위아래 끝에 닿으면 저절로 굴러갑니다.
+   * 트리와 즐겨찾기가 같은 칸을 쓰므로 여기 한 번만 걸어 둡니다.
+   */
+  const sidebarScroll = useEdgeScroll()
+
   const handleAddFiles = useCallback(
     async (files: File[], targetDir?: string) => {
       if (files.length === 0) return
@@ -1055,7 +1062,7 @@ export default function App() {
           {/* 고른 탭 하나만 그립니다. 둘을 함께 두면 좁은 칸을 나눠 쓰게 됩니다. */}
           {sidebarOpen && (
           <div className="sidebar-panes">
-            <div className="sidebar-scroll">
+            <div className="sidebar-scroll" ref={sidebarScroll}>
             {sidebarTab === 'favorites' ? (
               <Favorites
                 paths={favorites}
