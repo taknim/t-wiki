@@ -132,6 +132,30 @@ button, input, select, textarea { font: inherit; color: inherit; }
 /* 굴림 칸 안에서는 검색란 왼쪽 끝에 맞춥니다. 10px - 굴림 칸 여백 6px = 4px */
 .sidebar-scroll .panel-empty, .sidebar-scroll .tree-empty { padding-inline-start: 4px; }
 
+/* 폴더를 읽는 동안. 도는 고리와 셈으로 아직 일하는 중임을 알립니다. */
+.tree-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 8px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+.tree-loading-count { font-variant-numeric: tabular-nums; }
+.spinner {
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+  border: 2px solid var(--border-strong);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 700ms linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .spinner { animation-duration: 2s; }
+}
+
 /* ---------- 시작 화면 ---------- */
 
 .gate {
@@ -694,6 +718,8 @@ mark { background: var(--mark); color: inherit; border-radius: 2px; }
 .preview > * { max-width: var(--doc-width, 1000px); }
 
 .placeholder { padding: 60px 24px; text-align: center; color: var(--text-muted); }
+/* 본문 가운데에 뜰 때는 가운데로 모읍니다. 옆줄에서는 왼쪽에 붙습니다. */
+.placeholder .tree-loading { justify-content: center; }
 
 .panel { border-top: 1px solid var(--border); padding: 14px 20px 28px; background: var(--bg-sunken); }
 .panel h2 { font-size: 13px; text-transform: none; color: var(--text-muted); margin: 0 0 8px; }

@@ -50,15 +50,28 @@ function sortNodes(nodes: VaultNode[]): VaultNode[] {
  * 볼트 전체를 훑어 트리, 문서 본문 인덱스, 첨부 파일 위치를 한 번에 만듭니다.
  * 마크다운이 아닌 파일은 본문을 읽지 않고 경로만 기억해 둡니다.
  */
+/**
+ * 폴더를 훑어 트리와 색인을 만듭니다.
+ *
+ * `onCount` 를 주면 몇 개까지 읽었는지 알려 줍니다. 파일이 많은 폴더는 여는 데
+ * 한참 걸리는데, 그동안 화면이 비어 있으면 빈 폴더를 연 것처럼 보입니다.
+ * 너무 잦게 알리면 그리는 일이 읽는 일보다 무거워지므로 뭉텅이로 셉니다.
+ */
 export async function scanVault(
   root: FileSystemDirectoryHandle,
+  onCount?: (read: number) => void,
 ): Promise<{ tree: VaultNode; index: DocIndex; assets: AssetIndex }> {
   const index: DocIndex = new Map()
   const assets: AssetIndex = new Map()
   const tree: VaultNode = { kind: 'dir', name: root.name, path: '', children: [] }
-  await walk(root, '', tree, index, assets)
+  const tally = { read: 0, told: 0 }
+  await walk(root, '', tree, index, assets, onCount ? tally : null, onCount)
+  onCount?.(tally.read)
   return { tree, index, assets }
 }
+
+/** 이만큼 읽을 때마다 한 번씩 알립니다. */
+const COUNT_STEP = 50
 
 async function walk(
   dir: FileSystemDirectoryHandle,
@@ -66,15 +79,25 @@ async function walk(
   node: VaultNode,
   index: DocIndex,
   assets: AssetIndex,
+  tally: { read: number; told: number } | null,
+  onCount?: (read: number) => void,
 ): Promise<void> {
   const children: VaultNode[] = []
   for await (const [name, handle] of dir.entries()) {
     if (name.startsWith('.') || IGNORED.has(name)) continue
     const path = prefix ? `${prefix}/${name}` : name
 
+    if (tally) {
+      tally.read += 1
+      if (tally.read - tally.told >= COUNT_STEP) {
+        tally.told = tally.read
+        onCount?.(tally.read)
+      }
+    }
+
     if (handle.kind === 'directory') {
       const child: VaultNode = { kind: 'dir', name, path, children: [] }
-      await walk(handle as FileSystemDirectoryHandle, path, child, index, assets)
+      await walk(handle as FileSystemDirectoryHandle, path, child, index, assets, tally, onCount)
       children.push(child)
       continue
     }

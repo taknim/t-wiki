@@ -12,6 +12,8 @@ export type VaultStatus = 'unsupported' | 'empty' | 'needs-permission' | 'loadin
 
 export interface Vault {
   status: VaultStatus
+  /** 폴더를 읽는 동안 지금까지 읽은 항목 수. */
+  read: number
   error: string | null
   root: FileSystemDirectoryHandle | null
   tree: VaultNode | null
@@ -77,6 +79,8 @@ function assertSafeName(name: string): void {
 
 export function useVault(): Vault {
   const [status, setStatus] = useState<VaultStatus>(() => (fs.isSupported() ? 'empty' : 'unsupported'))
+  /** 지금까지 읽은 항목 수. 폴더를 여는 동안 얼마나 나아갔는지 보여 줍니다. */
+  const [read, setRead] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [tree, setTree] = useState<VaultNode | null>(null)
   const [index, setIndex] = useState<DocIndex>(() => new Map())
@@ -94,8 +98,10 @@ export function useVault(): Vault {
 
   const scan = useCallback(async (root: FileSystemDirectoryHandle) => {
     setStatus('loading')
+    setRead(0)
     try {
-      const result = await fs.scanVault(root)
+      // 몇 개까지 읽었는지 알려 줍니다. 큰 폴더는 여는 데 한참 걸립니다.
+      const result = await fs.scanVault(root, setRead)
       setTree(result.tree)
       setIndex(result.index)
       setAssets(result.assets)
@@ -330,6 +336,7 @@ export function useVault(): Vault {
 
   return {
     status,
+    read,
     error,
     root,
     tree,

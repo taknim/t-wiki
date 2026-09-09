@@ -1118,6 +1118,16 @@ export default function App() {
                   box.setSelectionRange(box.value.length, box.value.length)
                 }}
               />
+            ) : vault.status === 'loading' && !vault.tree ? (
+              /*
+               * 폴더가 크면 다 훑는 데 한참 걸립니다. 그동안 아무것도 그리지 않으면
+               * 빈 폴더를 연 것처럼 보입니다. 어디까지 왔는지 세어 보여 줍니다.
+               */
+              <p className="tree-loading">
+                <span className="spinner" aria-hidden="true" />
+                폴더를 읽는 중…
+                {vault.read > 0 && <span className="tree-loading-count">{vault.read}개</span>}
+              </p>
             ) : (
               vault.tree && (
                 <TreeView
@@ -1311,6 +1321,16 @@ export default function App() {
               </div>
 
             </>
+          ) : vault.status === 'loading' && !vault.tree ? (
+            // 옆줄만 알리고 본문을 비워 두면, 넓은 쪽이 멎은 것처럼 보입니다.
+            <div className="placeholder">
+              <p className="tree-loading">
+                <span className="spinner" aria-hidden="true" />
+                폴더를 읽는 중…
+                {vault.read > 0 && <span className="tree-loading-count">{vault.read}개</span>}
+              </p>
+              <p className="hint">파일이 많으면 조금 걸립니다. 다 읽으면 트리가 나타납니다.</p>
+            </div>
           ) : (
             <div className="placeholder">
               <p>왼쪽에서 문서를 고르거나 새로 만들어 보세요.</p>
