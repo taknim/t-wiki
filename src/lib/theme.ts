@@ -467,13 +467,14 @@ export const LEADINGS: { id: LeadingId; name: string; value: string }[] = [
  *
  * 기본 글자 크기(15px)에서 코드 글씨는 13.5px 고정폭이라 한 칸이 8.1px 남짓입니다.
  * 여기에 코드 칸의 안쪽 여백을 더하면
- *   좁게 = 80칸 한 줄, 보통 = 100칸 한 줄이 딱 들어옵니다.
+ *   좁게 = 80칸 한 줄, 보통 = 120칸 한 줄이 들어옵니다.
  * 코드가 툭하면 옆으로 밀리는 폭은 쓸모가 없어, 흔히 쓰는 줄 길이를 잣대로 삼았습니다.
- * 한글로 치면 좁게가 45자, 보통이 56자쯤입니다. 둘 다 읽기 좋은 자리입니다.
+ * 한글로 치면 좁게가 45자, 보통이 66자쯤입니다.
+ * 좁게는 글만 읽는 자리, 보통은 표와 코드가 섞인 문서를 펴 놓는 자리로 봅니다.
  */
 export const WIDTHS: { id: WidthId; name: string; value: string }[] = [
   { id: 'narrow', name: '좁게', value: '680px' },
-  { id: 'medium', name: '보통', value: '840px' },
+  { id: 'medium', name: '보통', value: '1000px' },
   { id: 'wide', name: '넓게', value: 'none' },
 ]
 

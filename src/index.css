@@ -27,7 +27,7 @@
   --doc-font: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", Pretendard, system-ui, sans-serif;
   --doc-size: 15px;
   --doc-leading: 1.7;
-  --doc-width: 840px;
+  --doc-width: 1000px;
   --sans: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard",
     "Malgun Gothic", system-ui, sans-serif;
   color-scheme: light;
@@ -683,7 +683,7 @@ mark { background: var(--mark); color: inherit; border-radius: 2px; }
  * 가운데로 밀려납니다. 글·제목·목록은 저마다 margin 을 통째로 다시 적어
  * 그 auto 를 덮어쓰는데, 표와 코드는 그러지 않아 둘만 자리를 옮깁니다.
  */
-.preview > * { max-width: var(--doc-width, 840px); }
+.preview > * { max-width: var(--doc-width, 1000px); }
 
 .placeholder { padding: 60px 24px; text-align: center; color: var(--text-muted); }
 

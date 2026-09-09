@@ -280,6 +280,9 @@ try {
    * 오른쪽이 어긋나 글이 들쭉날쭉해 보입니다.
    */
   step('9. 표와 코드도 본문 너비를 따른다')
+  // 보통(1000px)이 걸리는지 보려면 미리보기 칸이 그보다 넓어야 합니다.
+  await page.setViewportSize({ width: 1720, height: 920 })
+  await page.waitForTimeout(300)
   await openDoc('너비')
   // 나란히 보기에서는 칸이 반쪽이라 너비 설정이 걸리지 않습니다. 결과만 봅니다.
   await page.click('.mode-switch button[aria-label="미리보기"]')
@@ -306,7 +309,7 @@ try {
   await pick('본문 너비', '보통')
   const medium = await widths()
   console.log('  보통: ' + JSON.stringify(medium))
-  expect('보통은 840', medium.text === 840, JSON.stringify(medium))
+  expect('보통은 1000', medium.text === 1000, JSON.stringify(medium))
   expect('코드도 같은 폭', medium.code === medium.text, JSON.stringify(medium))
   expect('표도 같은 폭', medium.table === medium.text, JSON.stringify(medium))
   expect('창은 그보다 넓음', medium.pane > medium.text, JSON.stringify(medium))
@@ -354,7 +357,7 @@ try {
     }
   })
   console.log('  표: ' + JSON.stringify(csv))
-  expect('표도 본문 너비에 섬', csv.width === 840, JSON.stringify(csv))
+  expect('표도 본문 너비에 섬', csv.width === 1000, JSON.stringify(csv))
   expect('창은 그보다 넓음', csv.pane > csv.width, JSON.stringify(csv))
   expect('글자 크기도 본문을 따름', csv.size === '13.5px', String(csv.size))
 
@@ -368,7 +371,7 @@ try {
     }
   })
   console.log('  코드: ' + JSON.stringify(json))
-  expect('코드도 본문 너비에 섬', json.width === 840, JSON.stringify(json))
+  expect('코드도 본문 너비에 섬', json.width === 1000, JSON.stringify(json))
   expect('글자 크기도 본문을 따름', json.size === '13.5px', String(json.size))
 
   // 크기를 키우면 첨부 미리보기의 글씨도 함께 커져야 합니다.
@@ -398,7 +401,7 @@ try {
   await pick('이미지 최대 너비', '제한 없음')
   const full = await shot()
   console.log('  제한 없음: ' + JSON.stringify(full))
-  expect('본문 너비까지만 커짐', full.natural === 1200 && full.width === 840, JSON.stringify(full))
+  expect('본문 너비까지만 커짐', full.natural === 1200 && full.width === 1000, JSON.stringify(full))
 
   await pick('이미지 최대 너비', '보통')
   const half = await shot()
