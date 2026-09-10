@@ -311,10 +311,10 @@ try {
     })))
   console.log('  ' + JSON.stringify(fileTips))
   expect('크기에 설명이 붙음',
-    fileTips.some((one) => (one.tip ?? '').startsWith('파일 크기 ·')), JSON.stringify(fileTips))
-  // 반올림해 보여 주므로 안내에는 바이트 그대로도 적습니다.
-  expect('바이트 그대로도 적힘',
-    fileTips.some((one) => /파일 크기 · [\d,]+바이트/.test(one.tip ?? '')), JSON.stringify(fileTips))
+    fileTips.some((one) => one.tip === '파일 크기'), JSON.stringify(fileTips))
+  // 손을 얹은 채 긴 문장을 읽고 있을 사람은 없습니다. 안내는 짧아야 합니다.
+  expect('안내가 모두 짧음',
+    fileTips.every((one) => (one.tip ?? '').length <= 12), JSON.stringify(fileTips))
   // 빈칸만 두면 "84 B 2026. 09. 10." 가 한 덩어리로 읽힙니다.
   const between = await page.evaluate(() => {
     const metas = [...document.querySelectorAll('.info-bar .info-meta')]
@@ -329,32 +329,68 @@ try {
   expect('맨 앞에는 붙지 않음', !(between.first ?? '').includes('·'), JSON.stringify(between))
 
   expect('시각은 고친 때라고 밝힘',
-    fileTips.some((one) => (one.tip ?? '').startsWith('마지막으로 고친 시각 ·')),
+    fileTips.some((one) => one.tip === '최종 수정일시'),
     JSON.stringify(fileTips))
 
   // 손을 얹으면 실제로 뜨는지도 봅니다. 붙여 두기만 하고 안 뜨면 소용없습니다.
-  const sizeCell = page.locator('.info-bar [data-tip^="파일 크기"]')
+  const sizeCell = page.locator('.info-bar [data-tip="파일 크기"]')
   await sizeCell.hover()
   await page.waitForTimeout(700)
   const shownTip = await page.evaluate(() =>
     document.querySelector('.tooltip')?.textContent ?? null)
   console.log('  뜬 안내: ' + String(shownTip))
-  expect('손을 얹으면 뜸', (shownTip ?? '').startsWith('파일 크기 ·'), String(shownTip))
+  expect('손을 얹으면 뜸', shownTip === '파일 크기', String(shownTip))
 
-  step('13. 폴더는 파일 수와 크기를 따로 밝힌다')
-  await page.click('.tree-row:has-text("회고")')
+  /*
+   * 폴더도 파일과 같은 차례로 늘어놓습니다. 항목 수만 앞에 더 붙습니다.
+   * 폴더 자체에는 고친 시각이 없으므로 안에서 가장 최근 것을 끌어올려 적습니다.
+   */
+  step('13. 폴더도 항목 수 · 크기 · 시각을 차례로 밝힌다')
+  // 회사 아래에는 앞선 걸음에서 옮겨 온 자료 폴더가 있습니다. 폴더까지 세는지 볼 자리입니다.
+  await page.click('.tree-row:has-text("회사")')
   await page.waitForTimeout(500)
-  const dirTips = await page.evaluate(() =>
-    [...document.querySelectorAll('.info-bar [data-tip]')].map((one) => ({
-      text: one.textContent.trim(),
-      tip: one.getAttribute('data-tip'),
-    })))
-  console.log('  ' + JSON.stringify(dirTips))
-  expect('파일 수에 설명이 붙음',
-    dirTips.some((one) => one.text.includes('개') && (one.tip ?? '').includes('파일 수')),
-    JSON.stringify(dirTips))
-  expect('폴더 크기에도 설명이 붙음',
-    dirTips.some((one) => (one.tip ?? '').startsWith('폴더 크기 ·')), JSON.stringify(dirTips))
+  const dirMetas = await page.evaluate(() => {
+    const folder = window.__mockRoot._children.get('회사')
+    // 폴더 안에서 가장 최근에 고친 때. 화면에 적힌 시각과 맞아야 합니다.
+    const newest = (node) => {
+      if (node.kind !== 'directory') return node._lastModified ?? 0
+      let at = 0
+      for (const child of node._children.values()) at = Math.max(at, newest(child))
+      return at
+    }
+    // 안엣것을 세는 두 가지 셈. 폴더를 빼고 세면 숫자가 달라야 시험이 뜻이 있습니다.
+    const count = (node, dirs) => {
+      let at = 0
+      for (const child of node._children.values()) {
+        if (child.kind === 'directory') at += (dirs ? 1 : 0) + count(child, dirs)
+        else at += 1
+      }
+      return at
+    }
+    return {
+      metas: [...document.querySelectorAll('.info-bar .info-meta')].map((one) => ({
+        text: one.textContent.trim(),
+        tip: one.getAttribute('data-tip'),
+      })),
+      items: count(folder, true),
+      filesOnly: count(folder, false),
+      newest: new Date(newest(folder)).toLocaleString('ko-KR', {
+        year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit',
+      }),
+    }
+  })
+  console.log('  ' + JSON.stringify(dirMetas))
+  const dirTips = dirMetas.metas
+  expect('셈이 갈리는 폴더임', dirMetas.items > dirMetas.filesOnly, JSON.stringify(dirMetas))
+  expect('맨 앞이 항목 수임',
+    dirTips[0]?.text === `항목 ${dirMetas.items}개` && dirTips[0]?.tip === '하위 항목 개수',
+    JSON.stringify(dirMetas))
+  expect('그다음이 폴더 크기임', dirTips[1]?.tip === '폴더 크기', JSON.stringify(dirTips))
+  expect('마지막이 고친 시각임',
+    dirTips[2]?.tip === '최종 수정일시' && dirTips[2]?.text === dirMetas.newest,
+    JSON.stringify(dirMetas))
+  expect('안내가 모두 짧음',
+    dirTips.every((one) => (one.tip ?? '').length <= 12), JSON.stringify(dirTips))
 
   /*
    * 백링크나 위키링크로 문서를 열면 트리에서 고르기는 됩니다. 다만 그 줄이 위나

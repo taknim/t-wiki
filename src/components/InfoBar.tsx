@@ -16,8 +16,8 @@ export interface SelectionInfo {
   name: string
   size: number
   lastModified: number | null
-  /** 폴더일 때만: 안에 든 파일 수. */
-  fileCount?: number
+  /** 폴더일 때만: 안에 든 항목 수. 하위 폴더와 그 안의 파일까지 셉니다. */
+  itemCount?: number
 }
 
 interface InfoBarProps {
@@ -101,10 +101,7 @@ export function InfoBar({
       )}
 
       <div className="info-bar">
-        <span
-          className={`info-kind info-kind-${info.kind}`}
-          data-tip={`고른 것의 갈래 · ${KIND_LABEL[info.kind]}`}
-        >
+        <span className={`info-kind info-kind-${info.kind}`} data-tip="고른 것의 갈래">
           {KIND_LABEL[info.kind]}
         </span>
         {/* 눌러서 베낍니다. 긴 경로를 손으로 골라 잡는 것은 번거롭습니다. */}
@@ -112,7 +109,7 @@ export function InfoBar({
           type="button"
           className="info-path"
           title={fullPath}
-          data-tip="눌러서 경로를 클립보드에 복사합니다"
+          data-tip="눌러서 경로 복사"
           onClick={() => void copyPath()}
         >
           {fullPath}
@@ -122,28 +119,20 @@ export function InfoBar({
 
         {/*
           숫자만 놓여 있으면 무엇을 센 것인지 알 수 없습니다. 손을 얹으면 말로 밝힙니다.
-          크기는 반올림해 보여 주므로, 안내에는 바이트 그대로도 함께 적습니다.
+          말은 짧게 답니다. 손을 얹은 채 긴 문장을 읽고 있을 사람은 없습니다.
+
+          폴더도 파일과 같은 차례(크기 · 시각)로 늘어놓고, 그 앞에 항목 수만 더 답니다.
+          고른 것에 따라 자리가 바뀌면 눈이 매번 다시 훑어야 합니다.
         */}
-        {info.kind === 'dir' ? (
-          <>
-            <span className="info-meta" data-tip="이 폴더 아래에 있는 파일 수입니다. 하위 폴더까지 셉니다">
-              파일 {info.fileCount ?? 0}개
-            </span>
-            <span
-              className="info-meta"
-              data-tip={`폴더 크기 · 이 폴더 아래 파일을 모두 더해 ${info.size.toLocaleString('ko-KR')}바이트입니다`}
-            >
-              {formatBytes(info.size)}
-            </span>
-          </>
-        ) : (
-          <span
-            className="info-meta"
-            data-tip={`파일 크기 · ${info.size.toLocaleString('ko-KR')}바이트`}
-          >
-            {formatBytes(info.size)}
+        {info.kind === 'dir' && (
+          <span className="info-meta" data-tip="하위 항목 개수">
+            항목 {info.itemCount ?? 0}개
           </span>
         )}
+
+        <span className="info-meta" data-tip={info.kind === 'dir' ? '폴더 크기' : '파일 크기'}>
+          {formatBytes(info.size)}
+        </span>
 
         {info.lastModified !== null && (
           <span
@@ -151,10 +140,9 @@ export function InfoBar({
             /*
              * 만든 시각은 적을 수 없습니다. 브라우저가 파일에서 내주는 시각은
              * 마지막으로 고친 때 하나뿐입니다. 헷갈리지 않도록 그렇게 밝힙니다.
+             * 폴더는 안에서 가장 최근에 고친 때입니다.
              */
-            data-tip={`마지막으로 고친 시각 · ${new Date(info.lastModified).toLocaleString('ko-KR', {
-              dateStyle: 'full', timeStyle: 'medium',
-            })}`}
+            data-tip="최종 수정일시"
           >
             {new Date(info.lastModified).toLocaleString('ko-KR', {
               year: 'numeric', month: '2-digit', day: '2-digit',

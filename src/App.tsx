@@ -632,14 +632,14 @@ export default function App() {
   const selection = useMemo<SelectionInfo | null>(() => {
     if (selectedDir !== null && vault.tree) {
       const node = findNode(vault.tree, selectedDir)
-      const rolled = node ? rollUp(node) : { size: 0, files: 0 }
+      const rolled = node ? rollUp(node) : { size: 0, items: 0, lastModified: null }
       return {
         kind: 'dir',
         path: selectedDir,
         name: selectedDir.split('/').pop() || vault.vaultName,
         size: rolled.size,
-        fileCount: rolled.files,
-        lastModified: null,
+        itemCount: rolled.items,
+        lastModified: rolled.lastModified,
       }
     }
 
@@ -1418,18 +1418,31 @@ function findNode(root: VaultNode, path: string): VaultNode | null {
   return null
 }
 
-/** 폴더 아래에 든 파일 수와 크기 합계. */
-function rollUp(node: VaultNode): { size: number; files: number } {
-  if (node.kind === 'file') return { size: node.size ?? 0, files: 1 }
+/**
+ * 폴더 아래에 든 항목 수와 크기 합계, 그리고 마지막으로 고친 때.
+ *
+ * 세는 것은 파일만이 아니라 하위 폴더까지입니다. 표시줄에 '항목'이라 적으므로
+ * 폴더를 빼고 세면 눈에 보이는 것과 숫자가 어긋납니다.
+ * 폴더 자체에는 고친 시각이 없습니다. 안에서 가장 최근 것을 폴더의 시각으로 씁니다.
+ */
+function rollUp(node: VaultNode): { size: number; items: number; lastModified: number | null } {
+  // 파일은 제 아래에 든 것이 없습니다. 크기와 시각만 위로 올려 보냅니다.
+  if (node.kind === 'file') {
+    return { size: node.size ?? 0, items: 0, lastModified: node.lastModified ?? null }
+  }
 
   let size = 0
-  let files = 0
+  let items = 0
+  let lastModified: number | null = null
   for (const child of node.children ?? []) {
     const inner = rollUp(child)
     size += inner.size
-    files += inner.files
+    items += 1 + inner.items
+    if (inner.lastModified !== null && (lastModified === null || inner.lastModified > lastModified)) {
+      lastModified = inner.lastModified
+    }
   }
-  return { size, files }
+  return { size, items, lastModified }
 }
 
 /**
