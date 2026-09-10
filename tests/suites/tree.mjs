@@ -41,6 +41,12 @@ await page.addInitScript(() => {
   folder('회사', '자료', '표.md', '# 표\n\n회사 쪽 자료입니다.\n')
   folder('회고', '자료', '표.md', '# 표\n\n회고 쪽 자료입니다.\n')
 
+  // 맨 아래 줄을 가리키는 문서. 위키링크로 열었을 때 그 줄이 보이는지 볼 때 씁니다.
+  root._children.set('길잡이.md', Object.assign(
+    Object.create(Object.getPrototypeOf(sample)),
+    { kind: 'file', name: '길잡이.md', _data: '# 길잡이\n\n[[쪽지 30]] 으로 갑니다.\n', _lastModified: Date.now() },
+  ))
+
   // 굴림대가 생길 만큼 줄을 늘려 둡니다. 끝에서 저절로 굴러가는지 보려면 길어야 합니다.
   for (let at = 1; at <= 30; at += 1) {
     const name = `쪽지 ${String(at).padStart(2, '0')}.md`
@@ -349,6 +355,46 @@ try {
     JSON.stringify(dirTips))
   expect('폴더 크기에도 설명이 붙음',
     dirTips.some((one) => (one.tip ?? '').startsWith('폴더 크기 ·')), JSON.stringify(dirTips))
+
+  /*
+   * 백링크나 위키링크로 문서를 열면 트리에서 고르기는 됩니다. 다만 그 줄이 위나
+   * 아래로 숨어 있으면 어디가 열렸는지 알 수 없습니다. 끌어와 보여 줘야 합니다.
+   */
+  step('14. 숨어 있던 줄을 골라도 보이는 자리로 끌어온다')
+  await page.setViewportSize({ width: 1200, height: 520 })
+  await page.waitForTimeout(300)
+  await page.click('.tree-row:has-text("길잡이") .tree-name')
+  await page.waitForTimeout(600)
+  // 옆줄을 맨 위로 올려 두면 "쪽지 30" 줄은 화면 밖에 있습니다.
+  await page.evaluate(() => { document.querySelector('.sidebar-scroll').scrollTop = 0 })
+  await page.waitForTimeout(300)
+  const hidden = await page.evaluate(() => {
+    const box = document.querySelector('.sidebar-scroll').getBoundingClientRect()
+    const row = [...document.querySelectorAll('.tree-row')]
+      .find((one) => one.textContent.includes('쪽지 30'))
+    if (!row) return { there: false }
+    const at = row.getBoundingClientRect()
+    return { there: true, inside: at.top >= box.top - 1 && at.bottom <= box.bottom + 1 }
+  })
+  console.log('  누르기 전: ' + JSON.stringify(hidden))
+  expect('그 줄은 아직 숨어 있음', hidden.there && hidden.inside === false, JSON.stringify(hidden))
+
+  await page.click('.preview a.wikilink')
+  await page.waitForTimeout(700)
+  const brought = await page.evaluate(() => {
+    const box = document.querySelector('.sidebar-scroll').getBoundingClientRect()
+    const row = document.querySelector('.tree-row.is-selected')
+    const at = row?.getBoundingClientRect()
+    return {
+      name: row?.textContent.trim() ?? null,
+      inside: at ? at.top >= box.top - 1 && at.bottom <= box.bottom + 1 : false,
+    }
+  })
+  console.log('  누른 뒤: ' + JSON.stringify(brought))
+  expect('그 줄이 골라짐', (brought.name ?? '').includes('쪽지 30'), JSON.stringify(brought))
+  expect('보이는 자리로 끌려옴', brought.inside === true, JSON.stringify(brought))
+  await page.setViewportSize({ width: 1400, height: 920 })
+  await page.waitForTimeout(300)
 
 } catch (cause) {
   fail('묶음이 도중에 멈춤', cause instanceof Error ? (cause.stack ?? cause.message) : String(cause))

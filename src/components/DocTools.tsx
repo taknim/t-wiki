@@ -34,8 +34,19 @@ function findPane(): HTMLElement | null {
  * 맨 아래까지 내려가야 했습니다. 글 옆에 두면 읽던 자리에서 손이 닿습니다.
  * 맨 위·맨 아래는 굴릴 것이 있을 때만 나옵니다.
  */
+/** 글에서 띄울 만큼. 굴림대와 아래 표시줄은 이 값에 더해 따로 셉니다. */
+const GAP = 24
+
 export function DocTools({ toc, backlinks, path }: DocToolsProps) {
   const [rolls, setRolls] = useState(false)
+  /*
+   * 오른쪽·아래로 얼마나 띄울지.
+   *
+   * 굴림대가 자리를 차지하는 기계에서는 오른쪽 여백이 그만큼 깎여 단추가 굴림대에
+   * 달라붙습니다. 반대로 굴림대가 떠 있는 기계에서는 그대로입니다. 눈에 보이는
+   * 틈을 같게 하려면 굴림대 너비를 재서 더해야 합니다. 아래도 표시줄 높이만큼 더합니다.
+   */
+  const [gap, setGap] = useState({ right: GAP, bottom: GAP })
 
   // 보던 것이 바뀌면 굴림 여부도 새로 재야 합니다. 렌더 중에 비워 둡니다.
   const [shown, setShown] = useState(path)
@@ -48,8 +59,12 @@ export function DocTools({ toc, backlinks, path }: DocToolsProps) {
     const pane = findPane()
     if (!pane) return
 
-    // 글이 늘거나 창이 바뀌면 굴릴 수 있는지도 달라집니다. 칸을 지켜봅니다.
-    const look = () => setRolls(pane.scrollHeight > pane.clientHeight + 8)
+    // 글이 늘거나 창이 바뀌면 굴릴 수 있는지도, 굴림대 너비도 달라집니다. 칸을 지켜봅니다.
+    const look = () => {
+      setRolls(pane.scrollHeight > pane.clientHeight + 8)
+      const dock = document.querySelector('.info-dock')?.getBoundingClientRect().height ?? 0
+      setGap({ right: GAP + (pane.offsetWidth - pane.clientWidth), bottom: GAP + dock })
+    }
 
     const watcher = new ResizeObserver(look)
     watcher.observe(pane)
@@ -72,7 +87,10 @@ export function DocTools({ toc, backlinks, path }: DocToolsProps) {
   if (!toc && !backlinks && !rolls) return null
 
   return (
-    <div className="doc-tools">
+    <div
+      className="doc-tools"
+      style={{ insetInlineEnd: gap.right, insetBlockEnd: gap.bottom }}
+    >
       {toc && (
         <button
           type="button"

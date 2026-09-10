@@ -86,7 +86,36 @@ try {
   await page.screenshot({ path: join(HERE, '..', 'shots', 'doctools', '01-tools.png'),
     clip: { x: 700, y: 250, width: 500, height: 440 } })
 
-  step('2. 눌러서 목차를 폈다 접는다')
+  /*
+   * 굴림대가 자리를 차지하는 기계에서는 오른쪽 여백이 그만큼 깎여 단추가 굴림대에
+   * 달라붙었습니다. 눈에 보이는 틈이 같아야 합니다.
+   * 여기 굴림대는 떠 있는 꼴이라 자리를 먹지 않으므로, gutter 로 흉내 냅니다.
+   */
+  step('2. 굴림대가 자리를 먹어도 틈은 그대로다')
+  const gaps = () => page.evaluate(() => {
+    const box = document.querySelector('.main .preview')
+    const tools = document.querySelector('.doc-tools').getBoundingClientRect()
+    const dock = document.querySelector('.info-dock').getBoundingClientRect()
+    const bar = box.offsetWidth - box.clientWidth
+    return {
+      bar,
+      right: Math.round(box.getBoundingClientRect().right - bar - tools.right),
+      bottom: Math.round(dock.top - tools.bottom),
+    }
+  })
+  const plain = await gaps()
+  console.log('  떠 있는 굴림대: ' + JSON.stringify(plain))
+  expect('오른쪽이 넉넉함', plain.right >= 20, JSON.stringify(plain))
+  expect('아래도 같은 틈', Math.abs(plain.bottom - plain.right) <= 2, JSON.stringify(plain))
+
+  await page.addStyleTag({ content: '.main .preview { scrollbar-gutter: stable; }' })
+  await page.waitForTimeout(700)
+  const wide = await gaps()
+  console.log('  자리 먹는 굴림대: ' + JSON.stringify(wide))
+  expect('굴림대가 자리를 먹음', wide.bar > 8, JSON.stringify(wide))
+  expect('그래도 틈은 그대로', Math.abs(wide.right - plain.right) <= 2, JSON.stringify(wide))
+
+  step('3. 눌러서 목차를 폈다 접는다')
   await page.click('.doc-tool:has-text("목차")')
   await page.waitForTimeout(400)
   const opened = await page.evaluate(() => ({
@@ -101,7 +130,7 @@ try {
   expect('다시 누르면 접힘',
     (await page.evaluate(() => document.querySelectorAll('.info-panel').length)) === 0)
 
-  step('3. 맨 위·맨 아래로 한 번에 간다')
+  step('4. 맨 위·맨 아래로 한 번에 간다')
   const before = await pane()
   await page.click('.doc-tool:has-text("맨 아래")')
   const bottom = await settled()
@@ -112,7 +141,7 @@ try {
   console.log('  ' + JSON.stringify(top))
   expect('맨 위까지 올라옴', top.top <= 2, JSON.stringify(top))
 
-  step('4. 굴릴 것이 없으면 위아래 단추도 없다')
+  step('5. 굴릴 것이 없으면 위아래 단추도 없다')
   await openDoc('짧은 문서')
   await page.waitForTimeout(600)
   const short = await tools()
@@ -120,7 +149,7 @@ try {
   expect('맨 위·맨 아래가 없음', !short.some((one) => one.includes('맨')), JSON.stringify(short))
   expect('목차·백링크는 그대로', short.some((one) => one.startsWith('백링크')), JSON.stringify(short))
 
-  step('5. 마크다운이 아닌 글에서도 위아래로 간다')
+  step('6. 마크다운이 아닌 글에서도 위아래로 간다')
   await openDoc('긴 자료.csv')
   await page.waitForTimeout(800)
   const csv = await tools()

@@ -1700,8 +1700,9 @@ a.btn { text-decoration: none; color: inherit; display: inline-block; }
  */
 .doc-tools {
   position: absolute;
-  inset-inline-end: 18px;
-  inset-block-end: 54px;
+  /* 자리는 DocTools 가 재서 정합니다. 굴림대 너비와 표시줄 높이를 더해야 합니다. */
+  inset-inline-end: 24px;
+  inset-block-end: 60px;
   z-index: 6;
   display: flex;
   flex-direction: column;

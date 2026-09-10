@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { VaultNode } from '../types'
 import {
   ChevronIcon, ClipIcon, DocIcon, DocPlusIcon, FolderCloseIcon, FolderIcon, FolderPlusIcon,
@@ -120,6 +120,19 @@ function TreeRow({ node, depth, selectedPath, expanded, onToggle, ...actions }: 
   const isOpen = expanded.has(node.path)
   const isSelected = selectedPath === node.path
 
+  /*
+   * 고른 줄이 굴림 칸 밖에 있으면 끌어와 보여 줍니다.
+   *
+   * 백링크나 위키링크로 문서를 열면 트리에서 고르기는 되지만, 그 줄이 위나 아래로
+   * 숨어 있으면 어디가 열렸는지 알 수 없습니다.
+   * 'nearest' 라서 이미 보이는 줄은 건드리지 않습니다. 손으로 누른 줄까지
+   * 들썩이면 그게 더 어수선합니다.
+   */
+  const row = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (isSelected) row.current?.scrollIntoView({ block: 'nearest' })
+  }, [isSelected])
+
   const isFavorite = actions.favorites.includes(node.path)
   const parentDir = node.path.split('/').slice(0, -1).join('/')
   const dropDir = isDir ? node.path : parentDir
@@ -127,6 +140,7 @@ function TreeRow({ node, depth, selectedPath, expanded, onToggle, ...actions }: 
   return (
     <div className="tree-branch">
       <div
+        ref={row}
         className={[
           'tree-row',
           isSelected ? 'is-selected' : '',
