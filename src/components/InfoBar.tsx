@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import type { DocIndex } from '../types'
 import type { Heading } from '../lib/markdown'
 import { formatBytes } from '../lib/attachments'
 import { Backlinks } from './Backlinks'
+import { backlinksFor } from '../lib/wikilinks'
 import { DocTools } from './DocTools'
 import { Toc } from './Toc'
 import { displayPath } from '../lib/paths'
@@ -46,9 +47,32 @@ export function InfoBar({
 }: InfoBarProps) {
   const [panel, setPanel] = useState<Panel>(null)
 
-  const backlinkCount = info.kind === 'markdown' ? countBacklinks(info.path, index) : 0
+  /*
+   * 백링크는 셈과 목록을 한 자리에서 냅니다.
+   *
+   * 예전에는 단추에 적을 셈만 따로 세었습니다. 그 셈은 [[링크]] 의 파일명만 맞춰
+   * 보았고, 같은 이름이 여러 폴더에 있으면 실제로는 다른 문서를 가리키는 링크까지
+   * 제 것으로 세었습니다. 그래서 백링크가 없는 문서에도 큰 수가 적혔습니다.
+   * 목록을 짓는 쪽(backlinksFor)은 링크를 실제 문서로 풀어 보므로, 그 결과의
+   * 길이를 그대로 씁니다. 적힌 수와 펼친 목록이 어긋날 자리가 없습니다.
+   */
+  const links = useMemo(
+    () => (info.kind === 'markdown' ? backlinksFor(info.path, index) : []),
+    [info.kind, info.path, index],
+  )
   const tocAvailable = showToc && info.kind === 'markdown' && headings.length >= 2
+  const backlinksAvailable = info.kind === 'markdown'
   const toggle = (next: Panel) => setPanel((current) => (current === next ? null : next))
+
+  /*
+   * 부를 단추가 사라졌으면 펼쳐 둔 것도 접습니다.
+   *
+   * 편집만 보기로 바꾸면 뛰어갈 결과 화면이 없어 목차 단추를 감춥니다. 그런데
+   * 펼친 채로 두면 목차만 덩그러니 남고, 접을 단추가 없어 닫지도 못했습니다.
+   * 마크다운이 아닌 것을 고른 뒤에도 백링크가 그대로 남아 있었습니다.
+   */
+  if (panel === 'toc' && !tocAvailable) setPanel(null)
+  if (panel === 'backlinks' && !backlinksAvailable) setPanel(null)
 
   /*
    * 열어 둔 폴더 이름까지 붙인 경로.
@@ -78,9 +102,9 @@ export function InfoBar({
         toc={tocAvailable
           ? { count: headings.length, open: panel === 'toc', onToggle: () => toggle('toc') }
           : null}
-        backlinks={info.kind === 'markdown'
+        backlinks={backlinksAvailable
           ? {
-              count: backlinkCount,
+              count: links.length,
               open: panel === 'backlinks',
               onToggle: () => toggle('backlinks'),
             }
@@ -96,7 +120,7 @@ export function InfoBar({
       {panel === 'backlinks' && (
         <div className="info-panel">
           <p className="toc-head">이 문서를 가리키는 문서</p>
-          <Backlinks path={info.path} index={index} onOpen={onOpen} />
+          <Backlinks links={links} onOpen={onOpen} />
         </div>
       )}
 
@@ -155,23 +179,4 @@ export function InfoBar({
     </div>
     </>
   )
-}
-
-/** 목록을 만들지 않고 개수만 셉니다. 표시줄에는 숫자만 필요합니다. */
-function countBacklinks(path: string, index: DocIndex): number {
-  const WIKILINK = /\[\[([^\][|]+)(?:\|[^\]]+)?\]\]/g
-  const target = (path.split('/').pop() ?? path).replace(/\.md$/i, '').toLowerCase()
-
-  let count = 0
-  for (const entry of index.values()) {
-    if (entry.path === path) continue
-    for (const match of entry.content.matchAll(WIKILINK)) {
-      const name = match[1].trim().split('/').pop() ?? ''
-      if (name.replace(/\.md$/i, '').toLowerCase() === target) {
-        count += 1
-        break
-      }
-    }
-  }
-  return count
 }

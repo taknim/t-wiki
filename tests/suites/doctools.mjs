@@ -2,6 +2,7 @@ import { chromium } from 'playwright'
 import { readFileSync, mkdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { DOCX_LONG_B64, XLSX_LONG_B64 } from '../office-fixtures.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 mkdirSync(join(HERE, '..', 'shots', 'doctools'), { recursive: true })
@@ -16,21 +17,45 @@ const page = await browser.newPage({ viewport: { width: 1200, height: 700 } })
 const errors = []
 page.on('pageerror', (e) => errors.push('pageerror: ' + e.message))
 await page.addInitScript(readFileSync(join(HERE, '..', 'mock-fs.js'), 'utf8'))
-await page.addInitScript(() => {
+await page.addInitScript(({ xlsx, docx }) => {
   window.__installMockFs()
   const root = window.__mockRoot
   const sample = root._children.get('개발 환경.md')
-  const make = (name, data) => root._children.set(name, Object.assign(
+  const bytes = (b64) => Uint8Array.from(atob(b64), (one) => one.charCodeAt(0))
+  const mk = (name, data) => Object.assign(
     Object.create(Object.getPrototypeOf(sample)),
     { kind: 'file', name, _data: data, _lastModified: Date.now() },
-  ))
+  )
+  const make = (name, data) => root._children.set(name, mk(name, data))
   // 굴릴 것이 있는 긴 글과, 한 화면에 들어오는 짧은 글을 함께 둡니다.
   make('긴 문서.md', ['# 긴 문서', '', ...Array.from({ length: 40 },
     (_, at) => `## 제목 ${at + 1}\n\n본문 줄입니다.\n`)].join('\n'))
   make('짧은 문서.md', '# 짧은 문서\n\n한 줄뿐입니다.\n')
   make('긴 자료.csv', ['가,나,다', ...Array.from({ length: 200 },
     (_, at) => `${at},값,값`)].join('\n'))
-})
+  // 한 화면에 담기지 않는 오피스 문서. 이쪽은 벌을 내려받아 그린 뒤에야 칸이 섭니다.
+  make('긴 표.xlsx', bytes(xlsx))
+  make('긴 보고서.docx', bytes(docx))
+
+  /*
+   * 같은 이름의 문서를 두 자리에 둡니다.
+   *
+   * [[메모]] 는 뿌리 쪽으로 풀립니다. 이름만 맞춰 세면 깊은 곳의 메모도 제 것으로
+   * 세어 백링크가 없는데도 큰 수가 적힙니다. 코드 블록 안의 링크는 링크가 아닙니다.
+   */
+  make('메모.md', '# 메모\n\n뿌리에 있는 메모입니다.\n')
+  const dir = (parent, name) => {
+    const made = Object.create(Object.getPrototypeOf(root))
+    Object.assign(made, { kind: 'directory', name, _children: new Map() })
+    parent._children.set(name, made)
+    return made
+  }
+  dir(dir(root, '자료'), '깊은')._children.set('메모.md', mk('메모.md', '# 메모\n\n깊은 곳입니다.\n'))
+  for (const at of [1, 2, 3]) {
+    make(`가리킴 ${at}.md`, `# 가리킴 ${at}\n\n[[메모]] 를 봅니다.\n`)
+  }
+  make('코드.md', '# 코드\n\n```\n[[메모]]\n```\n')
+}, { xlsx: XLSX_LONG_B64, docx: DOCX_LONG_B64 })
 
 const openDoc = async (label) => {
   await page.click(`.tree-row:has-text("${label}") .tree-name`)
@@ -160,6 +185,98 @@ try {
   const csvBottom = await settled()
   console.log('  ' + JSON.stringify(csvBottom))
   expect('표도 맨 아래로 감', csvBottom.top >= csvBottom.max - 12, JSON.stringify(csvBottom))
+
+  /*
+   * 워드·엑셀은 벌을 내려받아 그린 뒤에야 굴릴 칸이 생깁니다. 문서를 열 때 한 번만
+   * 재고 말면 그때는 아직 칸이 없어, 단추가 끝내 나오지 않았습니다.
+   */
+  step('7. 워드·엑셀에서도 위아래 단추가 나온다')
+  for (const [label, what] of [['긴 표.xlsx', '엑셀'], ['긴 보고서.docx', '워드']]) {
+    await openDoc(label)
+    await page.waitForSelector('.main .asset-view .preview', { timeout: 15000 })
+    await page.waitForTimeout(900)
+    const office = await tools()
+    console.log(`  ${what}: ` + JSON.stringify(office))
+    expect(`${what}에도 맨 위·맨 아래가 뜸`,
+      office.some((one) => one.includes('맨 아래')), JSON.stringify(office))
+  }
+  // 정말 굴러가는지도 봅니다. 단추만 떠 있고 움직이지 않으면 소용없습니다.
+  const officePane = () => page.evaluate(() => {
+    const one = document.querySelector('.main .asset-view .preview')
+    return { top: Math.round(one.scrollTop), max: Math.round(one.scrollHeight - one.clientHeight) }
+  })
+  await page.click('.doc-tool:has-text("맨 아래")')
+  await page.waitForTimeout(1500)
+  const wordBottom = await officePane()
+  console.log('  ' + JSON.stringify(wordBottom))
+  expect('워드도 맨 아래로 감', wordBottom.top >= wordBottom.max - 12, JSON.stringify(wordBottom))
+
+  /*
+   * 보기 모드를 바꾸면 굴릴 칸이 통째로 갈아 끼워집니다. 한 번 잡아 둔 칸을 붙들고
+   * 있으면 그 뒤로는 아무것도 재지 못해 단추가 사라진 채로 남았습니다.
+   */
+  step('8. 보기 모드를 바꿔도 단추가 남는다')
+  await openDoc('긴 문서')
+  await page.click('.mode-switch button[aria-label="미리보기"]')
+  await page.waitForTimeout(700)
+  for (const mode of ['편집', '나란히', '미리보기']) {
+    await page.click(`.mode-switch button[aria-label="${mode}"]`)
+    await page.waitForTimeout(800)
+    const now = await tools()
+    console.log(`  ${mode}: ` + JSON.stringify(now))
+    expect(`${mode}에서도 맨 위·맨 아래가 뜸`,
+      now.some((one) => one.includes('맨 아래')), JSON.stringify(now))
+  }
+
+  // 편집만 볼 때는 뛰어갈 결과 화면이 없어 목차를 감춥니다. 펼쳐 둔 것도 함께 접혀야 합니다.
+  step('9. 목차를 편 채 편집으로 가면 함께 접힌다')
+  await page.click('.doc-tool:has-text("목차")')
+  await page.waitForTimeout(400)
+  expect('목차가 펴짐',
+    (await page.evaluate(() => document.querySelectorAll('.info-panel .toc').length)) === 1)
+  await page.click('.mode-switch button[aria-label="편집"]')
+  await page.waitForTimeout(700)
+  const folded = await page.evaluate(() => ({
+    panel: document.querySelectorAll('.info-panel').length,
+    tools: [...document.querySelectorAll('.doc-tool')].map((one) => one.textContent.trim()),
+  }))
+  console.log('  ' + JSON.stringify(folded))
+  expect('목차도 접힘', folded.panel === 0, JSON.stringify(folded))
+  expect('목차 단추도 감춰짐',
+    !folded.tools.some((one) => one.startsWith('목차')), JSON.stringify(folded))
+  await page.click('.mode-switch button[aria-label="미리보기"]')
+  await page.waitForTimeout(700)
+
+  /*
+   * 백링크 셈은 목록과 같은 자리에서 나와야 합니다. 예전에는 셈만 따로 세면서
+   * 파일명만 맞춰 보아, 다른 폴더의 같은 이름 문서를 가리키는 링크까지 세었습니다.
+   */
+  step('10. 백링크 셈이 펼친 목록과 맞는다')
+  await page.click('.tree-row:has-text("자료") .tree-caret')
+  await page.waitForTimeout(300)
+  await page.click('.tree-row:has-text("깊은") .tree-caret')
+  await page.waitForTimeout(300)
+  await page.locator('.tree-row:has-text("메모.md")').nth(0).click()
+  await page.waitForTimeout(700)
+  const deep = await tools()
+  console.log('  깊은 곳: ' + JSON.stringify(deep))
+  expect('가리키는 문서가 없으면 0', deep.includes('백링크0'), JSON.stringify(deep))
+  await page.click('.doc-tool:has-text("백링크")')
+  await page.waitForTimeout(400)
+  expect('목록도 비었다고 알림',
+    (await page.evaluate(() => document.querySelector('.info-panel .panel-empty')?.textContent ?? ''))
+      .includes('아직 없습니다'))
+
+  await page.locator('.tree-row:has-text("메모.md")').nth(1).click()
+  await page.waitForTimeout(700)
+  const rooted = await page.evaluate(() => ({
+    tools: [...document.querySelectorAll('.doc-tool')].map((one) => one.textContent.trim()),
+    items: document.querySelectorAll('.info-panel .backlinks > li').length,
+  }))
+  console.log('  뿌리: ' + JSON.stringify(rooted))
+  // 셋이 가리키고, 코드 블록 안의 하나는 링크가 아닙니다.
+  expect('셋이라고 적힘', rooted.tools.includes('백링크3'), JSON.stringify(rooted))
+  expect('펼친 목록도 셋', rooted.items === 3, JSON.stringify(rooted))
 } catch (cause) {
   fail('묶음이 도중에 멈춤', cause instanceof Error ? (cause.stack ?? cause.message) : String(cause))
 } finally {

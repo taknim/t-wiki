@@ -14,14 +14,20 @@ XLSX.utils.book_append_sheet(book, XLSX.utils.aoa_to_sheet([
 XLSX.utils.book_append_sheet(book, XLSX.utils.aoa_to_sheet([['둘째 시트의 값']]), '메모')
 export const XLSX_B64 = XLSX.write(book, { type: 'base64', bookType: 'xlsx' })
 
+/** 한 화면에 담기지 않는 표. 굴림대가 서야 맨 위·맨 아래 단추를 볼 수 있습니다. */
+const long = XLSX.utils.book_new()
+XLSX.utils.book_append_sheet(long, XLSX.utils.aoa_to_sheet([
+  ['번호', '이름', '수량'],
+  ...Array.from({ length: 300 }, (_, at) => [at + 1, `줄 ${at + 1}`, (at + 1) * 3]),
+]), '긴표')
+export const XLSX_LONG_B64 = XLSX.write(long, { type: 'base64', bookType: 'xlsx' })
+
 /** 워드는 규격대로 묶은 zip 입니다. 최소한의 부품만 넣어 파이썬으로 짓습니다. */
-export const DOCX_B64 = execFileSync('python3', ['-c', `
+const docx = (paragraphs) => execFileSync('python3', ['-c', `
 import base64, io, zipfile
 body = '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>
-<w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr><w:r><w:t>워드 제목</w:t></w:r></w:p>
-<w:p><w:r><w:t>첫 문단입니다.</w:t></w:r><w:r><w:rPr><w:b/></w:rPr><w:t>굵은 글씨</w:t></w:r></w:p>
-<w:p><w:pPr><w:pStyle w:val="ListParagraph"/><w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr></w:pPr><w:r><w:t>목록 한 줄</w:t></w:r></w:p>
+${paragraphs}
 </w:body></w:document>'''
 types = '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
@@ -52,4 +58,16 @@ with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as z:
     z.writestr('word/_rels/document.xml.rels', doc_rels)
 print(base64.b64encode(buf.getvalue()).decode())
 `], { encoding: 'utf8' }).trim()
+
+export const DOCX_B64 = docx(`
+<w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr><w:r><w:t>워드 제목</w:t></w:r></w:p>
+<w:p><w:r><w:t>첫 문단입니다.</w:t></w:r><w:r><w:rPr><w:b/></w:rPr><w:t>굵은 글씨</w:t></w:r></w:p>
+<w:p><w:pPr><w:pStyle w:val="ListParagraph"/><w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr></w:pPr><w:r><w:t>목록 한 줄</w:t></w:r></w:p>
+`)
+
+/** 한 화면에 담기지 않는 워드 문서. 굴림대가 설 만큼 문단을 늘립니다. */
+export const DOCX_LONG_B64 = docx(
+  Array.from({ length: 200 }, (_, at) =>
+    `<w:p><w:r><w:t>${at + 1}번째 문단입니다.</w:t></w:r></w:p>`).join('\n'),
+)
 

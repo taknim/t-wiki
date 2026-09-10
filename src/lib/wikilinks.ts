@@ -55,14 +55,31 @@ export interface Backlink {
 export function backlinksFor(targetPath: string, index: DocIndex): Backlink[] {
   const results: Backlink[] = []
 
+  /*
+   * 같은 링크 글귀는 한 번만 풉니다.
+   *
+   * 푸는 일은 문서 이름을 모두 훑어 보는 일이라 싸지 않은데, 볼트 안에서 자주
+   * 쓰이는 링크는 수십 번씩 되풀이됩니다. 아래 표시줄이 문서를 고를 때마다
+   * 이 셈을 부르므로, 되풀이되는 몫을 덜어 둡니다.
+   */
+  const resolved = new Map<string, string | null>()
+  const resolve = (target: string): string | null => {
+    const found = resolved.get(target)
+    if (found !== undefined) return found
+    const path = resolveLink(target, index)
+    resolved.set(target, path)
+    return path
+  }
+
   for (const entry of index.values()) {
     if (entry.path === targetPath) continue
 
     const contexts: string[] = []
-    const lines = entry.content.split('\n')
+    // 코드 블록 안의 [[...]] 는 링크가 아닙니다. 셈에도 넣지 않습니다.
+    const lines = stripCode(entry.content).split('\n')
     for (const line of lines) {
       for (const match of line.matchAll(WIKILINK)) {
-        if (resolveLink(match[1].trim(), index) === targetPath) {
+        if (resolve(match[1].trim()) === targetPath) {
           contexts.push(line.trim())
           break
         }
