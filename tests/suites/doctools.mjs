@@ -31,6 +31,13 @@ await page.addInitScript(({ xlsx, docx }) => {
   make('긴 문서.md', ['# 긴 문서', '', ...Array.from({ length: 40 },
     (_, at) => `## 제목 ${at + 1}\n\n본문 줄입니다.\n`)].join('\n'))
   make('짧은 문서.md', '# 짧은 문서\n\n한 줄뿐입니다.\n')
+  /*
+   * 앞머리가 달린 글. 제목은 앞머리를 뗀 본문에서 뽑으므로, 뗀 만큼 자리를 밀어
+   * 주지 않으면 편집기에서 엉뚱한 줄로 뛰어갑니다.
+   */
+  make('앞머리 문서.md', ['---', 'title: 앞머리', 'tags: [가, 나]', '# 주석처럼 보이는 줄', '---', '',
+    '# 앞머리 문서', '', ...Array.from({ length: 40 },
+      (_, at) => `## 갈래 ${at + 1}\n\n본문 줄입니다.\n`)].join('\n'))
   make('긴 자료.csv', ['가,나,다', ...Array.from({ length: 200 },
     (_, at) => `${at},값,값`)].join('\n'))
   // 한 화면에 담기지 않는 오피스 문서. 이쪽은 벌을 내려받아 그린 뒤에야 칸이 섭니다.
@@ -55,11 +62,21 @@ await page.addInitScript(({ xlsx, docx }) => {
     make(`가리킴 ${at}.md`, `# 가리킴 ${at}\n\n[[메모]] 를 봅니다.\n`)
   }
   make('코드.md', '# 코드\n\n```\n[[메모]]\n```\n')
+  // 이름이 같은 두 문서가 같은 문맥으로 가리킵니다. 이름만 적으면 구별이 되지 않습니다.
+  for (const where of ['회사', '회고']) {
+    root._children.get(where)._children.set('알림.md',
+      mk('알림.md', '# 알림\n\n[[자료/깊은/메모]] 를 봅니다.\n'))
+  }
 }, { xlsx: XLSX_LONG_B64, docx: DOCX_LONG_B64 })
 
 const openDoc = async (label) => {
   await page.click(`.tree-row:has-text("${label}") .tree-name`)
   await page.waitForTimeout(700)
+}
+const openToc = async () => {
+  const open = await page.evaluate(() => document.querySelectorAll('.info-panel .toc').length > 0)
+  if (!open) await page.click('.doc-tool:has-text("목차")')
+  await page.waitForTimeout(400)
 }
 const tools = () => page.evaluate(() =>
   [...document.querySelectorAll('.doc-tool')].map((one) => one.textContent.trim()))
@@ -228,30 +245,91 @@ try {
       now.some((one) => one.includes('맨 아래')), JSON.stringify(now))
   }
 
-  // 편집만 볼 때는 뛰어갈 결과 화면이 없어 목차를 감춥니다. 펼쳐 둔 것도 함께 접혀야 합니다.
-  step('9. 목차를 편 채 편집으로 가면 함께 접힌다')
+  /*
+   * 편집만 볼 때도 목차는 남습니다. 뛰어갈 앵커가 없을 뿐이지, 갈 곳은 있습니다.
+   * 글자 자리를 짚어 편집기를 그 줄로 굴려 보냅니다.
+   */
+  step('9. 편집 화면에서도 목차로 그 줄을 찾아간다')
+  await page.click('.mode-switch button[aria-label="편집"]')
+  await page.waitForTimeout(700)
+  const inEdit = await tools()
+  console.log('  ' + JSON.stringify(inEdit))
+  expect('편집에서도 목차가 뜸', inEdit.some((one) => /^목차\d+$/.test(one)), JSON.stringify(inEdit))
   await page.click('.doc-tool:has-text("목차")')
   await page.waitForTimeout(400)
-  expect('목차가 펴짐',
-    (await page.evaluate(() => document.querySelectorAll('.info-panel .toc').length)) === 1)
+  await page.click('.info-panel .toc a:text-is("제목 30")')
+  await page.waitForTimeout(600)
+  const jumped = await page.evaluate(() => {
+    const editor = document.querySelector('.main .editor')
+    const at = editor.value.indexOf('## 제목 30')
+    // 그 줄이 화면 어디쯤에 섰는지. 전체 높이에서 차지하는 몫으로 어림합니다.
+    const upTo = editor.scrollHeight * (at / editor.value.length)
+    return {
+      top: Math.round(editor.scrollTop),
+      max: Math.round(editor.scrollHeight - editor.clientHeight),
+      line: Math.round(upTo),
+      caret: editor.selectionStart,
+      at,
+      dirty: document.querySelector('.pill')?.textContent ?? null,
+    }
+  })
+  console.log('  ' + JSON.stringify(jumped))
+  expect('편집기가 굴러감', jumped.top > 0, JSON.stringify(jumped))
+  expect('그 줄이 화면 안에 듦',
+    jumped.line >= jumped.top - 40 && jumped.line <= jumped.top + 400, JSON.stringify(jumped))
+  expect('낫표도 그 줄에 섬', jumped.caret === jumped.at, JSON.stringify(jumped))
+  // 자리를 재느라 값을 잠깐 갈아 끼웁니다. 고쳐졌다고 잡히면 안 됩니다.
+  expect('글은 고쳐지지 않음', jumped.dirty === '저장됨', String(jumped.dirty))
+
+  // 앞머리를 뗀 만큼 자리를 밀어야 합니다. 안 그러면 몇 줄 앞으로 떨어집니다.
+  await openDoc('앞머리 문서')
   await page.click('.mode-switch button[aria-label="편집"]')
+  await page.waitForTimeout(700)
+  await openToc()
+  await page.click('.info-panel .toc a:text-is("갈래 30")')
+  await page.waitForTimeout(600)
+  const withHead = await page.evaluate(() => {
+    const editor = document.querySelector('.main .editor')
+    return { caret: editor.selectionStart, at: editor.value.indexOf('## 갈래 30'), top: Math.round(editor.scrollTop) }
+  })
+  console.log('  앞머리: ' + JSON.stringify(withHead))
+  expect('앞머리가 있어도 그 줄에 섬', withHead.caret === withHead.at, JSON.stringify(withHead))
+  expect('앞머리가 있어도 굴러감', withHead.top > 0, JSON.stringify(withHead))
+
+  // 결과 화면이 있을 때는 앵커가 데려다 줍니다. 편집기를 굴리지 않습니다.
+  await openDoc('긴 문서')
+  await page.waitForTimeout(400)
+  await openToc()
+  await page.click('.mode-switch button[aria-label="미리보기"]')
+  await page.waitForTimeout(700)
+  await page.click('.info-panel .toc a:text-is("제목 20")')
+  await page.waitForTimeout(700)
+  const anchored = await page.evaluate(() => {
+    const box = document.querySelector('.main .preview')
+    const head = [...box.querySelectorAll('h2')].find((one) => one.textContent.startsWith('제목 20'))
+    return { top: Math.round(box.scrollTop), head: Math.round(head.getBoundingClientRect().top) }
+  })
+  console.log('  ' + JSON.stringify(anchored))
+  expect('결과 화면도 그 자리로 감', anchored.top > 0 && anchored.head < 400, JSON.stringify(anchored))
+
+  // 부를 단추가 사라지면 펼친 것도 접습니다. 접을 단추가 없는데 남으면 닫을 길이 없습니다.
+  step('10. 부를 단추가 사라지면 펼친 것도 접힌다')
+  await openDoc('긴 자료.csv')
   await page.waitForTimeout(700)
   const folded = await page.evaluate(() => ({
     panel: document.querySelectorAll('.info-panel').length,
     tools: [...document.querySelectorAll('.doc-tool')].map((one) => one.textContent.trim()),
   }))
   console.log('  ' + JSON.stringify(folded))
-  expect('목차도 접힘', folded.panel === 0, JSON.stringify(folded))
+  expect('목차가 접힘', folded.panel === 0, JSON.stringify(folded))
   expect('목차 단추도 감춰짐',
     !folded.tools.some((one) => one.startsWith('목차')), JSON.stringify(folded))
-  await page.click('.mode-switch button[aria-label="미리보기"]')
-  await page.waitForTimeout(700)
 
   /*
    * 백링크 셈은 목록과 같은 자리에서 나와야 합니다. 예전에는 셈만 따로 세면서
    * 파일명만 맞춰 보아, 다른 폴더의 같은 이름 문서를 가리키는 링크까지 세었습니다.
    */
-  step('10. 백링크 셈이 펼친 목록과 맞는다')
+  step('11. 백링크 셈이 펼친 목록과 맞고, 어느 폴더의 것인지 밝힌다')
   await page.click('.tree-row:has-text("자료") .tree-caret')
   await page.waitForTimeout(300)
   await page.click('.tree-row:has-text("깊은") .tree-caret')
@@ -260,23 +338,34 @@ try {
   await page.waitForTimeout(700)
   const deep = await tools()
   console.log('  깊은 곳: ' + JSON.stringify(deep))
-  expect('가리키는 문서가 없으면 0', deep.includes('백링크0'), JSON.stringify(deep))
+  expect('가리키는 둘만 셈', deep.includes('백링크2'), JSON.stringify(deep))
   await page.click('.doc-tool:has-text("백링크")')
   await page.waitForTimeout(400)
-  expect('목록도 비었다고 알림',
-    (await page.evaluate(() => document.querySelector('.info-panel .panel-empty')?.textContent ?? ''))
-      .includes('아직 없습니다'))
+  const listed = await page.evaluate(() =>
+    [...document.querySelectorAll('.info-panel .backlinks > li')].map((one) => ({
+      text: one.querySelector('.backlink-title').textContent.trim(),
+      dir: one.querySelector('.backlink-dir')?.textContent.trim() ?? null,
+    })))
+  console.log('  ' + JSON.stringify(listed))
+  expect('펼친 목록도 둘', listed.length === 2, JSON.stringify(listed))
+  // 이름은 둘 다 알림.md 입니다. 폴더까지 적혀야 어느 것인지 갈립니다.
+  expect('폴더까지 적힘',
+    listed.every((one) => /^(회사|회고)\/$/.test(one.dir ?? '')), JSON.stringify(listed))
+  expect('둘이 서로 다름', listed[0].text !== listed[1].text, JSON.stringify(listed))
 
   await page.locator('.tree-row:has-text("메모.md")').nth(1).click()
   await page.waitForTimeout(700)
   const rooted = await page.evaluate(() => ({
     tools: [...document.querySelectorAll('.doc-tool')].map((one) => one.textContent.trim()),
-    items: document.querySelectorAll('.info-panel .backlinks > li').length,
+    items: [...document.querySelectorAll('.info-panel .backlinks > li')].map((one) =>
+      one.querySelector('.backlink-title').textContent.trim()),
   }))
   console.log('  뿌리: ' + JSON.stringify(rooted))
   // 셋이 가리키고, 코드 블록 안의 하나는 링크가 아닙니다.
   expect('셋이라고 적힘', rooted.tools.includes('백링크3'), JSON.stringify(rooted))
-  expect('펼친 목록도 셋', rooted.items === 3, JSON.stringify(rooted))
+  expect('펼친 목록도 셋', rooted.items.length === 3, JSON.stringify(rooted))
+  // 뿌리에 있는 문서는 앞에 붙일 폴더가 없습니다.
+  expect('뿌리 문서는 이름만', rooted.items.every((one) => !one.includes('/')), JSON.stringify(rooted))
 } catch (cause) {
   fail('묶음이 도중에 멈춤', cause instanceof Error ? (cause.stack ?? cause.message) : String(cause))
 } finally {

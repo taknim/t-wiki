@@ -1,5 +1,4 @@
 import type { DocIndex } from '../types'
-import { fileNameOf } from './paths'
 
 const WIKILINK = /\[\[([^\][|]+)(?:\|([^\]]+))?\]\]/g
 const FENCE = /^```[\s\S]*?^```/gm
@@ -47,7 +46,6 @@ export function resolveLink(target: string, index: DocIndex): string | null {
 
 export interface Backlink {
   path: string
-  title: string
   contexts: string[]
 }
 
@@ -86,11 +84,12 @@ export function backlinksFor(targetPath: string, index: DocIndex): Backlink[] {
       }
     }
     if (contexts.length > 0) {
-      results.push({ path: entry.path, title: fileNameOf(entry.path), contexts })
+      results.push({ path: entry.path, contexts })
     }
   }
 
-  return results.sort((a, b) => a.title.localeCompare(b.title, 'ko'))
+  // 경로로 줄 세웁니다. 같은 이름이 여러 폴더에 있을 때 폴더끼리 모여 보입니다.
+  return results.sort((a, b) => a.path.localeCompare(b.path, 'ko'))
 }
 
 /** 아직 문서가 없는 [[링크]] 목록. 위키에서 "다음에 쓸 글"을 찾는 용도입니다. */

@@ -7,11 +7,17 @@ export interface Heading {
   id: string
   depth: number
   text: string
+  /**
+   * 이 제목 줄이 시작하는 글자 자리.
+   *
+   * 편집만 보고 있을 때는 뛰어갈 앵커가 없습니다. 그때는 이 자리를 짚어
+   * 편집기를 그 줄로 굴려 보냅니다.
+   */
+  offset: number
 }
 
 export interface RenderResult {
   html: string
-  headings: Heading[]
   /** mermaid 블록이 들어 있는지. 있으면 Preview 가 다이어그램 렌더 패스를 한 번 더 돕니다. */
   hasDiagram: boolean
 }
@@ -24,7 +30,6 @@ const IMAGE_EXTENSIONS = /\.(png|jpe?g|gif|webp|svg|avif|bmp)$/i
 /* ------------------------------------------------------------------ */
 
 let currentResolver: LinkResolver = () => null
-let currentHeadings: Heading[] = []
 let currentSlugs = new Map<string, number>()
 
 const HEADING_LINE = /^(#{1,6})\s+(.+?)\s*#*\s*$/
@@ -60,8 +65,15 @@ export function extractHeadings(markdown: string): Heading[] {
   const seenCounts = new Map<string, number>()
   const headings: Heading[] = []
   let inFence = false
+  // 줄 바꿈까지 세어 가며 글자 자리를 붙듭니다. 편집기로 뛰어갈 때 이 자리를 씁니다.
+  let offset = 0
 
-  for (const line of markdown.split(/\r?\n/)) {
+  for (const raw of markdown.split('\n')) {
+    // 윈도우에서 온 글은 줄 끝에 \r 이 붙습니다. 셈에서는 빼지 않고 볼 때만 떼어 냅니다.
+    const line = raw.endsWith('\r') ? raw.slice(0, -1) : raw
+    const at = offset
+    offset += raw.length + 1
+
     if (FENCE_LINE.test(line)) {
       inFence = !inFence
       continue
@@ -72,7 +84,7 @@ export function extractHeadings(markdown: string): Heading[] {
     if (!match) continue
 
     const text = match[2].replace(/\[\[([^\][|]+)(?:\|([^\]]+))?\]\]/g, (_, target, label) => label ?? target)
-    headings.push({ id: slugify(text, seenCounts), depth: match[1].length, text })
+    headings.push({ id: slugify(text, seenCounts), depth: match[1].length, text, offset: at })
   }
 
   return headings
@@ -353,7 +365,6 @@ marked.use({
       const text = this.parser.parseInline(token.tokens)
       const plain = token.text.replace(/<[^>]+>/g, '')
       const id = slugify(plain, currentSlugs)
-      currentHeadings.push({ id, depth: token.depth, text: plain })
       return `<h${token.depth} id="${escapeHtml(id)}">${text}<a class="anchor" href="#${escapeHtml(id)}" aria-label="이 절로 가는 링크">#</a></h${token.depth}>`
     },
 
@@ -423,19 +434,16 @@ export async function renderMarkdown(markdown: string, resolve: LinkResolver): P
   await ensureFeatures(markdown)
 
   currentResolver = resolve
-  currentHeadings = []
   currentSlugs = new Map()
 
   try {
     const raw = marked.parse(markdown, { async: false }) as string
     return {
       html: DOMPurify.sanitize(raw, PURIFY_OPTIONS),
-      headings: currentHeadings,
       hasDiagram: raw.includes('class="mermaid-block"'),
     }
   } finally {
     currentResolver = () => null
-    currentHeadings = []
   }
 }
 

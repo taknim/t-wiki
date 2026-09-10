@@ -25,7 +25,6 @@ interface InfoBarProps {
   info: SelectionInfo
   headings: Heading[]
   index: DocIndex
-  showToc: boolean
   onOpen: (path: string) => void
   /** 지금 열어 둔 폴더 이름. 경로 앞에 세워 어느 볼트의 것인지 밝힙니다. */
   vaultName: string
@@ -43,7 +42,7 @@ const KIND_LABEL: Record<SelectionKind, string> = {
 type Panel = 'toc' | 'backlinks' | null
 
 export function InfoBar({
-  info, headings, index, showToc, onOpen, vaultName, onNotice,
+  info, headings, index, onOpen, vaultName, onNotice,
 }: InfoBarProps) {
   const [panel, setPanel] = useState<Panel>(null)
 
@@ -60,16 +59,15 @@ export function InfoBar({
     () => (info.kind === 'markdown' ? backlinksFor(info.path, index) : []),
     [info.kind, info.path, index],
   )
-  const tocAvailable = showToc && info.kind === 'markdown' && headings.length >= 2
+  const tocAvailable = info.kind === 'markdown' && headings.length >= 2
   const backlinksAvailable = info.kind === 'markdown'
   const toggle = (next: Panel) => setPanel((current) => (current === next ? null : next))
 
   /*
    * 부를 단추가 사라졌으면 펼쳐 둔 것도 접습니다.
    *
-   * 편집만 보기로 바꾸면 뛰어갈 결과 화면이 없어 목차 단추를 감춥니다. 그런데
-   * 펼친 채로 두면 목차만 덩그러니 남고, 접을 단추가 없어 닫지도 못했습니다.
-   * 마크다운이 아닌 것을 고른 뒤에도 백링크가 그대로 남아 있었습니다.
+   * 마크다운이 아닌 것을 고르면 목차도 백링크도 부를 단추가 사라집니다. 그런데
+   * 펼친 채로 두면 그 칸만 덩그러니 남고, 접을 단추가 없어 닫지도 못했습니다.
    */
   if (panel === 'toc' && !tocAvailable) setPanel(null)
   if (panel === 'backlinks' && !backlinksAvailable) setPanel(null)

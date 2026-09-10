@@ -676,7 +676,17 @@ export default function App() {
   const textPreview = editableText && selection ? textPreviewKind(selection.path) : null
 
   const { fields, body } = useMemo(() => parseFrontmatter(draft), [draft])
-  const headings = useMemo(() => extractHeadings(body), [body])
+  /*
+   * 제목의 글자 자리는 편집기에 든 글(draft)을 기준으로 맞춰 둡니다.
+   *
+   * 제목은 앞머리(frontmatter)를 뗀 본문에서 뽑습니다. 앞머리 안의 `# 메모` 같은
+   * 주석 줄까지 제목으로 셀 수는 없기 때문입니다. 그런데 편집기에는 앞머리도
+   * 들어 있어, 뗀 만큼 자리를 밀어 주지 않으면 엉뚱한 줄로 뛰어갑니다.
+   */
+  const headings = useMemo(() => {
+    const ahead = draft.length - body.length
+    return extractHeadings(body).map((one) => ({ ...one, offset: one.offset + ahead }))
+  }, [draft, body])
 
   const handleNewDoc = useCallback(
     async (dirPath: string) => {
@@ -1345,7 +1355,6 @@ export default function App() {
               info={selection}
               headings={headings}
               index={vault.index}
-              showToc={viewMode !== 'edit'}
               onOpen={(path) => void openDoc(path)}
               vaultName={vault.vaultName}
               onNotice={flash}
