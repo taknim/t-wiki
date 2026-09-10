@@ -3,6 +3,7 @@ import type { DocIndex } from '../types'
 import type { Heading } from '../lib/markdown'
 import { formatBytes } from '../lib/attachments'
 import { Backlinks } from './Backlinks'
+import { DocTools } from './DocTools'
 import { Toc } from './Toc'
 import { displayPath } from '../lib/paths'
 
@@ -70,6 +71,22 @@ export function InfoBar({
   }
 
   return (
+    <>
+      {/* 목차·백링크는 표시줄이 아니라 글 옆에 뜹니다. 읽던 자리에서 손이 닿습니다. */}
+      <DocTools
+        path={info.path}
+        toc={tocAvailable
+          ? { count: headings.length, open: panel === 'toc', onToggle: () => toggle('toc') }
+          : null}
+        backlinks={info.kind === 'markdown'
+          ? {
+              count: backlinkCount,
+              open: panel === 'backlinks',
+              onToggle: () => toggle('backlinks'),
+            }
+          : null}
+      />
+
     <div className="info-dock">
       {panel === 'toc' && (
         <div className="info-panel">
@@ -146,29 +163,9 @@ export function InfoBar({
           </span>
         )}
 
-        {tocAvailable && (
-          <button
-            type="button"
-            className={panel === 'toc' ? 'info-toggle is-open' : 'info-toggle'}
-            data-tip="문서 안의 제목 목록을 펼칩니다"
-            onClick={() => toggle('toc')}
-          >
-            목차 {headings.length}
-          </button>
-        )}
-
-        {info.kind === 'markdown' && (
-          <button
-            type="button"
-            className={panel === 'backlinks' ? 'info-toggle is-open' : 'info-toggle'}
-            data-tip="이 문서로 [[링크]] 를 건 다른 문서를 보여 줍니다"
-            onClick={() => toggle('backlinks')}
-          >
-            백링크 {backlinkCount}
-          </button>
-        )}
       </div>
     </div>
+    </>
   )
 }
 

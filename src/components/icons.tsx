@@ -286,3 +286,47 @@ export function StarIcon({ filled, ...props }: IconProps & { filled?: boolean })
     </svg>
   )
 }
+
+/** 맨 위로. 가로줄과 위쪽 화살표를 겹쳐 '끝까지' 라는 뜻을 담습니다. */
+export function ToTopIcon(props: IconProps) {
+  return (
+    <Svg {...props} strokeWidth={1.8}>
+      <path d="M3 3h10" />
+      <path d="M8 13V6" />
+      <path d="M5 9l3-3 3 3" />
+    </Svg>
+  )
+}
+
+/** 맨 아래로. */
+export function ToBottomIcon(props: IconProps) {
+  return (
+    <Svg {...props} strokeWidth={1.8}>
+      <path d="M3 13h10" />
+      <path d="M8 3v7" />
+      <path d="M5 7l3 3 3-3" />
+    </Svg>
+  )
+}
+
+/** 목차. 줄 셋을 늘어놓아 차례를 나타냅니다. */
+export function ListIcon(props: IconProps) {
+  return (
+    <Svg {...props} strokeWidth={1.8}>
+      <path d="M3 4h10" />
+      <path d="M3 8h7" />
+      <path d="M3 12h4" />
+    </Svg>
+  )
+}
+
+/** 백링크. 이쪽으로 들어오는 화살표. */
+export function InboundIcon(props: IconProps) {
+  return (
+    <Svg {...props} strokeWidth={1.8}>
+      <path d="M13 8H4" />
+      <path d="M7 5L4 8l3 3" />
+      <path d="M13 3v10" />
+    </Svg>
+  )
+}
