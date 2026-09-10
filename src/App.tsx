@@ -27,7 +27,7 @@ import {
   ACCEPT_ATTRIBUTE, attachmentKind, formatBytes, isEditableText, isMarkdown,
   MAX_ATTACHMENT_BYTES,
 } from './lib/attachments'
-import { extractHeadings, parseFrontmatter } from './lib/markdown'
+import { extractHeadings, parseFrontmatter, toggleTask } from './lib/markdown'
 import { entryKind, readFile } from './lib/fsAccess'
 import { DEFAULT_VIEW_MODE, loadSession, saveSession } from './lib/session'
 import { formatTidyFor, textPreviewKind, trimWhitespace } from './lib/textPreview'
@@ -688,6 +688,20 @@ export default function App() {
     return extractHeadings(body).map((one) => ({ ...one, offset: one.offset + ahead }))
   }, [draft, body])
 
+  /*
+   * 미리보기에서 누른 할 일 네모를 원문에도 적습니다.
+   *
+   * 제목 자리와 같은 셈입니다. 앞머리를 뗀 본문에서 자리를 짚고, 편집기에 든 글에는
+   * 앞머리가 그대로 있으므로 뗀 조각을 다시 앞에 붙여 돌려 놓습니다.
+   * 저장은 늘 하던 대로 자동 저장이 이어받습니다.
+   */
+  const toggleTaskAt = (at: number) => {
+    const next = toggleTask(body, at)
+    if (next === null) return
+    setDraft(draft.slice(0, draft.length - body.length) + next)
+    setDirty(true)
+  }
+
   const handleNewDoc = useCallback(
     async (dirPath: string) => {
       const name = await dialogs.prompt({
@@ -1326,6 +1340,7 @@ export default function App() {
                     root={vault.root}
                     docPath={selectedPath}
                     onOpenLink={(target, resolved) => void handleOpenLink(target, resolved)}
+                    onToggleTask={(at) => toggleTaskAt(at)}
                   />
                 )}
               </div>

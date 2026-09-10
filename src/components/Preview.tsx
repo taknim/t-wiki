@@ -13,12 +13,16 @@ interface PreviewProps {
   root: FileSystemDirectoryHandle
   docPath: string
   onOpenLink: (target: string, resolvedPath: string | null) => void
+  /** 할 일 네모를 눌렀을 때. 몇 번째 네모인지 넘깁니다. */
+  onToggleTask: (index: number) => void
 }
 
 /** 타자를 칠 때마다 하이라이팅과 다이어그램을 다시 그리지 않도록 잠깐 기다립니다. */
 const RENDER_DELAY = 220
 
-export function Preview({ markdown, index, assets, root, docPath, onOpenLink }: PreviewProps) {
+export function Preview({
+  markdown, index, assets, root, docPath, onOpenLink, onToggleTask,
+}: PreviewProps) {
   const [html, setHtml] = useState('')
   const containerRef = useRef<HTMLDivElement>(null)
   const generation = useRef(0)
@@ -67,6 +71,21 @@ export function Preview({ markdown, index, assets, root, docPath, onOpenLink }: 
 
   // 위키링크는 개수가 많아 각각 핸들러를 다는 대신 컨테이너에서 위임 처리합니다.
   const handleClick = (event: MouseEvent<HTMLDivElement>) => {
+    /*
+     * 할 일 네모.
+     *
+     * 몇 번째 네모인지만 세어 넘깁니다. 그린 차례와 원문에 적힌 차례가 같으므로
+     * 그 수만으로 원문의 자리를 짚을 수 있습니다.
+     * 눌린 대로 먼저 켜졌다 꺼지게 두고(막지 않습니다) 원문은 뒤따라 바뀝니다.
+     * 막아 두면 다시 그릴 때까지 눌러도 아무 일이 없는 것처럼 보입니다.
+     */
+    const box = (event.target as HTMLElement).closest('input.task-check')
+    if (box && containerRef.current) {
+      const boxes = [...containerRef.current.querySelectorAll('input.task-check')]
+      onToggleTask(boxes.indexOf(box))
+      return
+    }
+
     const anchor = (event.target as HTMLElement).closest('a[data-wikilink]')
     if (!anchor) return
     event.preventDefault()

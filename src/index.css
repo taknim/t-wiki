@@ -748,6 +748,17 @@ mark { background: var(--mark); color: inherit; border-radius: 2px; }
 .markdown-body h3 { font-size: 16px; margin: 20px 0 8px; }
 .markdown-body p, .markdown-body ul, .markdown-body ol { margin: 0 0 12px; }
 .markdown-body ul, .markdown-body ol { padding-inline-start: 22px; }
+/*
+ * 할 일 네모. 눌러서 켜고 끄는 것이므로 손 모양을 내주고, 글줄과 눈높이를 맞춥니다.
+ * 네모가 든 줄에는 점(list-marker)을 두지 않습니다. 표시가 둘이면 어수선합니다.
+ */
+.markdown-body li:has(> .task-check) { list-style: none; margin-inline-start: -18px; }
+.markdown-body .task-check {
+  margin-inline-end: 6px;
+  cursor: pointer;
+  vertical-align: middle;
+  accent-color: var(--accent);
+}
 .markdown-body a { color: var(--accent); }
 .markdown-body code {
   font-family: var(--mono);

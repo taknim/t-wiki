@@ -90,6 +90,48 @@ export function extractHeadings(markdown: string): Heading[] {
   return headings
 }
 
+/**
+ * 할 일 줄. `- [ ]`, `* [x]`, `1. [ ]`, 인용 안의 `> - [ ]` 까지 잡습니다.
+ */
+const TASK_LINE = /^(\s*(?:>\s*)*(?:[-*+]|\d+[.)])\s+\[)([ xX])(\])/
+
+/**
+ * 미리보기에서 누른 네모를 원문에서도 켜고 끕니다.
+ *
+ * 몇 번째 네모인지로 자리를 짚습니다. 그린 차례와 원문에 적힌 차례가 같기 때문입니다.
+ * 코드 블록 안의 `- [ ]` 는 네모로 그려지지 않으므로 셈에서도 뺍니다.
+ * 짚을 자리가 없으면 null 을 돌려주고 원문은 건드리지 않습니다.
+ */
+export function toggleTask(markdown: string, index: number): string | null {
+  const lines = markdown.split('\n')
+  let inFence = false
+  let at = 0
+
+  for (let where = 0; where < lines.length; where += 1) {
+    const raw = lines[where]
+    const line = raw.endsWith('\r') ? raw.slice(0, -1) : raw
+
+    if (FENCE_LINE.test(line)) {
+      inFence = !inFence
+      continue
+    }
+    if (inFence) continue
+
+    const match = TASK_LINE.exec(line)
+    if (!match) continue
+
+    if (at === index) {
+      const next = match[2] === ' ' ? 'x' : ' '
+      lines[where] = match[1] + next + match[3] + line.slice(match[0].length)
+        + (raw.endsWith('\r') ? '\r' : '')
+      return lines.join('\n')
+    }
+    at += 1
+  }
+
+  return null
+}
+
 /* ------------------------------------------------------------------ */
 /* 확장                                                                */
 /* ------------------------------------------------------------------ */
@@ -366,6 +408,16 @@ marked.use({
       const plain = token.text.replace(/<[^>]+>/g, '')
       const id = slugify(plain, currentSlugs)
       return `<h${token.depth} id="${escapeHtml(id)}">${text}<a class="anchor" href="#${escapeHtml(id)}" aria-label="이 절로 가는 링크">#</a></h${token.depth}>`
+    },
+
+    /*
+     * 할 일 네모. marked 는 기본으로 disabled 를 달아 내놓습니다.
+     *
+     * 눌러도 아무 일이 없는 네모를 그려 둘 까닭이 없습니다. 여기서는 눌러서 켜고
+     * 끄고, 그 자리를 원문에서도 [ ] ↔ [x] 로 바꿔 씁니다(toggleTask).
+     */
+    checkbox({ checked }: Tokens.Checkbox) {
+      return `<input type="checkbox" class="task-check"${checked ? ' checked' : ''}>`
     },
 
     code(token) {
