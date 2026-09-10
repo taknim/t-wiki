@@ -309,6 +309,19 @@ try {
   // 반올림해 보여 주므로 안내에는 바이트 그대로도 적습니다.
   expect('바이트 그대로도 적힘',
     fileTips.some((one) => /파일 크기 · [\d,]+바이트/.test(one.tip ?? '')), JSON.stringify(fileTips))
+  // 빈칸만 두면 "84 B 2026. 09. 10." 가 한 덩어리로 읽힙니다.
+  const between = await page.evaluate(() => {
+    const metas = [...document.querySelectorAll('.info-bar .info-meta')]
+    return {
+      count: metas.length,
+      dot: metas[1] ? getComputedStyle(metas[1], '::before').content : null,
+      first: metas[0] ? getComputedStyle(metas[0], '::before').content : null,
+    }
+  })
+  console.log('  ' + JSON.stringify(between))
+  expect('값 사이에 가운데 점이 있음', (between.dot ?? '').includes('·'), JSON.stringify(between))
+  expect('맨 앞에는 붙지 않음', !(between.first ?? '').includes('·'), JSON.stringify(between))
+
   expect('시각은 고친 때라고 밝힘',
     fileTips.some((one) => (one.tip ?? '').startsWith('마지막으로 고친 시각 ·')),
     JSON.stringify(fileTips))
