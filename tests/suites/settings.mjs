@@ -198,6 +198,14 @@ try {
    * 아무것도 없는 칸만 남습니다. 필요한 만큼만 두었는지 함께 봅니다.
    */
   await open()
+  /*
+   * 창은 지난번에 보던 자리에서 열립니다. 그 자리가 이미 GitHub 동기화 묶음이면
+   * 묶음 이름을 눌렀을 때 뛰는 대신 접히므로, 먼저 다른 묶음으로 갔다가 옵니다.
+   */
+  if ((await page.locator('.settings-nav button.is-active').textContent()).includes('GitHub')) {
+    await page.click('.settings-nav button:has-text("모양")')
+    await page.waitForTimeout(900)
+  }
   await page.click('.settings-nav button:has-text("GitHub 동기화")')
   await page.waitForTimeout(1200)
   const jumped = await page.evaluate(() => {
@@ -414,6 +422,66 @@ try {
   await page.click('.sheet-close')
   await page.waitForTimeout(400)
   expect('단추로도 닫힘', !(await isOpen()), '아직 열려 있습니다')
+
+  /*
+   * 설정은 잠깐 들러 고치고 닫는 자리입니다. 다음에 열 때 보던 갈래가 그대로 나오면
+   * 이어서 손볼 수 있고, 매번 맨 위에서 다시 굴려 내려가지 않아도 됩니다.
+   */
+  step('16. 닫을 때 보던 갈래를 기억했다가 다시 연다')
+  const where = () => page.evaluate(() => {
+    const box = document.querySelector('.settings-content').getBoundingClientRect()
+    const here = document.querySelector('.settings-nav-item.is-here')?.textContent ?? null
+    const head = here && [...document.querySelectorAll('.field-group-title')]
+      .find((one) => one.textContent === here)
+    return {
+      here,
+      top: head ? Math.round(head.getBoundingClientRect().top - box.top) : null,
+      group: document.querySelector('.settings-nav button.is-active')?.textContent.trim() ?? null,
+    }
+  })
+  await open()
+  await page.click('.settings-nav .settings-nav-item:text-is("설정 주고받기")')
+  await page.waitForTimeout(800)
+  console.log('  닫기 전: ' + JSON.stringify(await where()))
+  // Esc 로 닫아도 적혀야 합니다. 닫는 길이 여럿입니다.
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(400)
+  expect('Esc 로 닫힘', !(await isOpen()))
+  await open()
+  const reopened = await where()
+  console.log('  다시 연 뒤: ' + JSON.stringify(reopened))
+  expect('보던 갈래가 짙어져 있음', reopened.here === '설정 주고받기', JSON.stringify(reopened))
+  expect('그 자리가 창 위쪽에 옴', reopened.top !== null && reopened.top >= -4 && reopened.top < 60, JSON.stringify(reopened))
+
+  // 저장소 설정을 지워 둡니다. 아래에서 동기화 단추가 설정 창을 열게 하려면 비어 있어야 합니다.
+  await page.click('.settings-nav .settings-nav-item:text-is("이 폴더의 설정")')
+  await page.waitForTimeout(600)
+  await page.click('button:has-text("이 폴더의 설정 지우기")')
+  await page.waitForSelector('button:has-text("정말 지울까요?")')
+  await page.click('button:has-text("정말 지울까요?")')
+  await page.waitForTimeout(500)
+
+  // 다른 묶음의 갈래도 같습니다. 이번에는 단추로 닫습니다.
+  await page.click('.settings-nav .settings-nav-item:text-is("본문")')
+  await page.waitForTimeout(800)
+  await page.click('.sheet-close')
+  await page.waitForTimeout(300)
+  await open()
+  const once = await where()
+  console.log('  또 연 뒤: ' + JSON.stringify(once))
+  expect('마지막에 보던 갈래로 감', once.here === '본문' && once.group?.includes('모양'), JSON.stringify(once))
+  await page.click('.sheet-close')
+  await page.waitForTimeout(300)
+
+  // 갈 곳이 정해진 부름은 기억보다 앞섭니다. 동기화 설정이 덜 된 채 동기화를 누르면 그 묶음으로 갑니다.
+  await page.click('.topbar button:has-text("GitHub 동기화")')
+  await page.waitForSelector('.settings-nav')
+  await page.waitForTimeout(600)
+  const pointed = await where()
+  console.log('  동기화 단추로 연 뒤: ' + JSON.stringify(pointed))
+  expect('짚어 준 묶음이 앞섬', pointed.group?.includes('GitHub 동기화'), JSON.stringify(pointed))
+  await page.click('.sheet-close')
+  await page.waitForTimeout(300)
 } catch (cause) {
   fail('묶음이 도중에 멈춤', cause instanceof Error ? (cause.stack ?? cause.message) : String(cause))
 } finally {

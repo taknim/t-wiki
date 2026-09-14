@@ -352,11 +352,16 @@ try {
   await page.waitForTimeout(300)
 
   // 내보내기 갈래도 기억되는 값이므로, 내보낸 뒤에 적어 둡니다.
-  const before = await page.evaluate(() =>
+  /*
+   * 설정 창의 책갈피(마지막에 보던 갈래)는 취향이 아니라 담지 않습니다.
+   * 견줄 때도 뺍니다. 다른 기기가 알 일이 아닙니다.
+   */
+  const BOOKMARKS = ['mdwiki:settings-spot']
+  const before = await page.evaluate((skip) =>
     Object.fromEntries(Object.keys(localStorage)
-      .filter((key) => key.startsWith('mdwiki:'))
+      .filter((key) => key.startsWith('mdwiki:') && !skip.includes(key))
       .sort()
-      .map((key) => [key, localStorage.getItem(key)])))
+      .map((key) => [key, localStorage.getItem(key)])), BOOKMARKS)
   console.log('  내보내기 전: ' + JSON.stringify(before))
 
   // 전부 되돌려 놓고, 들여와서 제자리로 돌아오는지 봅니다.
@@ -379,11 +384,11 @@ try {
   await page.click('.sheet-close')
   await page.waitForTimeout(400)
 
-  const after = await page.evaluate(() =>
+  const after = await page.evaluate((skip) =>
     Object.fromEntries(Object.keys(localStorage)
-      .filter((key) => key.startsWith('mdwiki:'))
+      .filter((key) => key.startsWith('mdwiki:') && !skip.includes(key))
       .sort()
-      .map((key) => [key, localStorage.getItem(key)])))
+      .map((key) => [key, localStorage.getItem(key)])), BOOKMARKS)
   console.log('  들여온 뒤:   ' + JSON.stringify(after))
 
   const missing = Object.keys(before).filter((key) => before[key] !== after[key])

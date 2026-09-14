@@ -71,7 +71,8 @@ export default function App() {
   const [query, setQuery] = useState('')
   // 즐겨찾기 탭의 찾기. 폴더 탭의 검색과는 하는 일이 달라 따로 둡니다.
   const [favoriteQuery, setFavoriteQuery] = useState('')
-  const [settingsTab, setSettingsTab] = useState<'general' | 'appearance' | 'sync' | null>(null)
+  // 'last' 는 지난번에 보던 자리로. 갈 곳이 정해진 부름(동기화 설정이 덜 됐을 때)만 묶음을 짚습니다.
+  const [settingsTab, setSettingsTab] = useState<'general' | 'appearance' | 'sync' | 'last' | null>(null)
   const [reportOpen, setReportOpen] = useState(false)
   const [historyOpen, setHistoryOpen] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
@@ -970,7 +971,7 @@ export default function App() {
             className="btn"
             data-tip="테마, 글꼴, GitHub 동기화를 설정합니다"
             aria-label="설정"
-            onClick={() => setSettingsTab('general')}
+            onClick={() => setSettingsTab('last')}
           >
             <SettingsIcon />
             <span>설정</span>

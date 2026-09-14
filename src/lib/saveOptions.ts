@@ -273,3 +273,40 @@ export function writeSidebarTab(tab: SidebarTab): void {
     // 저장이 막혀 있어도 이번에는 그대로 적용됩니다.
   }
 }
+
+/*
+ * 설정 창에서 마지막으로 보던 자리.
+ *
+ * 설정은 잠깐 들러 고치고 닫는 자리입니다. 다음에 열 때 보던 갈래가 그대로 나오면
+ * 이어서 손볼 수 있고, 매번 맨 위에서 다시 굴려 내려가지 않아도 됩니다.
+ * 취향이 아니라 책갈피라 설정 파일에는 담지 않습니다. 다른 기기가 알 일이 아닙니다.
+ * 어느 값이 유효한지는 설정 창이 압니다. 여기서는 모양만 봅니다.
+ */
+const SETTINGS_SPOT = 'mdwiki:settings-spot'
+
+export interface SettingsSpot {
+  /** 묶음(일반·모양·GitHub 동기화). */
+  tab: string
+  /** 묶음 안의 갈래. 맨 위라 갈래를 넘기기 전이면 null. */
+  field: string | null
+}
+
+export function readSettingsSpot(): SettingsSpot | null {
+  try {
+    const raw = localStorage.getItem(SETTINGS_SPOT)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as Partial<SettingsSpot>
+    if (typeof parsed.tab !== 'string') return null
+    return { tab: parsed.tab, field: typeof parsed.field === 'string' ? parsed.field : null }
+  } catch {
+    return null
+  }
+}
+
+export function writeSettingsSpot(spot: SettingsSpot): void {
+  try {
+    localStorage.setItem(SETTINGS_SPOT, JSON.stringify(spot))
+  } catch {
+    // 저장이 막혀 있어도 이번에는 그대로 적용됩니다.
+  }
+}

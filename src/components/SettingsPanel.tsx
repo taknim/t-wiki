@@ -9,7 +9,8 @@ import { ChevronIcon } from './icons'
 import { clearSessions, isRememberEnabled, setRememberEnabled } from '../lib/session'
 import { isLocked, lock, unlock, type Locked } from '../lib/secret'
 import {
-  readIncludeToken, readSaveOptions, writeIncludeToken, writeSaveOptions, type SaveOptions,
+  readIncludeToken, readSaveOptions, readSettingsSpot, writeIncludeToken, writeSaveOptions,
+  writeSettingsSpot, type SaveOptions,
 } from '../lib/saveOptions'
 import { removeEntry } from '../lib/fsAccess'
 import { buildBundle, bundleFileName, parseBundle } from '../lib/settingsFile'
@@ -29,7 +30,11 @@ interface SettingsPanelProps {
   sync: GitHubSync
   onShowHistory: () => void
   /** 설정 창을 열 때 바로 보여 줄 묶음. */
-  initialTab?: TabId
+  /**
+   * 열면서 곧장 갈 묶음. 'last' 는 지난번에 보던 자리로 돌아간다는 뜻입니다.
+   * 동기화 설정이 덜 됐을 때처럼 갈 곳이 정해진 부름만 묶음을 짚어 줍니다.
+   */
+  initialTab?: TabId | 'last'
   /** 지금 열려 있는 폴더 이름. 내보낸 파일에 적어 둡니다. */
   vaultName: string | null
   /** 지금 열려 있는 폴더. 내보낸 파일이 그 안에 떨어졌는지 가리는 데 씁니다. */
@@ -113,11 +118,11 @@ export function SettingsPanel({
   splitRatio, onSplitRatio,
   imagePreview, onImagePreview, imageBackdrop, onImageBackdrop,
   officePreview, onOfficePreview,
-  initialTab = 'general',
+  initialTab = 'last',
 }: SettingsPanelProps) {
   const { settings, isDark, update } = useTheme()
   const dialogs = useDialogs()
-  const [tab, setTab] = useState<TabId>(initialTab)
+  const [tab, setTab] = useState<TabId>(initialTab === 'last' ? 'general' : initialTab)
   const [saveOptions, setSaveOptions] = useState<SaveOptions>(readSaveOptions)
   const [includeToken, setIncludeToken] = useState(readIncludeToken)
   /** 주고받기 결과 한 줄. 조심해야 할 결과는 눈에 띄게 그립니다. */
@@ -470,13 +475,45 @@ export function SettingsPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // 창을 열 때 지정된 묶음으로 바로 이동합니다.
+  /*
+   * 창을 열 때 갈 자리.
+   *
+   * 짚어 준 묶음이 있으면 그리로, 없으면 지난번에 닫을 때 보던 갈래로 갑니다.
+   * 저장해 둔 이름이 지금 판에 없으면(갈래를 고쳐 이름이 바뀐 뒤) 맨 위에서 엽니다.
+   * 엉뚱한 곳으로 가느니 처음부터가 낫습니다.
+   */
   useEffect(() => {
-    if (initialTab === 'general') return
-    sectionRefs[initialTab].current?.scrollIntoView({ block: 'start' })
-    setTab(initialTab)
+    const target = initialTab === 'last' ? readSettingsSpot() : { tab: initialTab, field: null }
+    if (!target) return
+    const group = TABS.find((one) => one.id === target.tab)
+    if (!group) return
+    const field = group.items.some((one) => one.id === target.field) ? target.field : null
+    if (group.id === 'general' && field === null) return
+
+    // 묶음 머리로 갈 때 굴림 자리로 갈래를 다시 고르지 않도록, 눌러서 뛸 때와 같이 잠시 막습니다.
+    jumpingTo.current = group.id
+    const element = field ? document.getElementById(field) : sectionRefs[group.id].current
+    element?.scrollIntoView({ block: 'start' })
+    setTab(group.id)
+    setField(field)
+    window.clearTimeout(releaseTimer.current)
+    releaseTimer.current = window.setTimeout(() => {
+      jumpingTo.current = null
+    }, 800)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialTab])
+
+  /*
+   * 닫을 때 보던 자리를 적어 둡니다.
+   *
+   * 닫는 길이 여럿(단추, 바깥 누르기, Esc)이라 각각에 다는 대신, 창이 걷힐 때 한 번
+   * 적습니다. 걷히는 순간의 값은 ref 로 붙들어 둡니다.
+   */
+  const spot = useRef({ tab, field })
+  useEffect(() => {
+    spot.current = { tab, field }
+  }, [tab, field])
+  useEffect(() => () => writeSettingsSpot(spot.current), [])
   const [remember, setRemember] = useState(isRememberEnabled)
   const [cleared, setCleared] = useState(false)
 
