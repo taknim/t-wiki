@@ -1037,6 +1037,20 @@ a.btn { text-decoration: none; color: inherit; display: inline-block; }
 
 /* ---------- 저장소 선택 ---------- */
 
+/* 저장된 토큰 자리. 입력란 대신 별표만 세워 값이 있다는 것만 알립니다. */
+.token-mask {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 0 10px;
+  border: 1px dashed var(--border-strong);
+  border-radius: 6px;
+  color: var(--text-muted);
+  letter-spacing: 2px;
+  font-family: var(--mono);
+}
+
 .repo-list { list-style: none; margin: 0; padding: 0; max-height: 220px; overflow: auto; border: 1px solid var(--border); border-radius: 8px; }
 .repo-list li + li { border-top: 1px solid var(--border); }
 .repo-list button {

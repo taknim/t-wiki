@@ -1,5 +1,6 @@
 import { del, get, set } from 'idb-keyval'
 import { vaultKeyFor } from './vaultKey'
+import { isSealed, open, seal, type Sealed } from './secret'
 import type { GitHubConfig, LastCommit, SyncRun, SyncState } from '../types'
 
 const VAULT_HANDLE = 'mdwiki:vault-handle'
@@ -41,13 +42,38 @@ async function readByVault<T>(bucket: string): Promise<ByVault<T>> {
   return raw as ByVault<T>
 }
 
+/*
+ * 저장소에 적히는 꼴. 토큰만 봉해서 둡니다(secret.ts).
+ *
+ * 앱 안에서는 늘 글자 그대로의 토큰(GitHubConfig)만 오갑니다. 봉하고 푸는 일은
+ * 여기 두 자리에서만 하므로, 다른 어디서도 봉한 꼴을 알 필요가 없습니다.
+ * 옛 저장분은 토큰이 글자 그대로 적혀 있습니다. 읽는 김에 봉해서 다시 둡니다.
+ */
+type StoredGitHubConfig = Omit<GitHubConfig, 'token'> & { token: string | Sealed }
+
 export async function loadGitHubConfig(vault: string): Promise<GitHubConfig | undefined> {
-  return (await readByVault<GitHubConfig>(GITHUB_CONFIG))[vault]
+  const stored = (await readByVault<StoredGitHubConfig>(GITHUB_CONFIG))[vault]
+  if (!stored) return undefined
+
+  if (!isSealed(stored.token)) {
+    // 글자 그대로 적혀 있던 옛 저장분. 봉해서 다시 두고, 이번에는 그대로 돌려줍니다.
+    const legacy = { ...stored, token: typeof stored.token === 'string' ? stored.token : '' }
+    await saveGitHubConfig(vault, legacy)
+    return legacy
+  }
+
+  try {
+    return { ...stored, token: await open(stored.token) }
+  } catch {
+    // 열쇠가 바뀌었거나 값이 상했습니다. 토큰만 비우고 나머지 설정은 살립니다.
+    return { ...stored, token: '' }
+  }
 }
 
 export async function saveGitHubConfig(vault: string, config: GitHubConfig): Promise<void> {
-  const store = await readByVault<GitHubConfig>(GITHUB_CONFIG)
-  store[vault] = config
+  const sealed = await seal(config.token)
+  const store = await readByVault<StoredGitHubConfig>(GITHUB_CONFIG)
+  store[vault] = { ...config, token: sealed }
   await set(GITHUB_CONFIG, store)
 }
 
@@ -223,7 +249,8 @@ async function runMigration(): Promise<void> {
       return
     }
 
-    await set(GITHUB_CONFIG, { [key]: config as GitHubConfig })
+    // 옛 벌은 토큰이 글자 그대로입니다. 옮기면서 봉합니다.
+    await saveGitHubConfig(key, config as GitHubConfig)
 
     const baselines = await get<unknown>(SYNC_STATE)
     if (baselines && typeof baselines === 'object') await set(SYNC_STATE, { [key]: baselines })

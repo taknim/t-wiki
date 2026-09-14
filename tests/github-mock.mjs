@@ -41,11 +41,15 @@ export function createGitHubMock() {
     head = commitSha
   }
 
+  // 마지막 요청에 실린 인증 머리글. 봉해 둔 토큰이 제대로 풀려 실리는지 볼 때 씁니다.
+  let lastAuth = null
+
   const handler = async (route) => {
     const request = route.request()
     const url = new URL(request.url())
     const path = url.pathname
     const method = request.method()
+    lastAuth = request.headers()['authorization'] ?? null
     if (slow > 0) await new Promise((done) => setTimeout(done, slow))
 
     if (failNext) {
@@ -59,6 +63,11 @@ export function createGitHubMock() {
       route.fulfill({ status: 200, body: bytes, contentType: 'application/vnd.github.raw' })
 
     if (path === '/user') return reply(json({ login: 'tester' }))
+    // 토큰 확인 단추가 부르는 저장소 목록. 하나만 돌려주면 됩니다.
+    if (path === '/user/repos') {
+      return reply(json([{ full_name: 'tester/wiki', default_branch: 'main', private: true,
+        permissions: { push: true } }]))
+    }
     if (path.startsWith('/repos/') && path.split('/').length === 4) {
       return reply(json({ full_name: 'tester/wiki', default_branch: 'main', private: true,
         permissions: { push: true } }))
@@ -135,6 +144,7 @@ export function createGitHubMock() {
     /** 지금 가지 끝에 있는 커밋 이름. 화면에 보이는 커밋 이름과 견주는 데 씁니다. */
     get headSha() { return head },
     failOnce(status, message) { failNext = { status, message } },
+    lastAuth() { return lastAuth },
     setSlow(ms) { slow = ms },
   }
 }

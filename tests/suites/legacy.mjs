@@ -18,6 +18,7 @@ const errors = []
 page.on('pageerror', (e) => errors.push('pageerror: ' + e.message))
 await page.route('https://api.github.com/**', github.handler)
 await page.addInitScript(readFileSync(join(HERE, '..', 'mock-fs.js'), 'utf8'))
+await page.addInitScript(readFileSync(join(HERE, '..', 'peek.js'), 'utf8'))
 await page.addInitScript(() => {
   window.__installMockFs()
   const first = window.__mockRoot
@@ -46,7 +47,12 @@ const tokenInSettings = async () => {
   await page.waitForSelector('.settings-nav')
   await page.click('.settings-nav button:has-text("GitHub 동기화")')
   await page.waitForTimeout(700)
-  const value = await page.inputValue('#gh-token')
+  // 토큰은 별표로만 나옵니다. 별표가 섰으면 저장소에서 풀어 보고, 입력란이면 그 값입니다.
+  const value = await page.evaluate(async () => {
+    if (!document.querySelector('.token-mask')) return document.querySelector('#gh-token')?.value ?? ''
+    const stored = await window.__githubConfigFor(window.__vaults[window.__pick].name)
+    return stored?.token ?? '(별표만 있고 저장된 값은 없음)'
+  })
   await page.click('.sheet-close')
   await page.waitForTimeout(200)
   return value

@@ -24,6 +24,7 @@ await page.route('https://api.github.com/**', github.handler)
  * 실제로도 "폴더 열기" 를 누를 때마다 다른 폴더를 고를 수 있습니다.
  */
 await page.addInitScript(readFileSync(join(HERE, '..', 'mock-fs.js'), 'utf8'))
+await page.addInitScript(readFileSync(join(HERE, '..', 'peek.js'), 'utf8'))
 await page.addInitScript(() => {
   window.__installMockFs()
   const first = window.__mockRoot
@@ -66,11 +67,21 @@ const openSettings = async () => {
   await page.click('.settings-nav button:has-text("GitHub 동기화")')
   await page.waitForTimeout(800)
 }
-const readRepoFields = () => page.evaluate(() => ({
-  token: document.querySelector('#gh-token')?.value ?? '',
-  owner: document.querySelector('#gh-owner')?.value ?? '',
-  repo: document.querySelector('.row input[placeholder="저장소 이름"]')?.value ?? '',
-}))
+/*
+ * 토큰은 화면에 별표로만 나옵니다. 값은 저장소에서 풀어 봅니다.
+ * 별표가 서 있는데 저장소에 없거나, 입력란이 있는데 저장소에 값이 있으면 어긋난 것입니다.
+ */
+const readRepoFields = () => page.evaluate(async () => {
+  const name = window.__vaults[window.__pick].name
+  const stored = await window.__githubConfigFor(name)
+  const masked = document.querySelector('.token-mask') !== null
+  const token = masked ? (stored?.token ?? '(별표만 있고 저장된 값은 없음)') : (document.querySelector('#gh-token')?.value ?? '')
+  return {
+    token,
+    owner: document.querySelector('#gh-owner')?.value ?? '',
+    repo: document.querySelector('.row input[placeholder="저장소 이름"]')?.value ?? '',
+  }
+})
 const idle = () =>
   page.waitForFunction(() => !document.querySelector('.topbar button[disabled]'), { timeout: 30000 })
 

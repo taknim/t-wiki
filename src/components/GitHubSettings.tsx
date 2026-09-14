@@ -13,6 +13,30 @@ export function GitHubSettings({ sync, onShowHistory }: GitHubSettingsProps) {
   const { config, update, reset } = sync
   const [confirming, setConfirming] = useState(false)
 
+  /*
+   * 토큰 칸.
+   *
+   * 값이 있으면 입력란을 치우고 별표만 보입니다. 비밀번호 칸이라 어차피 점만
+   * 보이지만, 입력란이 서 있으면 손이 가서 지우거나 덧붙이기 쉽습니다.
+   * 바꾸려면 옆의 단추를 눌러 빈 입력란을 받습니다. 그 사이 물러서면 쓰던 값으로
+   * 돌아갑니다. 바꾸는 동안 친 글자는 그때그때 저장되므로, 물러설 자리를
+   * 따로 붙들어 두어야 합니다.
+   */
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState('')
+  const [previousToken, setPreviousToken] = useState('')
+  const hasToken = config.token.trim() !== ''
+
+  const beginEditing = () => {
+    setPreviousToken(config.token)
+    setDraft('')
+    setEditing(true)
+  }
+  const cancelEditing = () => {
+    update({ token: previousToken })
+    setEditing(false)
+  }
+
   // 마지막으로 올린 커밋으로 가는 길. 지을 수 없으면 null 이고, 그때는 링크를 안 내놓습니다.
   const lastCommitUrl = commitUrl(config, sync.lastCommit?.sha ?? null)
   const [viewer, setViewer] = useState<string | null>(null)
@@ -39,6 +63,8 @@ export function GitHubSettings({ sync, onShowHistory }: GitHubSettingsProps) {
       const me = await api.getViewer(config.token.trim())
       setViewer(me.login)
       setRepos(await api.listRepos(config.token.trim()))
+      // 쓸 수 있는 토큰이 들어왔으니 입력란은 거두고 별표로 돌아갑니다.
+      setEditing(false)
     })
 
   const chooseRepo = (fullName: string, defaultBranch: string) =>
@@ -64,15 +90,46 @@ export function GitHubSettings({ sync, onShowHistory }: GitHubSettingsProps) {
       <section className="field">
         <label htmlFor="gh-token">액세스 토큰</label>
         <div className="row">
-          <input
-            id="gh-token"
-            className="dialog-input"
-            type="password"
-            value={config.token}
-            placeholder="github_pat_..."
-            autoComplete="off"
-            onChange={(event) => update({ token: event.target.value })}
-          />
+          {editing || !hasToken ? (
+            <input
+              id="gh-token"
+              className="dialog-input"
+              type="password"
+              value={editing ? draft : config.token}
+              placeholder="github_pat_..."
+              autoComplete="off"
+              onChange={(event) => {
+                setDraft(event.target.value)
+                update({ token: event.target.value })
+              }}
+            />
+          ) : (
+            <span className="token-mask" data-tip="토큰이 저장되어 있습니다. 봉해 두어 여기서도 보이지 않습니다">
+              **********
+            </span>
+          )}
+          {hasToken && !editing && (
+            <button
+              type="button"
+              className="btn"
+              data-tip="새 토큰을 붙여넣을 입력란을 엽니다"
+              onClick={beginEditing}
+              disabled={busy !== null}
+            >
+              변경
+            </button>
+          )}
+          {editing && previousToken !== '' && (
+            <button
+              type="button"
+              className="btn"
+              data-tip="쓰던 토큰으로 돌아갑니다"
+              onClick={cancelEditing}
+              disabled={busy !== null}
+            >
+              취소
+            </button>
+          )}
           <button
             type="button"
             className="btn btn-primary"
@@ -86,7 +143,7 @@ export function GitHubSettings({ sync, onShowHistory }: GitHubSettingsProps) {
         <p className="hint">
           GitHub → Settings → Developer settings → <strong>Fine-grained personal access token</strong> 에서
           대상 저장소만 고르고 <strong>Repository permissions → Contents: Read and write</strong> 만 주세요.
-          토큰은 이 브라우저에만 저장되고 다른 곳으로 전송되지 않습니다.
+          토큰은 이 브라우저에만 봉해서(암호화) 저장되고 다른 곳으로 전송되지 않습니다.
         </p>
         {viewer && <span className="pill pill-ok">{viewer} 로 연결됨</span>}
       </section>

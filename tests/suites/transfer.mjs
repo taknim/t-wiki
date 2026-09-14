@@ -23,6 +23,7 @@ const errors = []
 page.on('pageerror', (e) => errors.push('pageerror: ' + e.message))
 await page.route('https://api.github.com/**', github.handler)
 await page.addInitScript(readFileSync(join(HERE, '..', 'mock-fs.js'), 'utf8'))
+await page.addInitScript(readFileSync(join(HERE, '..', 'peek.js'), 'utf8'))
 await page.addInitScript(() => {
   window.__installMockFs()
   const first = window.__mockRoot
@@ -39,6 +40,15 @@ const openVault = async (which) => {
   await page.waitForSelector('.tree', { timeout: 10000 })
   await page.waitForTimeout(600)
 }
+/*
+ * 지금 폴더의 토큰. 화면에는 별표로만 나오므로 저장소에서 풀어 봅니다.
+ * 입력란이 서 있으면(값이 없을 때) 그 값입니다.
+ */
+const currentToken = () => page.evaluate(async () => {
+  if (!document.querySelector('.token-mask')) return document.querySelector('#gh-token')?.value ?? ''
+  const stored = await window.__githubConfigFor(window.__vaults[window.__pick].name)
+  return stored?.token ?? '(별표만 있고 저장된 값은 없음)'
+})
 const closeVault = async () => {
   if (await page.locator('.sheet-close').count()) { await page.click('.sheet-close'); await page.waitForTimeout(200) }
   await page.click('.tree-root button[aria-label="폴더 닫기"]')
@@ -133,12 +143,12 @@ try {
   await page.click('.settings-nav button:has-text("GitHub 동기화")')
   await page.waitForTimeout(400)
   const landed = await page.evaluate(() => ({
-    token: document.querySelector('#gh-token').value,
     owner: document.querySelector('#gh-owner').value,
     repo: document.querySelector('.row input[placeholder="저장소 이름"]').value,
     minutes: document.querySelector('#gh-interval')?.value,
     theme: document.documentElement.dataset.theme,
   }))
+  landed.token = await currentToken()
   console.log('  ' + JSON.stringify(landed))
   expect('토큰이 들어옴', landed.token === '비밀토큰', landed.token)
   expect('저장소가 들어옴', landed.repo === 'wiki' && landed.owner === 'tester', JSON.stringify(landed))
@@ -169,7 +179,7 @@ try {
   await openSettings()
   await page.click('.settings-nav button:has-text("GitHub 동기화")')
   await page.waitForTimeout(400)
-  const origin = await page.inputValue('#gh-token')
+  const origin = await currentToken()
   expect('원래 폴더도 제 값을 지킴', origin === '비밀토큰', origin)
   await page.click('.sheet-close')
 
@@ -201,16 +211,17 @@ try {
   const madeAfter = await page.evaluate(() => window.__savedNames().length)
   expect('물러서면 파일이 생기지 않음', madeAfter === madeBefore, `${madeBefore} -> ${madeAfter}`)
 
-  const beforeCancel = await page.inputValue('#gh-token').catch(() => null)
+  await page.click('.settings-nav button:has-text("GitHub 동기화")')
+  await page.waitForTimeout(300)
+  const beforeCancel = await currentToken()
   await page.setInputFiles('#settings-bundle', plain.path)
   await page.waitForSelector('.dialog')
   await page.click('.dialog button:has-text("취소")')
   await page.waitForTimeout(500)
   await page.click('.settings-nav button:has-text("GitHub 동기화")')
   await page.waitForTimeout(300)
-  expect('물러서면 설정도 그대로',
-    (await page.inputValue('#gh-token')) === beforeCancel,
-    `${beforeCancel} -> ${await page.inputValue('#gh-token')}`)
+  const tokenAfterCancel = await currentToken()
+  expect('물러서면 설정도 그대로', tokenAfterCancel === beforeCancel, `${beforeCancel} -> ${tokenAfterCancel}`)
   await page.click('.sheet-close')
 
   step('7. 브라우저에 남는 취향이 하나도 빠지지 않는다')
@@ -240,6 +251,8 @@ try {
 
   await openSettings()
   await page.click('.settings-nav button:has-text("GitHub 동기화")')
+  // 이미 토큰이 있어 별표가 서 있습니다. 바꾸려면 변경을 눌러 입력란을 받습니다.
+  await page.click('#set-token button:has-text("변경")')
   await page.fill('#gh-token', '토큰2')
   await page.fill('#gh-owner', 'tester')
   await page.fill('.row input[placeholder="저장소 이름"]', 'wiki')
