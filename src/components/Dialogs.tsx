@@ -8,6 +8,7 @@ interface PromptRequest {
   label: string
   defaultValue: string
   confirmText: string
+  secret: boolean
 }
 
 interface ConfirmRequest {
@@ -36,7 +37,7 @@ export function DialogProvider({ children }: { children: ReactNode }) {
 
   const api = useMemo<DialogApi>(
     () => ({
-      prompt: ({ title, label, defaultValue = '', confirmText = '확인' }) =>
+      prompt: ({ title, label, defaultValue = '', confirmText = '확인', secret = false }) =>
         new Promise<string | null>((resolve) => {
           setValue(defaultValue)
           setRequest({
@@ -45,6 +46,7 @@ export function DialogProvider({ children }: { children: ReactNode }) {
             label,
             defaultValue,
             confirmText,
+            secret,
             settle: (result) => resolve(typeof result === 'string' ? result : null),
           })
         }),
@@ -80,9 +82,10 @@ export function DialogProvider({ children }: { children: ReactNode }) {
   const submit = useCallback(() => {
     if (!request) return
     if (request.kind === 'prompt') {
-      const trimmed = value.trim()
-      if (!trimmed) return
-      close(trimmed)
+      // 암호는 빈칸까지 값입니다. 이름은 앞뒤 빈칸을 뗍니다.
+      const answer = request.secret ? value : value.trim()
+      if (!answer) return
+      close(answer)
     } else {
       close(true)
     }
@@ -106,6 +109,8 @@ export function DialogProvider({ children }: { children: ReactNode }) {
               <input
                 ref={inputRef}
                 className="dialog-input"
+                type={request.secret ? 'password' : 'text'}
+                autoComplete={request.secret ? 'new-password' : undefined}
                 value={value}
                 autoFocus
                 onChange={(event) => setValue(event.target.value)}

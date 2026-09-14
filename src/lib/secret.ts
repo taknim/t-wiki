@@ -87,3 +87,73 @@ export async function open(sealed: Sealed): Promise<string> {
   )
   return new TextDecoder().decode(plain)
 }
+
+/*
+ * 파일로 내보낼 때는 다른 열쇠가 필요합니다.
+ *
+ * 위의 열쇠는 이 브라우저 안에만 있어, 그것으로 봉한 것은 다른 기기에서 풀 수 없습니다.
+ * 설정 파일은 다른 기기로 옮기려고 만드는 것이므로, 사람이 아는 암호에서 열쇠를
+ * 끌어냅니다(PBKDF2). 같은 암호를 아는 쪽만 풉니다.
+ */
+
+/** 암호로 잠근 꼴. 파일에 그대로 적힙니다. */
+export interface Locked {
+  v: 1
+  kdf: 'PBKDF2-SHA-256'
+  iterations: number
+  salt: string
+  iv: string
+  data: string
+}
+
+/** 암호에서 열쇠를 끌어내는 횟수. 느린 기계에서도 반 초 안쪽입니다. */
+const ITERATIONS = 310_000
+
+export function isLocked(value: unknown): value is Locked {
+  const one = value as Locked
+  return typeof value === 'object' && value !== null
+    && one.v === 1 && one.kdf === 'PBKDF2-SHA-256'
+    && typeof one.iterations === 'number'
+    && typeof one.salt === 'string' && typeof one.iv === 'string' && typeof one.data === 'string'
+}
+
+async function keyFromPassphrase(
+  passphrase: string, salt: Uint8Array<ArrayBuffer>, iterations: number,
+): Promise<CryptoKey> {
+  const material = await crypto.subtle.importKey(
+    'raw', new TextEncoder().encode(passphrase), 'PBKDF2', false, ['deriveKey'],
+  )
+  return crypto.subtle.deriveKey(
+    { name: 'PBKDF2', hash: 'SHA-256', salt, iterations },
+    material,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt', 'decrypt'],
+  )
+}
+
+export async function lock(plain: string, passphrase: string): Promise<Locked> {
+  const salt = crypto.getRandomValues(new Uint8Array(16))
+  const iv = crypto.getRandomValues(new Uint8Array(12))
+  const key = await keyFromPassphrase(passphrase, salt, ITERATIONS)
+  const data = await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv }, key, new TextEncoder().encode(plain),
+  )
+  return {
+    v: 1,
+    kdf: 'PBKDF2-SHA-256',
+    iterations: ITERATIONS,
+    salt: toBase64(salt),
+    iv: toBase64(iv),
+    data: toBase64(new Uint8Array(data)),
+  }
+}
+
+/** 암호가 다르면 던집니다. 부르는 쪽에서 다시 묻습니다. */
+export async function unlock(locked: Locked, passphrase: string): Promise<string> {
+  const key = await keyFromPassphrase(passphrase, fromBase64(locked.salt), locked.iterations)
+  const plain = await crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv: fromBase64(locked.iv) }, key, fromBase64(locked.data),
+  )
+  return new TextDecoder().decode(plain)
+}

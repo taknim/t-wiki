@@ -6,6 +6,8 @@ export interface DialogApi {
     label: string
     defaultValue?: string
     confirmText?: string
+    /** 암호처럼 가려서 받을지. 앞뒤 빈칸도 그대로 둡니다. */
+    secret?: boolean
   }) => Promise<string | null>
   confirm: (options: {
     title: string

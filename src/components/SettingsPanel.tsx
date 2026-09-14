@@ -7,6 +7,7 @@ import type { GitHubSync } from '../hooks/useGitHubSync'
 import { GitHubSettings } from './GitHubSettings'
 import { ChevronIcon } from './icons'
 import { clearSessions, isRememberEnabled, setRememberEnabled } from '../lib/session'
+import { isLocked, lock, unlock, type Locked } from '../lib/secret'
 import {
   readIncludeToken, readSaveOptions, writeIncludeToken, writeSaveOptions, type SaveOptions,
 } from '../lib/saveOptions'
@@ -129,20 +130,43 @@ export function SettingsPanel({
      * 무엇이 담기는지 밝히고 확인을 받습니다.
      */
     const holding = sync.isConfigured ? `, "${vaultName ?? '이 폴더'}"의 저장소 설정` : ''
+    // 담을 토큰이 있을 때만 토큰 이야기를 합니다. 켜 두었어도 토큰이 없으면 담길 것이 없습니다.
+    const carrying = includeToken && sync.config.token.trim() !== ''
     const ok = await dialogs.confirm({
-      title: includeToken ? '액세스 토큰까지 내보낼까요?' : '설정을 내보낼까요?',
-      label: includeToken
-        ? '저장하는 파일에 액세스 토큰이 그대로 적힙니다.\n'
-          + '그 토큰으로 저장소를 읽고 쓸 수 있으니, 메일·채팅·공유 폴더로 주고받지 마시고'
+      title: carrying ? '액세스 토큰까지 내보낼까요?' : '설정을 내보낼까요?',
+      label: carrying
+        ? '저장하는 파일에 액세스 토큰이 담깁니다. 이어서 받는 암호로 잠가 적으며,'
+          + ' 들여오는 쪽에서 같은 암호를 넣어야 풀립니다.\n'
+          + '그래도 그 토큰으로 저장소를 읽고 쓸 수 있으니, 메일·채팅·공유 폴더로 주고받지 마시고'
           + ' 옮긴 뒤에는 지워 주세요.\n\n'
           + `담기는 것: 모양, 저장 방식, 트리 접힘${holding}\n`
           + '동기화 기준점은 담기지 않습니다.'
         : `담기는 것: 모양, 저장 방식, 트리 접힘${holding}\n`
           + '액세스 토큰과 동기화 기준점은 담기지 않습니다.',
       confirmText: '내보내기',
-      danger: includeToken,
+      danger: carrying,
     })
     if (!ok) return
+
+    /*
+     * 토큰을 담는 회차는 암호를 받아 잠급니다.
+     *
+     * 브라우저 안의 열쇠로 봉한 것은 다른 기기에서 풀 수 없습니다. 파일은 다른 기기로
+     * 옮기려고 만드는 것이므로 사람이 아는 암호로 잠급니다. 암호를 안 주면 파일도
+     * 만들지 않습니다 — 토큰을 글자 그대로 적는 길은 두지 않습니다.
+     */
+    let lockedToken: Locked | null = null
+    if (carrying) {
+      const passphrase = await dialogs.prompt({
+        title: '토큰을 잠글 암호',
+        label: '이 파일을 들여올 때 같은 암호를 넣어야 토큰이 풀립니다.\n'
+          + '암호를 잊으면 토큰만 빠지고 나머지 설정은 그대로 들여올 수 있습니다.',
+        confirmText: '잠그고 내보내기',
+        secret: true,
+      })
+      if (passphrase === null) return
+      lockedToken = await lock(sync.config.token, passphrase)
+    }
 
     const bundle = buildBundle({
       vaultName: vaultName,
@@ -158,6 +182,7 @@ export function SettingsPanel({
       saveOptions,
       github: sync.isConfigured || sync.config.token ? sync.config : null,
       includeToken,
+      lockedToken,
     })
 
     /*
@@ -182,12 +207,12 @@ export function SettingsPanel({
      * 아직 아무것도 쓰지 않았으니 여기서 물러서면 파일도 생기지 않습니다.
      */
     const inside = vaultRoot ? await vaultRoot.resolve(handle) : null
-    if (inside && includeToken) {
+    if (inside && carrying) {
       const go = await dialogs.confirm({
         title: '열어 둔 폴더 안에 저장할까요?',
         label: `"${inside.join('/')}" 는 지금 열어 둔 폴더 안입니다.\n`
           + '이 자리에 두면 다음 동기화 때 액세스 토큰이 담긴 채로 저장소에 올라갑니다.\n'
-          + '올라간 토큰은 커밋 기록에 남아 지워도 되돌리기 어렵습니다.',
+          + '암호로 잠가 두었더라도, 올라간 파일은 커밋 기록에 남아 지워도 되돌리기 어렵습니다.',
         confirmText: '그래도 저장',
         danger: true,
       })
@@ -224,17 +249,41 @@ export function SettingsPanel({
       setTransfer({
         text: `"${handle.name}" 를 열어 둔 폴더 안에 저장했습니다.`
           + ' 다음 동기화 때 저장소로 함께 올라갑니다.'
-          + (includeToken ? ' 토큰이 들어 있으니 폴더 밖으로 옮겨 주세요.' : ''),
-        danger: includeToken,
+          + (carrying ? ' 토큰이 들어 있으니 폴더 밖으로 옮겨 주세요.' : ''),
+        danger: carrying,
       })
       return
     }
 
     setTransfer({
-      text: includeToken
-        ? `"${handle.name}" 로 저장했습니다. 토큰이 들어 있으니 파일을 잘 간수해 주세요.`
+      text: carrying
+        ? `"${handle.name}" 로 저장했습니다. 토큰은 암호로 잠가 두었습니다. 파일과 암호를 잘 간수해 주세요.`
         : `"${handle.name}" 로 저장했습니다.`,
     })
+  }
+
+  /*
+   * 잠근 토큰을 풉니다. 암호가 틀리면 다시 묻고, 물러서면 토큰 없이 들여옵니다.
+   * 토큰 하나 때문에 나머지 설정까지 버릴 까닭은 없습니다.
+   */
+  const unlockWithPassphrase = async (locked: Locked): Promise<string | null> => {
+    let wrong = false
+    for (;;) {
+      const passphrase = await dialogs.prompt({
+        title: '토큰을 풀 암호',
+        label: (wrong ? '암호가 맞지 않습니다. 다시 넣어 주세요.\n' : '')
+          + '이 파일의 액세스 토큰은 내보낼 때 정한 암호로 잠겨 있습니다.\n'
+          + '물러서면 토큰만 빼고 나머지 설정을 들여옵니다.',
+        confirmText: '풀기',
+        secret: true,
+      })
+      if (passphrase === null) return null
+      try {
+        return await unlock(locked, passphrase)
+      } catch {
+        wrong = true
+      }
+    }
   }
 
   const importSettings = async (file: File) => {
@@ -284,11 +333,15 @@ export function SettingsPanel({
     setSaveOptions(next)
     writeSaveOptions(next)
 
+    let skippedToken = false
     if (bundle.github) {
       // 저장소 설정은 지금 열려 있는 폴더에만 넣습니다.
       // 토큰이 비어 있으면 여기 있던 것을 지우지 않고 그대로 둡니다.
-      const { token, ...rest } = bundle.github
-      sync.update(token ? bundle.github : rest)
+      const { token: carried, ...rest } = bundle.github
+      const token = isLocked(carried) ? await unlockWithPassphrase(carried) : carried
+      // null 은 암호를 넣지 않고 물러선 것. 토큰만 빼고 나머지는 들여옵니다.
+      skippedToken = token === null
+      sync.update(token ? { ...rest, token } : rest)
       /*
        * 잡아 둔 자동 차례를 버리고 새 설정으로 처음부터 다시 셉니다.
        * 대상이 달라졌는데 앞 설정으로 세던 시간이 그대로 이어지면,
@@ -298,11 +351,13 @@ export function SettingsPanel({
       sync.restartAutoSync()
     }
 
-    setTransfer({
-      text: bundle.github
-        ? `가져왔습니다${vaultName ? ` · 저장소 설정은 "${vaultName}" 에 넣었습니다` : ''}.`
-        : '가져왔습니다.',
-    })
+    setTransfer(skippedToken
+      ? { text: '암호를 넣지 않아 액세스 토큰은 빼고 가져왔습니다. 토큰은 설정에서 다시 넣어 주세요.', danger: true }
+      : {
+          text: bundle.github
+            ? `가져왔습니다${vaultName ? ` · 저장소 설정은 "${vaultName}" 에 넣었습니다` : ''}.`
+            : '가져왔습니다.',
+        })
   }
 
   const changeSave = (patch: Partial<SaveOptions>) => {

@@ -8,6 +8,7 @@ import {
   type SaveOptions,
 } from './saveOptions'
 import { DEFAULT_GITHUB_CONFIG } from '../hooks/useGitHubSync'
+import { isLocked, type Locked } from './secret'
 import type { GitHubConfig, ImageBackdrop, SidebarTab } from '../types'
 
 /**
@@ -38,8 +39,17 @@ export interface SettingsBundle {
     officePreview: boolean
     includeToken: boolean
   } & SaveOptions
-  github: GitHubConfig | null
+  github: BundleGitHub | null
 }
+
+/*
+ * 파일에 적히는 저장소 설정. 토큰은 **암호로 잠근 꼴**로만 적습니다.
+ *
+ * 브라우저 안의 열쇠로 봉한 것은 다른 기기에서 풀 수 없으므로, 파일에는 사람이 아는
+ * 암호로 잠근 것을 넣습니다. 빈 글자는 "담지 않았다" 입니다. 옛 판에서 만든 파일은
+ * 토큰이 글자 그대로 적혀 있을 수 있어, 읽을 때는 그것도 받습니다.
+ */
+export type BundleGitHub = Omit<GitHubConfig, 'token'> & { token: string | Locked }
 
 export interface ExportInput {
   vaultName: string | null
@@ -54,8 +64,10 @@ export interface ExportInput {
   officePreview: boolean
   saveOptions: SaveOptions
   github: GitHubConfig | null
-  /** 액세스 토큰까지 담을지. 파일에 그대로 적히므로 기본은 담지 않습니다. */
+  /** 액세스 토큰까지 담을지. 담더라도 암호로 잠근 꼴로만 적힙니다. */
   includeToken: boolean
+  /** 암호로 잠근 토큰. 담지 않으면 null. buildBundle 은 봉하지 않습니다 — 암호를 받는 것은 화면의 몫입니다. */
+  lockedToken: Locked | null
 }
 
 export function buildBundle(input: ExportInput): SettingsBundle {
@@ -78,7 +90,7 @@ export function buildBundle(input: ExportInput): SettingsBundle {
       ...input.saveOptions,
     },
     github: input.github
-      ? { ...input.github, token: input.includeToken ? input.github.token : '' }
+      ? { ...input.github, token: input.includeToken && input.lockedToken ? input.lockedToken : '' }
       : null,
   }
 }
@@ -162,7 +174,8 @@ export function parseBundle(raw: string): SettingsBundle | null {
     github: github
       ? {
           ...DEFAULT_GITHUB_CONFIG,
-          token: text(github.token),
+          // 잠근 꼴이면 그대로 두고 화면에서 암호를 받아 풉니다. 옛 파일의 글자 그대로도 받습니다.
+          token: isLocked(github.token) ? github.token : text(github.token),
           owner: text(github.owner),
           repo: text(github.repo),
           branch: text(github.branch) || DEFAULT_GITHUB_CONFIG.branch,

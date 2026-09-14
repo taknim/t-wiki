@@ -65,12 +65,27 @@ const openSettings = async () => {
  * 목이 그 자리를 들고 있으므로, 거기서 꺼내 진짜 파일로 옮겨 두었다가
  * 가져오기 시험에 다시 씁니다.
  */
+const PASSPHRASE = '열쇠 말 1234'
+/** 토큰을 담는 회차에 뜨는 암호 창을 채웁니다. 뜨지 않으면 그냥 지나갑니다. */
+const passLock = async () => {
+  const box = page.locator('.dialog input[type="password"]')
+  if (await box.count()) {
+    await box.fill(PASSPHRASE)
+    await page.click('.dialog button:has-text("잠그고 내보내기")')
+  }
+}
 const exportTo = async (withToken) => {
   const box = page.locator('.checkbox:has-text("액세스 토큰도 함께") input')
   if ((await box.isChecked()) !== withToken) await box.click()
   await page.click('button:has-text("설정 내보내기")')
   await page.waitForSelector('.dialog', { timeout: 5000 })
   await page.click('.dialog button:has-text("내보내기")')
+  if (withToken) {
+    // 토큰을 담는 회차는 잠글 암호를 묻습니다.
+    await page.waitForSelector('.dialog input[type="password"]', { timeout: 5000 })
+    await page.fill('.dialog input[type="password"]', PASSPHRASE)
+    await page.click('.dialog button:has-text("잠그고 내보내기")')
+  }
   await page.waitForTimeout(700)
   const saved = await page.evaluate(async () => {
     const names = window.__savedNames()
@@ -117,10 +132,16 @@ try {
   expect('기준점은 담지 않음', !JSON.stringify(plainBody).includes('sync-state')
     && plainBody.baselines === undefined, JSON.stringify(Object.keys(plainBody)))
 
-  step('3. 토큰을 포함해 내보내면 들어 있다')
+  step('3. 토큰을 포함해 내보내면 암호로 잠근 꼴로 들어 있다')
   const full = await exportTo(true)
-  const fullBody = JSON.parse(readFileSync(full.path, 'utf8'))
-  expect('토큰이 담김', fullBody.github.token === '비밀토큰', fullBody.github.token)
+  const fullText = readFileSync(full.path, 'utf8')
+  const fullBody = JSON.parse(fullText)
+  console.log('  ' + JSON.stringify(fullBody.github.token).slice(0, 120))
+  expect('토큰이 잠근 꼴로 담김',
+    fullBody.github.token?.kdf === 'PBKDF2-SHA-256' && typeof fullBody.github.token.data === 'string',
+    JSON.stringify(fullBody.github.token))
+  expect('글자 그대로는 어디에도 없음', !fullText.includes('비밀토큰'), fullText.slice(0, 200))
+  expect('저장소는 담김', fullBody.github.repo === 'wiki', JSON.stringify(fullBody.github))
   await page.screenshot({ path: join(HERE, '..', 'shots', 'transfer', '01-settings.png'),
     clip: { x: 300, y: 90, width: 820, height: 620 } })
   await page.click('.sheet-close')
@@ -139,6 +160,15 @@ try {
   await page.setInputFiles('#settings-bundle', full.path)
   await page.waitForSelector('.dialog', { timeout: 5000 })
   await page.click('.dialog button:has-text("적용")')
+  // 잠근 토큰을 풀 암호를 묻습니다. 틀리면 다시 묻고, 맞으면 들어갑니다.
+  await page.waitForSelector('.dialog input[type="password"]', { timeout: 5000 })
+  await page.fill('.dialog input[type="password"]', '엉뚱한 말')
+  await page.click('.dialog button:has-text("풀기")')
+  await page.waitForTimeout(600)
+  const again = await page.textContent('.dialog')
+  expect('틀리면 다시 물음', again.includes('암호가 맞지 않습니다'), again.slice(0, 120))
+  await page.fill('.dialog input[type="password"]', PASSPHRASE)
+  await page.click('.dialog button:has-text("풀기")')
   await page.waitForTimeout(700)
   await page.click('.settings-nav button:has-text("GitHub 동기화")')
   await page.waitForTimeout(400)
@@ -153,6 +183,21 @@ try {
   expect('토큰이 들어옴', landed.token === '비밀토큰', landed.token)
   expect('저장소가 들어옴', landed.repo === 'wiki' && landed.owner === 'tester', JSON.stringify(landed))
   expect('간격도 들어옴', landed.minutes === '7', String(landed.minutes))
+
+  step('4-2. 암호를 넣지 않고 물러서면 토큰만 빼고 들여온다')
+  await page.click('.settings-nav button:has-text("일반")')
+  await page.setInputFiles('#settings-bundle', full.path)
+  await page.waitForSelector('.dialog', { timeout: 5000 })
+  await page.click('.dialog button:has-text("적용")')
+  await page.waitForSelector('.dialog input[type="password"]', { timeout: 5000 })
+  await page.click('.dialog button:has-text("취소")')
+  await page.waitForTimeout(700)
+  const skipped = await page.textContent('.settings-section')
+  expect('토큰은 뺐다고 알림', skipped.includes('액세스 토큰은 빼고'), skipped.slice(0, 200))
+  await page.click('.settings-nav button:has-text("GitHub 동기화")')
+  await page.waitForTimeout(400)
+  // 있던 토큰은 지우지 않습니다. 빈 값으로 덮으면 토큰이 사라집니다.
+  expect('있던 토큰은 그대로', (await currentToken()) === '비밀토큰')
   expect('테마도 따라옴', landed.theme === 'nord', String(landed.theme))
   await page.click('.sheet-close')
 
@@ -326,6 +371,10 @@ try {
   await page.setInputFiles('#settings-bundle', both.path)
   await page.waitForSelector('.dialog', { timeout: 5000 })
   await page.click('.dialog button:has-text("적용")')
+  // 토큰이 담긴 파일이라 풀 암호를 묻습니다.
+  await page.waitForSelector('.dialog input[type="password"]', { timeout: 5000 })
+  await page.fill('.dialog input[type="password"]', PASSPHRASE)
+  await page.click('.dialog button:has-text("풀기")')
   await page.waitForTimeout(700)
   await page.click('.sheet-close')
   await page.waitForTimeout(400)
@@ -350,6 +399,8 @@ try {
   await page.click('button:has-text("설정 내보내기")')
   await page.waitForSelector('.dialog')
   await page.click('.dialog button:has-text("내보내기")')
+  await page.waitForTimeout(300)
+  await passLock()
   await page.waitForTimeout(800)
   const afterCancel = await page.evaluate(() => {
     window.__saveCancel = false
@@ -368,6 +419,8 @@ try {
   await page.click('button:has-text("설정 내보내기")')
   await page.waitForSelector('.dialog')
   await page.click('.dialog button:has-text("내보내기")')
+  await page.waitForTimeout(300)
+  await passLock()
   await page.waitForSelector('.dialog:has-text("열어 둔 폴더 안에")', { timeout: 5000 })
   const second = await page.textContent('.dialog')
   console.log('  ' + second.replace(/\s+/g, ' ').slice(0, 110))
@@ -384,6 +437,8 @@ try {
   await page.click('button:has-text("설정 내보내기")')
   await page.waitForSelector('.dialog')
   await page.click('.dialog button:has-text("내보내기")')
+  await page.waitForTimeout(300)
+  await passLock()
   await page.waitForSelector('.dialog:has-text("열어 둔 폴더 안에")', { timeout: 5000 })
   await page.click('.dialog button:has-text("그래도 저장")')
   await page.waitForTimeout(800)
