@@ -26,3 +26,13 @@ export const FAVORITES_FILE = '_t-wiki.favorites.json'
 export function isAppFile(path: string): boolean {
   return path === FAVORITES_FILE
 }
+
+/**
+ * 휴지통. 지운 것을 곧바로 없애지 않고 여기로 옮겨 둡니다.
+ *
+ * 볼트 안 폴더라 브라우저 저장소를 비워도 남고, 다른 편집기로도 꺼낼 수 있습니다.
+ * 트리·검색·동기화 어디에도 나오지 않습니다(fsAccess 가 훑을 때 건너뜁니다).
+ * 어느 것이 어디서 왔는지는 안의 _index.json 에 적습니다.
+ */
+export const TRASH_DIR = '_t-wiki.trash'
+export const TRASH_INDEX = `${TRASH_DIR}/_index.json`

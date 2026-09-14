@@ -147,7 +147,8 @@ try {
   await page.hover('.tree-row:has-text("개발 안내")')
   await page.click('.tree-row:has-text("개발 안내") .tree-tools button[aria-label="삭제"]')
   await page.waitForSelector('.dialog')
-  await page.click('.dialog button:has-text("삭제")')
+  // 지우기는 갈림길입니다(휴지통으로 이동 / 완전 삭제). 여기서는 곧바로 없앱니다.
+  await page.click('.dialog button:has-text("완전 삭제")')
   await page.waitForTimeout(800)
   const afterDelete = await listed()
   console.log('  ' + JSON.stringify(afterDelete))

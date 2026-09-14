@@ -1,9 +1,10 @@
 import type { AssetIndex, DocIndex, VaultNode } from '../types'
 import { isAttachment, isMarkdown, isSyncable } from './attachments'
-import { isAppFile } from './paths'
+import { isAppFile, TRASH_DIR } from './paths'
 
 /** 볼트 안에서 무시할 이름들. 점으로 시작하는 항목은 전부 별도로 걸러냅니다. */
-const IGNORED = new Set(['node_modules', 'Icon\r'])
+// 휴지통은 앱이 따로 읽습니다. 여기서 훑으면 지운 것이 트리·검색·동기화에 되살아납니다.
+const IGNORED = new Set(['node_modules', 'Icon\r', TRASH_DIR])
 
 export function isSupported(): boolean {
   return typeof window !== 'undefined' && typeof window.showDirectoryPicker === 'function'

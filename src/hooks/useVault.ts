@@ -7,6 +7,10 @@ import { clearAssetCache } from '../lib/assets'
 import { clearTextIndex } from '../lib/textIndex'
 import * as fs from '../lib/fsAccess'
 import { clearVaultHandle, loadVaultHandle, saveVaultHandle } from '../lib/store'
+import {
+  emptyTrash, moveToTrash, purgeTrashItem, purgeTrashOlderThan, readTrash, restoreFromTrash,
+  type RestoreResult, type TrashItem,
+} from '../lib/trash'
 
 export type VaultStatus = 'unsupported' | 'empty' | 'needs-permission' | 'loading' | 'ready' | 'error'
 
@@ -37,6 +41,16 @@ export interface Vault {
   move: (path: string, targetDir: string, overwrite?: boolean) => Promise<string>
   remove: (path: string) => Promise<void>
   addFiles: (dirPath: string, files: File[]) => Promise<AddResult>
+  /** 휴지통에 든 것. 최근에 지운 것이 앞입니다. */
+  trash: TrashItem[]
+  /** 지우는 대신 휴지통으로 옮깁니다. */
+  trashPath: (path: string) => Promise<TrashItem>
+  /** 원래 자리로. 그 자리에 다른 것이 있으면 ok: false 로 알리고, overwrite 를 켜면 덮습니다. */
+  restoreTrash: (item: TrashItem, overwrite?: boolean) => Promise<RestoreResult>
+  purgeTrash: (item: TrashItem) => Promise<void>
+  emptyTrash: () => Promise<number>
+  /** 옮긴 지 이만큼(ms)이 지난 것을 비웁니다. 비운 개수를 돌려줍니다. */
+  purgeTrashOlderThan: (ms: number) => Promise<number>
 }
 
 export interface AddResult {
@@ -99,6 +113,9 @@ export function useVault(): Vault {
     setRoot(next)
   }, [])
 
+  /** 휴지통에 든 것. 훑을 때 함께 읽습니다. */
+  const [trash, setTrash] = useState<TrashItem[]>([])
+
   const scan = useCallback(async (root: FileSystemDirectoryHandle) => {
     setStatus('loading')
     setRead(0)
@@ -108,6 +125,8 @@ export function useVault(): Vault {
       setTree(result.tree)
       setIndex(result.index)
       setAssets(result.assets)
+      // 휴지통은 훑을 때 건너뛰므로 따로 읽습니다. 못 읽어도 폴더 열기를 막지는 않습니다.
+      setTrash(await readTrash(root).catch(() => []))
       setVaultName(root.name)
       setError(null)
       setStatus('ready')
@@ -340,6 +359,57 @@ export function useVault(): Vault {
     [refresh, requireRoot],
   )
 
+  // 휴지통을 만진 뒤에는 목록을 디스크에서 다시 읽습니다. 목록 파일이 곧 사실입니다.
+  const rereadTrash = useCallback(async (root: FileSystemDirectoryHandle) => {
+    setTrash(await readTrash(root).catch(() => []))
+  }, [])
+
+  const trashPath = useCallback(
+    async (path: string) => {
+      const root = requireRoot()
+      const item = await moveToTrash(root, path)
+      await refresh()
+      return item
+    },
+    [refresh, requireRoot],
+  )
+
+  const restoreTrash = useCallback(
+    async (item: TrashItem, overwrite = false) => {
+      const root = requireRoot()
+      const result = await restoreFromTrash(root, item, overwrite)
+      if (result.ok) await refresh()
+      return result
+    },
+    [refresh, requireRoot],
+  )
+
+  const purgeTrash = useCallback(
+    async (item: TrashItem) => {
+      const root = requireRoot()
+      await purgeTrashItem(root, item)
+      await rereadTrash(root)
+    },
+    [rereadTrash, requireRoot],
+  )
+
+  const emptyAll = useCallback(async () => {
+    const root = requireRoot()
+    const count = await emptyTrash(root)
+    await rereadTrash(root)
+    return count
+  }, [rereadTrash, requireRoot])
+
+  const purgeOlder = useCallback(
+    async (ms: number) => {
+      const root = requireRoot()
+      const count = await purgeTrashOlderThan(root, ms)
+      if (count > 0) await rereadTrash(root)
+      return count
+    },
+    [rereadTrash, requireRoot],
+  )
+
   /**
    * 고른 파일을 폴더에 넣습니다.
    * 같은 이름이 있으면 덮지 않고 뒤에 번호를 붙입니다. 실수로 원본을 잃지 않도록.
@@ -384,6 +454,12 @@ export function useVault(): Vault {
     save,
     saveText,
     reload,
+    trash,
+    trashPath,
+    restoreTrash,
+    purgeTrash,
+    emptyTrash: emptyAll,
+    purgeTrashOlderThan: purgeOlder,
     createDoc,
     createFolder,
     rename,

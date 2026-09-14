@@ -9,8 +9,9 @@ import { ChevronIcon } from './icons'
 import { clearSessions, isRememberEnabled, setRememberEnabled } from '../lib/session'
 import { isLocked, lock, unlock, type Locked } from '../lib/secret'
 import {
-  readIncludeToken, readSaveOptions, readSettingsSpot, writeIncludeToken, writeSaveOptions,
-  writeSettingsSpot, type SaveOptions,
+  clampTrashDays, readIncludeToken, readSaveOptions, readSettingsSpot, readTrashPolicy,
+  writeIncludeToken, writeSaveOptions, writeSettingsSpot, writeTrashPolicy,
+  type SaveOptions, type TrashPolicy,
 } from '../lib/saveOptions'
 import { removeEntry } from '../lib/fsAccess'
 import { buildBundle, bundleFileName, parseBundle } from '../lib/settingsFile'
@@ -86,6 +87,7 @@ const TABS: { id: TabId; name: string; hint: string; items: { id: string; name: 
       { id: 'set-session', name: '마지막 화면 상태' },
       { id: 'set-image-preview', name: '미리보기' },
       { id: 'set-tidy', name: '저장할 때 정돈' },
+      { id: 'set-trash', name: '휴지통' },
       { id: 'set-transfer', name: '설정 주고받기' },
     ],
   },
@@ -124,6 +126,12 @@ export function SettingsPanel({
   const dialogs = useDialogs()
   const [tab, setTab] = useState<TabId>(initialTab === 'last' ? 'general' : initialTab)
   const [saveOptions, setSaveOptions] = useState<SaveOptions>(readSaveOptions)
+  const [trashPolicy, setTrashPolicy] = useState<TrashPolicy>(readTrashPolicy)
+  const changeTrash = (patch: Partial<TrashPolicy>) => {
+    const next = { ...trashPolicy, ...patch }
+    setTrashPolicy(next)
+    writeTrashPolicy(next)
+  }
   const [includeToken, setIncludeToken] = useState(readIncludeToken)
   /** 주고받기 결과 한 줄. 조심해야 할 결과는 눈에 띄게 그립니다. */
   const [transfer, setTransfer] = useState<{ text: string; danger?: boolean } | null>(null)
@@ -185,6 +193,7 @@ export function SettingsPanel({
       imageBackdrop,
       officePreview,
       saveOptions,
+      trashPolicy,
       github: sync.isConfigured || sync.config.token ? sync.config : null,
       includeToken,
       lockedToken,
@@ -329,6 +338,9 @@ export function SettingsPanel({
     onImagePreview(bundle.general.imagePreview)
     onImageBackdrop(bundle.general.imageBackdrop)
     onOfficePreview(bundle.general.officePreview)
+    const trashNext = { autoPurge: bundle.general.trashAutoPurge, days: bundle.general.trashPurgeDays }
+    setTrashPolicy(trashNext)
+    writeTrashPolicy(trashNext)
     setIncludeToken(bundle.general.includeToken)
     writeIncludeToken(bundle.general.includeToken)
     const next = {
@@ -797,6 +809,46 @@ export function SettingsPanel({
               </label>
             </section>
 
+            </div>
+
+            <div className="field-group" id="set-trash">
+              <h4 className="field-group-title">휴지통</h4>
+            <section className="field">
+              <p className="hint" style={{ marginTop: 0 }}>
+                지운 것은 곧바로 없어지지 않고 폴더 안 <code>_t-wiki.trash</code> 로 옮겨집니다.
+                트리 맨 아래 <strong>휴지통</strong>에서 되돌리거나 완전히 지울 수 있습니다.
+                휴지통은 동기화되지 않습니다 — 이 컴퓨터에만 있습니다.
+              </p>
+
+              <label className="checkbox">
+                <input
+                  type="checkbox"
+                  checked={trashPolicy.autoPurge}
+                  onChange={(event) => changeTrash({ autoPurge: event.target.checked })}
+                />
+                옮긴 지 오래된 것은 동기화할 때 저절로 비우기
+                <span className="hint">
+                  GitHub 동기화가 돌 때마다, 휴지통으로 옮긴 지 아래 날수가 지난 것을 없앱니다.
+                  꺼 두면 휴지통 비우기나 완전 삭제를 누를 때만 없어집니다.
+                </span>
+              </label>
+
+              <div className="row" style={{ alignItems: 'center', gap: 8 }}>
+                <label htmlFor="trash-days">며칠이 지나면</label>
+                <input
+                  id="trash-days"
+                  className="dialog-input"
+                  type="number"
+                  min={1}
+                  max={365}
+                  style={{ width: 90 }}
+                  value={trashPolicy.days}
+                  disabled={!trashPolicy.autoPurge}
+                  onChange={(event) => changeTrash({ days: clampTrashDays(Number(event.target.value)) })}
+                />
+                <span className="hint" style={{ margin: 0 }}>일 (1 ~ 365, 기본 30)</span>
+              </div>
+            </section>
             </div>
 
             <div className="field-group" id="set-transfer">

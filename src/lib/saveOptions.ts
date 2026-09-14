@@ -310,3 +310,46 @@ export function writeSettingsSpot(spot: SettingsSpot): void {
     // 저장이 막혀 있어도 이번에는 그대로 적용됩니다.
   }
 }
+
+/*
+ * 휴지통을 저절로 비울지.
+ *
+ * 켜 두면 동기화할 때마다 옮긴 지 정한 날수가 지난 것을 비웁니다. 기본은 꺼짐입니다.
+ * 지우는 일을 기본으로 삼을 수는 없습니다. 날수는 옮긴 때를 잣대로 셉니다.
+ */
+const TRASH_PURGE = 'mdwiki:trash-purge'
+const TRASH_DAYS = 'mdwiki:trash-days'
+
+export interface TrashPolicy {
+  autoPurge: boolean
+  /** 며칠이 지나면 비울지. */
+  days: number
+}
+
+export const DEFAULT_TRASH_POLICY: TrashPolicy = { autoPurge: false, days: 30 }
+
+export function clampTrashDays(days: number): number {
+  if (!Number.isFinite(days)) return DEFAULT_TRASH_POLICY.days
+  return Math.min(Math.max(Math.round(days), 1), 365)
+}
+
+export function readTrashPolicy(): TrashPolicy {
+  try {
+    const days = Number(localStorage.getItem(TRASH_DAYS))
+    return {
+      autoPurge: localStorage.getItem(TRASH_PURGE) === 'on',
+      days: localStorage.getItem(TRASH_DAYS) === null ? DEFAULT_TRASH_POLICY.days : clampTrashDays(days),
+    }
+  } catch {
+    return DEFAULT_TRASH_POLICY
+  }
+}
+
+export function writeTrashPolicy(policy: TrashPolicy): void {
+  try {
+    localStorage.setItem(TRASH_PURGE, policy.autoPurge ? 'on' : 'off')
+    localStorage.setItem(TRASH_DAYS, String(clampTrashDays(policy.days)))
+  } catch {
+    // 저장이 막혀 있어도 이번에는 그대로 적용됩니다.
+  }
+}

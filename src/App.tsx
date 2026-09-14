@@ -29,6 +29,10 @@ import {
 } from './lib/attachments'
 import { extractHeadings, parseFrontmatter, toggleTask } from './lib/markdown'
 import { ExternalChangeError } from './lib/fsAccess'
+import { TrashView } from './components/TrashView'
+import { TrashIcon } from './components/icons'
+import { readTrashPolicy } from './lib/saveOptions'
+import type { TrashItem } from './lib/trash'
 import { entryKind, readFile } from './lib/fsAccess'
 import { DEFAULT_VIEW_MODE, loadSession, saveSession } from './lib/session'
 import { formatTidyFor, textPreviewKind, trimWhitespace } from './lib/textPreview'
@@ -38,7 +42,7 @@ import {
   readSidebarTab, readSidebarWidth, readSplitRatio, writeImageBackdrop, writeImagePreview,
   writeOfficePreview, writeSidebarOpen, writeSidebarTab, writeSidebarWidth, writeSplitRatio,
 } from './lib/saveOptions'
-import { displayPath, FAVORITES_FILE, fileNameOf, isAppFile } from './lib/paths'
+import { displayPath, FAVORITES_FILE, fileNameOf, isAppFile, TRASH_DIR } from './lib/paths'
 import { loadFavorites } from './lib/store'
 import { favoritesFileBody, readFavoritesFile, reorderFavorites } from './lib/favorites'
 import { vaultKeyFor } from './lib/vaultKey'
@@ -89,6 +93,8 @@ export default function App() {
   /** 마지막으로 글자를 친 때. 저절로 도는 동기화가 타자가 멎기를 기다릴 때 봅니다. */
   const typedAtRef = useRef(0)
   const dirtyRef = useRef(false)
+  /** 이번 동기화 회차 직전에 휴지통에서 비운 개수. 완료 알림에 실어 보냅니다. */
+  const purgedRef = useRef(0)
   const selectedRef = useRef<string | null>(null)
 
   useEffect(() => {
@@ -249,6 +255,19 @@ export default function App() {
         }
       }
       await commitRef.current()
+
+      /*
+       * 휴지통을 저절로 비우기로 했으면 여기서 합니다. 동기화가 도는 때가 곧 정리하는 때입니다.
+       * 설정은 이 자리에서 곧바로 읽어, 설정 창에서 방금 바꾼 값이 바로 먹습니다.
+       */
+      const policy = readTrashPolicy()
+      if (policy.autoPurge) {
+        try {
+          purgedRef.current = await vault.purgeTrashOlderThan(policy.days * 86_400_000)
+        } catch (cause) {
+          report(cause)
+        }
+      }
     },
     onLocalChanged: async () => {
       await vault.refresh()
@@ -268,7 +287,11 @@ export default function App() {
       setReportOpen(true)
       return
     }
-    flash(`동기화 완료 · ${sync.status.message}`)
+    // 이번 회차에 휴지통을 비웠으면 그 셈도 같은 알림에 실어 보냅니다. 따로 띄우면 하나가 덮입니다.
+    const purged = purgedRef.current
+    purgedRef.current = 0
+    flash(`동기화 완료 · ${sync.status.message}`
+      + (purged > 0 ? ` · 휴지통에서 오래된 ${purged}개 비움` : ''))
   }, [sync.report, sync.status.message, flash])
 
   // 잠금에 막힌 건 결과가 없어 위 효과가 안 걸립니다. 따로 알려 줍니다.
@@ -713,6 +736,8 @@ export default function App() {
 
   // 문서 맨 앞 `---` 블록은 메타데이터로 떼어내고 본문만 렌더합니다.
   const selection = useMemo<SelectionInfo | null>(() => {
+    // 휴지통은 폴더 트리 밖의 자리라 크기·시각을 셀 나무가 없습니다. 제 화면이 머리를 답니다.
+    if (selectedDir === TRASH_DIR) return null
     if (selectedDir !== null && vault.tree) {
       const node = findNode(vault.tree, selectedDir)
       const rolled = node ? rollUp(node) : { size: 0, items: 0, lastModified: null }
@@ -845,20 +870,32 @@ export default function App() {
     [applyFavorites, commit, dialogs, favorites, report, selectedPath, vault],
   )
 
+  /*
+   * 지우기. 휴지통으로 옮기는 것이 먼저이고, 곧바로 없애는 길은 빨간 단추로 따로 둡니다.
+   * 물러서는 길(취소·Esc)은 아무것도 하지 않습니다.
+   */
   const handleDelete = useCallback(
     async (path: string) => {
       const isDoc = path.toLowerCase().endsWith('.md')
-      const ok = await dialogs.confirm({
-        title: isDoc ? '문서를 삭제할까요?' : '폴더를 삭제할까요?',
-        label: isDoc
-          ? displayPath(path)
-          : `"${displayPath(path)}" 와 그 안의 모든 내용이 지워집니다. 되돌릴 수 없습니다.`,
-        confirmText: '삭제',
-        danger: true,
+      const picked = await dialogs.choose({
+        title: isDoc ? '문서를 지울까요?' : '폴더를 지울까요?',
+        label: (isDoc
+          ? `${displayPath(path)}\n`
+          : `"${displayPath(path)}" 와 그 안의 모든 내용이 함께 갑니다.\n`)
+          + '휴지통으로 옮기면 트리 맨 아래 휴지통에서 되돌릴 수 있습니다. 완전 삭제는 되돌릴 수 없습니다.',
+        options: [
+          { id: 'trash', label: '휴지통으로 이동' },
+          { id: 'purge', label: '완전 삭제', danger: true },
+        ],
       })
-      if (!ok) return
+      if (picked === null) return
       try {
-        await vault.remove(path)
+        if (picked === 'trash') {
+          await vault.trashPath(path)
+          flash(`휴지통으로 옮겼습니다: ${displayPath(path)}`)
+        } else {
+          await vault.remove(path)
+        }
         // 지워진 것과 그 아래 것들을 즐겨찾기에서도 뺍니다.
         setFavorites((previous) => {
           const next = previous.filter((one) => one !== path && !one.startsWith(`${path}/`))
@@ -876,8 +913,70 @@ export default function App() {
         report(cause)
       }
     },
-    [dialogs, report, selectedPath, vault],
+    [dialogs, flash, report, selectedPath, vault],
   )
+
+  /** 휴지통에서 되돌립니다. 그 자리에 다른 것이 생겼으면 덮을지 묻습니다. */
+  const handleRestore = useCallback(
+    async (item: TrashItem) => {
+      try {
+        const result = await vault.restoreTrash(item)
+        if (result.ok) {
+          flash(`되돌렸습니다: ${displayPath(item.path)}`)
+          return
+        }
+        const ok = await dialogs.confirm({
+          title: '같은 이름이 있습니다',
+          label: `"${displayPath(item.path)}" 자리에 이미 다른 것이 있습니다.\n`
+            + (item.kind === 'dir'
+              ? '덮어쓰면 지금 그 자리에 있는 폴더와 그 안의 내용이 사라집니다.'
+              : '덮어쓰면 지금 그 자리에 있는 파일이 사라집니다.'),
+          confirmText: '덮어쓰기',
+          danger: true,
+        })
+        if (!ok) return
+        await vault.restoreTrash(item, true)
+        flash(`되돌렸습니다: ${displayPath(item.path)}`)
+      } catch (cause) {
+        report(cause)
+      }
+    },
+    [dialogs, flash, report, vault],
+  )
+
+  const handlePurge = useCallback(
+    async (item: TrashItem) => {
+      const ok = await dialogs.confirm({
+        title: '완전히 지울까요?',
+        label: `${displayPath(item.path)}\n휴지통에서도 없어집니다. 되돌릴 수 없습니다.`,
+        confirmText: '완전 삭제',
+        danger: true,
+      })
+      if (!ok) return
+      try {
+        await vault.purgeTrash(item)
+      } catch (cause) {
+        report(cause)
+      }
+    },
+    [dialogs, report, vault],
+  )
+
+  const handleEmptyTrash = useCallback(async () => {
+    const ok = await dialogs.confirm({
+      title: '휴지통을 비울까요?',
+      label: `${vault.trash.length}개가 모두 없어집니다. 되돌릴 수 없습니다.`,
+      confirmText: '휴지통 비우기',
+      danger: true,
+    })
+    if (!ok) return
+    try {
+      const count = await vault.emptyTrash()
+      flash(`휴지통에서 ${count}개를 없앴습니다.`)
+    } catch (cause) {
+      report(cause)
+    }
+  }, [dialogs, flash, report, vault])
 
   const handleMove = useCallback(
     async (from: string, targetDir: string) => {
@@ -1270,6 +1369,26 @@ export default function App() {
               )
             )}
             </div>
+            {vault.tree && sidebarTab !== 'favorites' && (
+              /*
+               * 휴지통은 트리 밖의 줄입니다. 트리 안에 폴더처럼 두면 안엣것을 열어 고치거나
+               * 끌어 옮기게 되는데, 지운 것은 되돌리거나 없애는 두 길만 있어야 합니다.
+               */
+              <button
+                type="button"
+                className={selectedDir === TRASH_DIR ? 'trash-row is-selected' : 'trash-row'}
+                data-tip="지운 것을 보고 되돌리거나 완전히 없앱니다"
+                aria-pressed={selectedDir === TRASH_DIR}
+                onClick={() => {
+                  setSelectedDir(TRASH_DIR)
+                  setSelectedPath(null)
+                }}
+              >
+                <TrashIcon />
+                <span>휴지통</span>
+                <span className="trash-row-count">{vault.trash.length}</span>
+              </button>
+            )}
           </div>
           )}
 
@@ -1306,7 +1425,20 @@ export default function App() {
         </aside>
 
         <main className="main">
-          {selection && selection.kind !== 'markdown' ? (
+          {selectedDir === TRASH_DIR ? (
+            <>
+              <div className="doc-head">
+                <h1>휴지통</h1>
+                <span className="pill">{vault.trash.length}개</span>
+              </div>
+              <TrashView
+                items={vault.trash}
+                onRestore={(item) => void handleRestore(item)}
+                onPurge={(item) => void handlePurge(item)}
+                onEmpty={() => void handleEmptyTrash()}
+              />
+            </>
+          ) : selection && selection.kind !== 'markdown' ? (
             <>
               <div className="doc-head">
                 <h1>{selection.name}</h1>

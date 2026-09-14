@@ -3,9 +3,9 @@ import {
   type ThemeSettings,
 } from './theme'
 import {
-  clampSidebarWidth, clampSplitRatio, DEFAULT_IMAGE_BACKDROP, DEFAULT_SAVE_OPTIONS,
-  DEFAULT_SIDEBAR_TAB, DEFAULT_SIDEBAR_WIDTH, DEFAULT_SPLIT_RATIO, isImageBackdrop,
-  type SaveOptions,
+  clampSidebarWidth, clampSplitRatio, clampTrashDays, DEFAULT_IMAGE_BACKDROP, DEFAULT_SAVE_OPTIONS,
+  DEFAULT_SIDEBAR_TAB, DEFAULT_SIDEBAR_WIDTH, DEFAULT_SPLIT_RATIO, DEFAULT_TRASH_POLICY,
+  isImageBackdrop, type SaveOptions, type TrashPolicy,
 } from './saveOptions'
 import { DEFAULT_GITHUB_CONFIG } from '../hooks/useGitHubSync'
 import { isLocked, type Locked } from './secret'
@@ -38,6 +38,8 @@ export interface SettingsBundle {
     imageBackdrop: ImageBackdrop
     officePreview: boolean
     includeToken: boolean
+    trashAutoPurge: boolean
+    trashPurgeDays: number
   } & SaveOptions
   github: BundleGitHub | null
 }
@@ -63,6 +65,7 @@ export interface ExportInput {
   imageBackdrop: ImageBackdrop
   officePreview: boolean
   saveOptions: SaveOptions
+  trashPolicy: TrashPolicy
   github: GitHubConfig | null
   /** 액세스 토큰까지 담을지. 담더라도 암호로 잠근 꼴로만 적힙니다. */
   includeToken: boolean
@@ -87,6 +90,8 @@ export function buildBundle(input: ExportInput): SettingsBundle {
       imageBackdrop: input.imageBackdrop,
       officePreview: input.officePreview,
       includeToken: input.includeToken,
+      trashAutoPurge: input.trashPolicy.autoPurge,
+      trashPurgeDays: input.trashPolicy.days,
       ...input.saveOptions,
     },
     github: input.github
@@ -168,6 +173,11 @@ export function parseBundle(raw: string): SettingsBundle | null {
       // 이 값을 모르던 판에서 온 파일이면 켜진 것으로 봅니다. 기본이 그쪽입니다.
       officePreview: bool(general.officePreview, true),
       includeToken: bool(general.includeToken, false),
+      // 이 값을 모르던 판에서 온 파일이면 꺼진 것으로 봅니다. 지우는 일을 기본으로 켤 수는 없습니다.
+      trashAutoPurge: bool(general.trashAutoPurge, DEFAULT_TRASH_POLICY.autoPurge),
+      trashPurgeDays: typeof general.trashPurgeDays === 'number'
+        ? clampTrashDays(general.trashPurgeDays)
+        : DEFAULT_TRASH_POLICY.days,
       trimWhitespace: bool(general.trimWhitespace, DEFAULT_SAVE_OPTIONS.trimWhitespace),
       tidyFormat: bool(general.tidyFormat, DEFAULT_SAVE_OPTIONS.tidyFormat),
     },
