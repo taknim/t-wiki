@@ -66,11 +66,14 @@ const openSettings = async () => {
  * 가져오기 시험에 다시 씁니다.
  */
 const PASSPHRASE = '열쇠 말 1234'
-/** 토큰을 담는 회차에 뜨는 암호 창을 채웁니다. 뜨지 않으면 그냥 지나갑니다. */
+/** 토큰을 담는 회차에 뜨는 암호 창(두 번)을 채웁니다. 뜨지 않으면 그냥 지나갑니다. */
 const passLock = async () => {
   const box = page.locator('.dialog input[type="password"]')
   if (await box.count()) {
     await box.fill(PASSPHRASE)
+    await page.click('.dialog button:has-text("다음")')
+    await page.waitForSelector('.dialog:has-text("한 번 더")', { timeout: 5000 })
+    await page.fill('.dialog input[type="password"]', PASSPHRASE)
     await page.click('.dialog button:has-text("잠그고 내보내기")')
   }
 }
@@ -81,10 +84,9 @@ const exportTo = async (withToken) => {
   await page.waitForSelector('.dialog', { timeout: 5000 })
   await page.click('.dialog button:has-text("내보내기")')
   if (withToken) {
-    // 토큰을 담는 회차는 잠글 암호를 묻습니다.
+    // 토큰을 담는 회차는 잠글 암호를 두 번 묻습니다.
     await page.waitForSelector('.dialog input[type="password"]', { timeout: 5000 })
-    await page.fill('.dialog input[type="password"]', PASSPHRASE)
-    await page.click('.dialog button:has-text("잠그고 내보내기")')
+    await passLock()
   }
   await page.waitForTimeout(700)
   const saved = await page.evaluate(async () => {
@@ -132,6 +134,31 @@ try {
   expect('기준점은 담지 않음', !JSON.stringify(plainBody).includes('sync-state')
     && plainBody.baselines === undefined, JSON.stringify(Object.keys(plainBody)))
 
+  /*
+   * 암호는 가려서 받으므로 오타를 눈으로 잡을 수 없습니다. 두 번 받아 맞춰 보고,
+   * 다르면 처음부터 다시 받습니다. 잘못 친 암호로 잠근 파일은 누구도 풀지 못합니다.
+   */
+  step('3-0. 잠글 암호는 두 번 받아 맞춰 본다')
+  const box3 = page.locator('.checkbox:has-text("액세스 토큰도 함께") input')
+  if (!(await box3.isChecked())) await box3.click()
+  await page.click('button:has-text("설정 내보내기")')
+  await page.waitForSelector('.dialog', { timeout: 5000 })
+  await page.click('.dialog button:has-text("내보내기")')
+  await page.waitForSelector('.dialog input[type="password"]', { timeout: 5000 })
+  await page.fill('.dialog input[type="password"]', PASSPHRASE)
+  await page.click('.dialog button:has-text("다음")')
+  await page.waitForSelector('.dialog:has-text("한 번 더")', { timeout: 5000 })
+  await page.fill('.dialog input[type="password"]', '다른 말')
+  await page.click('.dialog button:has-text("잠그고 내보내기")')
+  await page.waitForTimeout(400)
+  const mismatch = await page.textContent('.dialog')
+  expect('둘이 다르면 처음부터 다시 물음', mismatch.includes('두 암호가 다릅니다'), mismatch.slice(0, 120))
+  const madeSoFar = await page.evaluate(() => window.__savedNames().length)
+  await page.click('.dialog button:has-text("취소")')
+  await page.waitForTimeout(500)
+  expect('물러서면 파일이 생기지 않음',
+    (await page.evaluate(() => window.__savedNames().length)) === madeSoFar)
+
   step('3. 토큰을 포함해 내보내면 암호로 잠근 꼴로 들어 있다')
   const full = await exportTo(true)
   const fullText = readFileSync(full.path, 'utf8')
@@ -157,6 +184,43 @@ try {
   await closeVault()
   await openVault('second')
   await openSettings()
+  /*
+   * 세 번 틀리면 가져오기를 접습니다. 계속 틀리는 것은 파일이 다른 것일 수 있다는
+   * 뜻이라 파일부터 다시 고르게 합니다. 이때 아무것도 바뀌어 있으면 안 됩니다 —
+   * 암호는 무엇이든 적용하기 전에 먼저 받습니다.
+   */
+  const untouched = await page.evaluate(() => ({
+    theme: document.documentElement.dataset.theme,
+    owner: document.querySelector('#gh-owner')?.value ?? '',
+  }))
+  await page.setInputFiles('#settings-bundle', full.path)
+  await page.waitForSelector('.dialog', { timeout: 5000 })
+  await page.click('.dialog button:has-text("적용")')
+  await page.waitForSelector('.dialog input[type="password"]', { timeout: 5000 })
+  for (const attempt of [1, 2, 3]) {
+    await page.fill('.dialog input[type="password"]', `엉뚱한 말 ${attempt}`)
+    await page.click('.dialog button:has-text("풀기")')
+    await page.waitForTimeout(500)
+    if (attempt < 3) {
+      const again = await page.textContent('.dialog')
+      expect(`${attempt}번 틀리면 남은 횟수를 알리며 다시 물음`,
+        again.includes(`${3 - attempt}번 더 틀리면`), again.slice(0, 120))
+    }
+  }
+  expect('세 번 틀리면 창이 닫힘', (await page.locator('.dialog').count()) === 0)
+  const stopped = await page.textContent('.settings-section')
+  expect('멈췄다고 알리고 파일을 다시 고르라 함',
+    stopped.includes('3번 틀려') && stopped.includes('다시 골라'), stopped.slice(0, 200))
+  await page.click('.settings-nav button:has-text("GitHub 동기화")')
+  await page.waitForTimeout(300)
+  const still = await page.evaluate(() => ({
+    theme: document.documentElement.dataset.theme,
+    owner: document.querySelector('#gh-owner')?.value ?? '',
+  }))
+  expect('아무것도 바뀌지 않음', JSON.stringify(still) === JSON.stringify(untouched),
+    JSON.stringify(untouched) + ' -> ' + JSON.stringify(still))
+  await page.click('.settings-nav button:has-text("일반")')
+
   await page.setInputFiles('#settings-bundle', full.path)
   await page.waitForSelector('.dialog', { timeout: 5000 })
   await page.click('.dialog button:has-text("적용")')

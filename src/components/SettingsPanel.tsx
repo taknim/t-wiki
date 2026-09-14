@@ -170,13 +170,7 @@ export function SettingsPanel({
      */
     let lockedToken: Locked | null = null
     if (carrying) {
-      const passphrase = await dialogs.prompt({
-        title: '토큰을 잠글 암호',
-        label: '이 파일을 들여올 때 같은 암호를 넣어야 토큰이 풀립니다.\n'
-          + '암호를 잊으면 토큰만 빠지고 나머지 설정은 그대로 들여올 수 있습니다.',
-        confirmText: '잠그고 내보내기',
-        secret: true,
-      })
+      const passphrase = await askNewPassphrase()
       if (passphrase === null) return
       lockedToken = await lock(sync.config.token, passphrase)
     }
@@ -280,24 +274,66 @@ export function SettingsPanel({
    * 잠근 토큰을 풉니다. 암호가 틀리면 다시 묻고, 물러서면 토큰 없이 들여옵니다.
    * 토큰 하나 때문에 나머지 설정까지 버릴 까닭은 없습니다.
    */
-  const unlockWithPassphrase = async (locked: Locked): Promise<string | null> => {
-    let wrong = false
+  /*
+   * 잠글 암호를 두 번 받아 맞춰 봅니다.
+   *
+   * 암호는 가려서 받으므로 오타를 눈으로 잡을 수 없습니다. 잘못 친 줄 모르고 저장하면
+   * 그 파일의 토큰은 누구도 풀지 못합니다. 둘이 다르면 처음부터 다시 받습니다.
+   */
+  const askNewPassphrase = async (): Promise<string | null> => {
+    let mismatched = false
     for (;;) {
+      const first = await dialogs.prompt({
+        title: '토큰을 잠글 암호',
+        label: (mismatched ? '두 암호가 다릅니다. 처음부터 다시 넣어 주세요.\n' : '')
+          + '이 파일을 들여올 때 같은 암호를 넣어야 토큰이 풀립니다.\n'
+          + '암호를 잊으면 되찾을 길이 없습니다. 그때는 토큰만 빠지고 나머지 설정은 들여올 수 있습니다.',
+        confirmText: '다음',
+        secret: true,
+      })
+      if (first === null) return null
+      const again = await dialogs.prompt({
+        title: '암호를 한 번 더',
+        label: '같은 암호를 한 번 더 넣어 주세요. 가려서 받으므로 오타를 이렇게 잡습니다.',
+        confirmText: '잠그고 내보내기',
+        secret: true,
+      })
+      if (again === null) return null
+      if (first === again) return first
+      mismatched = true
+    }
+  }
+
+  /** 암호를 몇 번까지 틀릴 수 있는지. 그 뒤에는 가져오기를 접고 파일부터 다시 고르게 합니다. */
+  const MAX_PASSPHRASE_TRIES = 3
+
+  type Unlocked = { kind: 'ok'; token: string } | { kind: 'skipped' } | { kind: 'aborted' }
+
+  /*
+   * 잠근 토큰을 풉니다. 틀리면 다시 묻되 세 번까지입니다.
+   * 물러서면 토큰 없이 들여오고, 세 번 틀리면 가져오기 자체를 접습니다.
+   * 토큰 하나 때문에 나머지 설정까지 버릴 까닭은 없지만, 계속 틀리는 것은
+   * 파일이 다른 것일 수 있다는 뜻이라 파일부터 다시 고르게 합니다.
+   */
+  const unlockWithPassphrase = async (locked: Locked): Promise<Unlocked> => {
+    for (let tries = 0; tries < MAX_PASSPHRASE_TRIES; tries += 1) {
+      const left = MAX_PASSPHRASE_TRIES - tries
       const passphrase = await dialogs.prompt({
         title: '토큰을 풀 암호',
-        label: (wrong ? '암호가 맞지 않습니다. 다시 넣어 주세요.\n' : '')
+        label: (tries > 0 ? `암호가 맞지 않습니다. ${left}번 더 틀리면 가져오기를 멈춥니다.\n` : '')
           + '이 파일의 액세스 토큰은 내보낼 때 정한 암호로 잠겨 있습니다.\n'
           + '물러서면 토큰만 빼고 나머지 설정을 들여옵니다.',
         confirmText: '풀기',
         secret: true,
       })
-      if (passphrase === null) return null
+      if (passphrase === null) return { kind: 'skipped' }
       try {
-        return await unlock(locked, passphrase)
+        return { kind: 'ok', token: await unlock(locked, passphrase) }
       } catch {
-        wrong = true
+        // 틀렸습니다. 다음 바퀴에서 다시 묻습니다.
       }
     }
+    return { kind: 'aborted' }
   }
 
   const importSettings = async (file: File) => {
@@ -328,6 +364,30 @@ export function SettingsPanel({
     })
     if (!ok) return
 
+    /*
+     * 잠근 토큰은 무엇이든 적용하기 전에 먼저 풉니다.
+     * 세 번 틀려 가져오기를 접을 때, 모양만 바뀌고 저장소는 그대로인 반쪽이 남으면 안 됩니다.
+     */
+    let carriedToken: string | null = null
+    let skippedToken = false
+    if (bundle.github) {
+      const { token: carried } = bundle.github
+      if (isLocked(carried)) {
+        const unlocked = await unlockWithPassphrase(carried)
+        if (unlocked.kind === 'aborted') {
+          setTransfer({
+            text: `암호를 ${MAX_PASSPHRASE_TRIES}번 틀려 가져오기를 멈췄습니다. 아무것도 바꾸지 않았습니다. 파일을 다시 골라 주세요.`,
+            danger: true,
+          })
+          return
+        }
+        skippedToken = unlocked.kind === 'skipped'
+        carriedToken = unlocked.kind === 'ok' ? unlocked.token : null
+      } else {
+        carriedToken = carried
+      }
+    }
+
     update(bundle.appearance)
     setRemember(bundle.general.rememberSession)
     setRememberEnabled(bundle.general.rememberSession)
@@ -350,15 +410,12 @@ export function SettingsPanel({
     setSaveOptions(next)
     writeSaveOptions(next)
 
-    let skippedToken = false
     if (bundle.github) {
       // 저장소 설정은 지금 열려 있는 폴더에만 넣습니다.
-      // 토큰이 비어 있으면 여기 있던 것을 지우지 않고 그대로 둡니다.
-      const { token: carried, ...rest } = bundle.github
-      const token = isLocked(carried) ? await unlockWithPassphrase(carried) : carried
-      // null 은 암호를 넣지 않고 물러선 것. 토큰만 빼고 나머지는 들여옵니다.
-      skippedToken = token === null
-      sync.update(token ? { ...rest, token } : rest)
+      // 토큰이 비어 있으면(안 담았거나 암호를 넣지 않고 물러섰거나) 여기 있던 것을 지우지 않고 그대로 둡니다.
+      const { token: _carried, ...rest } = bundle.github
+      void _carried
+      sync.update(carriedToken ? { ...rest, token: carriedToken } : rest)
       /*
        * 잡아 둔 자동 차례를 버리고 새 설정으로 처음부터 다시 셉니다.
        * 대상이 달라졌는데 앞 설정으로 세던 시간이 그대로 이어지면,
