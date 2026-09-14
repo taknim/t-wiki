@@ -88,8 +88,25 @@ try {
   console.log('  ' + JSON.stringify(one))
   expect('목록에 나옴', JSON.stringify(one) === '["개발 환경.md"]', JSON.stringify(one))
   await showTab('폴더')
-  expect('트리 줄에도 별이 붙음',
-    (await page.locator('.tree-row:has-text("개발 환경") .tree-star').count()) === 1)
+  /*
+   * 담긴 줄은 손을 얹지 않아도 별 단추가 켜진 채로 보입니다. 이름 앞에 별을 따로 찍지 않습니다.
+   * 다른 단추는 손을 얹어야 나옵니다.
+   */
+  await page.mouse.move(5, 5)
+  const marked = await page.evaluate(() => {
+    const row = document.querySelector('.tree-row:has(.tree-name)') && [...document.querySelectorAll('.tree-row')]
+      .find((one) => one.textContent.includes('개발 환경'))
+    const shown = [...row.querySelectorAll('.tree-tools button')].filter((one) => one.offsetParent !== null)
+    return {
+      star: row.querySelector('.tree-star') !== null,
+      shown: shown.map((one) => one.getAttribute('aria-label')),
+      on: row.querySelector('.tree-fav.is-on') !== null,
+    }
+  })
+  console.log('  ' + JSON.stringify(marked))
+  expect('이름 앞에 별을 따로 찍지 않음', marked.star === false, JSON.stringify(marked))
+  expect('손을 얹지 않아도 켜진 별 단추만 보임',
+    marked.on && marked.shown.length === 1 && marked.shown[0] === '즐겨찾기에서 빼기', JSON.stringify(marked))
 
   step('3. 폴더도 담긴다')
   await star('회사')
@@ -162,7 +179,9 @@ try {
   expect('마지막 하나를 빼면 빈 안내가 남음',
     emptied.favorites === 0 && emptied.empty !== null, JSON.stringify(emptied))
   await showTab('폴더')
-  expect('트리의 별도 꺼짐', (await page.locator('.tree-star').count()) === 0)
+  await page.mouse.move(5, 5)
+  expect('트리의 별도 꺼짐', (await page.evaluate(() =>
+    [...document.querySelectorAll('.tree-fav')].filter((one) => one.offsetParent !== null).length)) === 0)
 
   step('10. 탭을 고르면 그 쪽만 보인다')
   /*

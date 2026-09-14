@@ -144,6 +144,8 @@ function TreeRow({ node, depth, selectedPath, expanded, onToggle, ...actions }: 
         className={[
           'tree-row',
           isSelected ? 'is-selected' : '',
+          // 담긴 줄은 별 단추를 늘 보여 둡니다. 이름 앞에 표를 따로 찍지 않습니다.
+          isFavorite ? 'is-favorite' : '',
           dropTarget ? 'is-drop-target' : '',
         ].filter(Boolean).join(' ')}
         style={{ paddingInlineStart: `${depth * 14 + 8}px` }}
@@ -207,7 +209,6 @@ function TreeRow({ node, depth, selectedPath, expanded, onToggle, ...actions }: 
         ) : (
           <span className="tree-caret" />
         )}
-        {isFavorite && <StarIcon className="tree-star" filled />}
         <span className={`tree-icon is-${kindOf(node)}`}>
           {isDir ? <FolderIcon /> : kindOf(node) === 'image' ? <ImageIcon /> : <DocIcon />}
         </span>
@@ -244,9 +245,13 @@ function TreeRow({ node, depth, selectedPath, expanded, onToggle, ...actions }: 
               </button>
             </>
           )}
+          {/*
+            별 단추가 곧 표시입니다. 담긴 줄에서는 손을 얹지 않아도 이 단추만 켜진 채로
+            남고, 같은 자리를 누르면 뺍니다. 이름 앞에 별을 따로 찍으면 같은 뜻이 둘이 됩니다.
+          */}
           <button
             type="button"
-            className={isFavorite ? 'is-on' : ''}
+            className={isFavorite ? 'tree-fav is-on' : 'tree-fav'}
             aria-label={isFavorite ? '즐겨찾기에서 빼기' : '즐겨찾기에 담기'}
             aria-pressed={isFavorite}
             data-tip={isFavorite ? '즐겨찾기에서 뺍니다' : '즐겨찾기에 담아 위쪽에 둡니다'}

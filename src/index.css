@@ -477,8 +477,13 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .favorites-drop:hover { background: var(--bg-raised); }
 
 /* 담아 둔 줄은 트리에서도 별로 알아봅니다. */
-.tree-star { flex: none; color: var(--warn); }
 .tree-tools button.is-on { color: var(--warn); }
+/*
+ * 담긴 줄은 별 단추만 늘 보입니다. 손을 얹으면 나머지 단추도 함께 나옵니다.
+ * 이름 앞에 별을 따로 찍지 않습니다. 켜진 단추가 곧 표시이고, 누르면 그 자리에서 뺍니다.
+ */
+.tree-row.is-favorite .tree-tools { display: flex; }
+.tree-row.is-favorite:not(:hover) .tree-tools button:not(.tree-fav) { display: none; }
 
 .tree { min-height: 100%; }
 
