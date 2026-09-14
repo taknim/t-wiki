@@ -83,7 +83,7 @@ await page.addInitScript(({ xlsx, docx }) => {
   const bytes = (b64) => Uint8Array.from(atob(b64), (one) => one.charCodeAt(0))
   root._children.set('판매표.xlsx', make('판매표.xlsx', bytes(xlsx)))
   root._children.set('안내문.docx', make('안내문.docx', bytes(docx)))
-  // 막힐 만한 것을 한 문서에 모아 둡니다. 그림·다이어그램·수식·문서 안 스타일.
+  // 막힐 만한 것을 한 문서에 모아 둡니다. 그림·다이어그램·수식. 문서 안 <style> 은 걷어내야 합니다.
   root._children.set('모둠.md', make('모둠.md',
     '# 모둠\n\n```mermaid\ngraph TD;\n  가-->나;\n```\n\n$$E = mc^2$$\n\n'
     + '![도표](첨부/도표.svg)\n\n<style>.doc-head h1 { letter-spacing: 1px; }</style>\n'))
@@ -125,12 +125,21 @@ try {
     // 문서가 스스로 데려온 스타일. mermaid 도 제 스타일을 넣으므로 내용으로 가립니다.
     styled: [...document.querySelectorAll('.preview style')]
       .some((one) => one.textContent.includes('letter-spacing')),
+    // 걷어낸 자취가 글자로 새어 나오지도 않아야 합니다.
+    leaked: document.querySelector('.preview').textContent.includes('letter-spacing'),
+    // 그 스타일이 앱 화면에 걸리지 않았는지도 봅니다.
+    spacing: getComputedStyle(document.querySelector('.doc-head h1')).letterSpacing,
   }))
   console.log('  ' + JSON.stringify(drawn))
   expect('다이어그램이 그려짐', drawn.diagram === 1, JSON.stringify(drawn))
   expect('수식이 그려짐', drawn.math > 0, JSON.stringify(drawn))
   expect('볼트 안 그림이 뜸', drawn.image > 0, JSON.stringify(drawn))
-  expect('문서 안 스타일도 살아 있음', drawn.styled === true, JSON.stringify(drawn))
+  /*
+   * 저장소를 같이 쓰는 사람이 넣은 CSS 가 앱 화면을 덮거나 가짜 안내를 그릴 수 있습니다.
+   * 문서 안 <style> 은 걷어내고, 앱 화면에 걸리지도 않아야 합니다.
+   */
+  expect('문서 안 스타일은 걷어냄', drawn.styled === false && !drawn.leaked, JSON.stringify(drawn))
+  expect('앱 화면에 걸리지 않음', drawn.spacing !== '1px', JSON.stringify(drawn))
   await page.screenshot({ path: join(HERE, '..', 'shots', 'csp', '01-doc.png') })
 
   step('4. HTML 첨부 미리보기도 그려진다')

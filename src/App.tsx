@@ -28,6 +28,7 @@ import {
   MAX_ATTACHMENT_BYTES,
 } from './lib/attachments'
 import { extractHeadings, parseFrontmatter, toggleTask } from './lib/markdown'
+import { ExternalChangeError } from './lib/fsAccess'
 import { entryKind, readFile } from './lib/fsAccess'
 import { DEFAULT_VIEW_MODE, loadSession, saveSession } from './lib/session'
 import { formatTidyFor, textPreviewKind, trimWhitespace } from './lib/textPreview'
@@ -80,11 +81,22 @@ export default function App() {
   const saveTimer = useRef<number | null>(null)
   // 자동 저장 타이머가 옛 draft 를 붙잡지 않도록 최신 값을 ref 로도 들고 있습니다.
   const draftRef = useRef('')
+  /*
+   * 밖에서 바뀐 파일을 두고 물었을 때 "취소" 한 글. 같은 글로는 다시 묻지 않습니다.
+   * 자동 저장이 잠깐마다 돌므로, 붙들어 두지 않으면 같은 물음이 되풀이됩니다.
+   */
+  const heldRef = useRef<string | null>(null)
+  /** 마지막으로 글자를 친 때. 저절로 도는 동기화가 타자가 멎기를 기다릴 때 봅니다. */
+  const typedAtRef = useRef(0)
+  const dirtyRef = useRef(false)
   const selectedRef = useRef<string | null>(null)
 
   useEffect(() => {
     draftRef.current = draft
   }, [draft])
+  useEffect(() => {
+    dirtyRef.current = dirty
+  }, [dirty])
   useEffect(() => {
     selectedRef.current = selectedPath
   }, [selectedPath])
@@ -120,11 +132,13 @@ export default function App() {
    * 손을 댈지 말지는 설정을 따릅니다. 둘 다 꺼져 있으면 쓴 그대로 저장합니다.
    * 저장하는 이 자리에서 곧바로 읽습니다. 설정 창에서 방금 바꾼 값이 바로 먹습니다.
    */
-  const commit = useCallback(async (tidy = false) => {
+  const commit = useCallback(async (tidy = false, force = false) => {
     const path = selectedRef.current
     if (!path) return
 
     const original = draftRef.current
+    // 이 글로 이미 물었고 물러섰다면, 떠나는 길이 아닌 한 다시 묻지 않습니다.
+    if (!tidy && !force && heldRef.current === original) return
     let candidate = original
 
     if (tidy) {
@@ -142,10 +156,19 @@ export default function App() {
 
     const snapshot = tidied ?? original
 
+    /*
+     * 마지막으로 읽거나 쓴 시각. 쓰기 직전에 디스크와 견줘, 밖에서 고쳐졌으면 묻습니다.
+     * 덮어쓰기로 답했으면(force) 견주지 않습니다.
+     */
+    const known = force
+      ? undefined
+      : (isMarkdown(path) ? vault.index.get(path) : vault.assets.get(path))?.lastModified
+
     try {
       // 마크다운은 문서 색인까지 갱신하고, 그 밖의 텍스트는 파일만 씁니다.
-      if (isMarkdown(path)) await vault.save(path, snapshot)
-      else await vault.saveText(path, snapshot)
+      if (isMarkdown(path)) await vault.save(path, snapshot, known)
+      else await vault.saveText(path, snapshot, known)
+      heldRef.current = null
 
       if (tidied !== null) {
         // 정돈한 내용으로 화면도 맞춥니다. 벗어나는 길이라 입력과 부딪히지 않습니다.
@@ -159,15 +182,74 @@ export default function App() {
       // 여기서 무조건 내려버리면 대기 중이던 자동 저장이 취소되어 그 입력이 사라집니다.
       if (draftRef.current === original && selectedRef.current === path) setDirty(false)
     } catch (cause) {
-      report(cause)
+      if (!(cause instanceof ExternalChangeError)) {
+        report(cause)
+        return
+      }
+
+      /*
+       * 밖에서 고쳐진 파일. 무엇을 잃을지 읽고 고르게 합니다.
+       * 물러서면(취소·Esc) 아무것도 쓰지 않고 글은 편집기에 그대로 둡니다.
+       */
+      const picked = await dialogs.choose({
+        title: '밖에서 바뀐 파일입니다',
+        label: `"${displayPath(path)}" 이(가) 이 앱 밖에서 고쳐졌습니다(다른 편집기나 동기화 도구).\n`
+          + '다시 읽으면 여기서 친 것이 사라지고, 덮어쓰면 밖에서 고친 것이 사라집니다.\n'
+          + '취소하면 저장하지 않고 편집을 이어갑니다.',
+        options: [
+          { id: 'reload', label: '밖의 내용 다시 읽기' },
+          { id: 'overwrite', label: '내 것으로 덮어쓰기', danger: true },
+        ],
+      })
+      if (picked === 'overwrite') {
+        await commitRef.current(tidy, true)
+        return
+      }
+      if (picked === 'reload') {
+        try {
+          const text = await vault.reload(path)
+          // 그 사이 다른 문서로 옮겨 갔으면 편집기는 건드리지 않습니다.
+          if (selectedRef.current === path) {
+            draftRef.current = text
+            setDraft(text)
+            setDirty(false)
+          }
+          heldRef.current = null
+        } catch (inner) {
+          report(inner)
+        }
+        return
+      }
+      heldRef.current = original
     }
-  }, [dirty, report, vault])
+  }, [dialogs, dirty, report, vault])
+
+  // 저장 안에서 저장을 다시 부를 때 씁니다(덮어쓰기). 제 이름을 안에서 부를 수 없습니다.
+  const commitRef = useRef(commit)
+  useEffect(() => {
+    commitRef.current = commit
+  }, [commit])
 
   const sync = useGitHubSync({
     root: vault.root,
     docs: vault.index,
     assets: vault.assets,
-    onBeforeSync: commit,
+    /*
+     * 저절로 도는 회차는 타자가 멎기를 잠깐 기다립니다.
+     * 치는 도중에 돌면 반쯤 쓴 글이 커밋됩니다. 손을 뗀 지 2초가 지나야 저장하고 돌며,
+     * 계속 치고 있으면 20초까지만 기다렸다가 그대로 갑니다. 마냥 미룰 수는 없습니다.
+     */
+    onBeforeSync: async (trigger) => {
+      if (trigger === 'auto') {
+        const IDLE = 2000
+        const LIMIT = 20_000
+        const started = Date.now()
+        while (dirtyRef.current && Date.now() - typedAtRef.current < IDLE && Date.now() - started < LIMIT) {
+          await new Promise((done) => window.setTimeout(done, 200))
+        }
+      }
+      await commitRef.current()
+    },
     onLocalChanged: async () => {
       await vault.refresh()
       // 저장소에서 즐겨찾기 파일이 내려왔을 수 있습니다.
@@ -1263,6 +1345,7 @@ export default function App() {
                       onChange={(next) => {
                         setDraft(next)
                         setDirty(true)
+                        typedAtRef.current = Date.now()
                       }}
                       onSave={() => void commit()}
                     />
@@ -1326,6 +1409,7 @@ export default function App() {
                     onChange={(next) => {
                       setDraft(next)
                       setDirty(true)
+                      typedAtRef.current = Date.now()
                     }}
                     onSave={() => void commit()}
                   />

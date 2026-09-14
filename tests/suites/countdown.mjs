@@ -193,6 +193,46 @@ try {
   expect('가져온 간격에서 시작', seconds(changed2) > 3 * 60 + 45 && seconds(changed2) <= 4 * 60 + 2,
     changed2)
 
+  /*
+   * 저절로 도는 회차가 타자 도중에 돌면 반쯤 쓴 글이 커밋됩니다.
+   * 손을 뗀 지 2초가 지나기를 기다렸다가 저장하고 돌아야 합니다.
+   * 1분 간격으로 맞추고, 돌기 직전부터 천천히 쳐서 마지막 글자까지 올라가는지 봅니다.
+   */
+  step('8-2. 저절로 도는 회차는 타자가 멎기를 기다린다')
+  await page.click('button[aria-label="설정"]')
+  await page.waitForSelector('.settings-nav')
+  await page.click('.settings-nav button:has-text("GitHub 동기화")')
+  await page.fill('#gh-interval', '1')
+  await page.waitForTimeout(400)
+  await page.click('.sheet-close')
+  await page.waitForTimeout(300)
+  await page.click('.tree-row:has-text("개발 환경") .tree-name')
+  await page.waitForSelector('.main .editor', { timeout: 8000 })
+  await page.click('.mode-switch button[aria-label="편집"]')
+  await page.waitForTimeout(300)
+  // 돌기 3초 전까지 기다립니다.
+  await page.waitForFunction(() => {
+    const text = document.querySelector('.sync-countdown')?.textContent ?? '99:99'
+    const [m, s] = text.trim().split(':').map(Number)
+    return m * 60 + s <= 3
+  }, undefined, { timeout: 70000 })
+  await page.click('.main .editor')
+  await page.keyboard.press('End')
+  const TYPED = ' 천천히 치는 글'
+  await page.keyboard.type(TYPED, { delay: 350 })   // 6초 남짓, 돌 시각을 지나서까지 칩니다
+  // 손을 뗀 뒤 회차가 끝나기를 기다립니다. 끝나면 남은 시간이 다시 1분 가까이로 돌아갑니다.
+  await page.waitForFunction(() => {
+    const text = document.querySelector('.sync-countdown')?.textContent ?? '00:00'
+    const [m, s] = text.trim().split(':').map(Number)
+    return m * 60 + s > 50 && !document.querySelector('.topbar button[disabled]')
+  }, undefined, { timeout: 40000 })
+  await page.waitForTimeout(500)
+  const pushed = github.currentFiles()['개발 환경.md'] ?? ''
+  console.log('  올라간 글 끝: …' + pushed.trim().slice(-24))
+  expect('마지막 글자까지 올라감', pushed.includes(TYPED), pushed.slice(-80))
+  // 결과 창이 떠 있으면 닫습니다.
+  if (await page.locator('.sheet-close').count()) await page.click('.sheet-close')
+
   step('9. 콘솔 오류')
   const real = errors.filter((l) => !l.includes('404') && !l.includes('Failed to load resource'))
   if (real.length > 0) fail('콘솔', real.join('\n      '))

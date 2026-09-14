@@ -17,11 +17,22 @@ interface DocToolsProps {
  * 나란히 보기에서는 둘 다 굴러가지만, 읽는 쪽이 결과이므로 그쪽을 잡습니다.
  * 칸을 만드는 곳이 넷으로 흩어져 있어 ref 를 넘기는 대신 여기서 찾습니다.
  */
-const PANES = ['.preview', '.editor', '.asset-view']
+/*
+ * 본문 바로 아래 칸만 짚습니다(:scope >). 문서 안에 class="editor" 같은 요소가 있어도
+ * 그것이 잡히지 않습니다. 문서가 앱의 단추를 엉뚱한 칸에 붙이게 둘 까닭이 없습니다.
+ */
+const PANES = [
+  ':scope > .doc-body > .preview',
+  ':scope > .asset-view > .preview',
+  ':scope > .doc-body > .editor',
+  ':scope > .asset-view',
+]
 
 function findPane(): HTMLElement | null {
+  const main = document.querySelector<HTMLElement>('.main')
+  if (!main) return null
   for (const one of PANES) {
-    const found = document.querySelector<HTMLElement>(`.main ${one}`)
+    const found = main.querySelector<HTMLElement>(one)
     if (found) return found
   }
   return null
@@ -52,6 +63,8 @@ export function DocTools({ toc, backlinks, path }: DocToolsProps) {
   useEffect(() => {
     const main = document.querySelector<HTMLElement>('.main')
     if (!main) return
+    // 아래 함수 선언 안에서는 위의 null 검사가 잊히므로 이름을 하나 더 둡니다.
+    const box: HTMLElement = main
 
     /*
      * 굴릴 칸은 그때그때 갈아 끼워집니다.
@@ -78,7 +91,7 @@ export function DocTools({ toc, backlinks, path }: DocToolsProps) {
        * 굴림대에 달라붙습니다. 눈에 보이는 틈을 같게 하려면 굴림대 너비를 재서
        * 더해야 합니다. 아래도 표시줄 높이만큼 더합니다.
        */
-      const dock = document.querySelector('.info-dock')?.getBoundingClientRect().height ?? 0
+      const dock = box.querySelector(':scope > .info-dock')?.getBoundingClientRect().height ?? 0
       const next = {
         right: GAP + (pane ? pane.offsetWidth - pane.clientWidth : 0),
         bottom: GAP + dock,

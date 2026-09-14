@@ -477,8 +477,16 @@ DOMPurify.addHook('afterSanitizeAttributes', (node) => {
   }
 })
 
+/*
+ * 문서 안의 <style> 은 걷어냅니다.
+ *
+ * 저장소를 같이 쓰는 사람이 넣은 CSS 가 앱 화면을 덮거나 가짜 안내를 그릴 수
+ * 있습니다. 밖으로 새 나갈 길은 CSP 가 막지만, 그래도 문서 하나가 앱의 생김새를
+ * 바꿔서는 안 됩니다. 인라인 style 속성은 그 요소 안에 갇히므로 그대로 둡니다.
+ */
 const PURIFY_OPTIONS = {
-  ADD_TAGS: ['style'],
+  // DOMPurify 는 기본으로 <style> 을 살려 둡니다. 여기서는 통째로 걷어냅니다(안의 글도).
+  FORBID_TAGS: ['style'],
   ADD_ATTR: ['data-wikilink', 'data-vault-src', 'target', 'rel', 'id', 'align'],
 }
 

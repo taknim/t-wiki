@@ -140,14 +140,42 @@ export async function writeFile(
   root: FileSystemDirectoryHandle,
   path: string,
   content: string,
+  expectMtime?: number,
 ): Promise<number> {
   const { segments, name } = splitPath(path)
   const dir = await resolveDir(root, segments, true)
   const handle = await dir.getFileHandle(name, { create: true })
+
+  /*
+   * 밖에서 고쳐진 파일을 모르고 덮어쓰지 않습니다.
+   *
+   * 브라우저는 파일이 바뀌었다고 알려 주지 않습니다. 같은 문서를 다른 편집기로
+   * 고치는 사이 여기서 한 글자만 쳐도 자동 저장이 그 수정을 지워 버립니다.
+   * 마지막으로 읽거나 쓴 시각을 받아, 쓰기 직전에 디스크의 시각과 견줍니다.
+   */
+  if (expectMtime !== undefined) {
+    const now = (await handle.getFile()).lastModified
+    if (now !== expectMtime) throw new ExternalChangeError(path, now)
+  }
+
   const writable = await handle.createWritable()
   await writable.write(content)
   await writable.close()
   return (await handle.getFile()).lastModified
+}
+
+/** 쓰려던 파일이 그 사이 밖에서 바뀌어 있었습니다. 부르는 쪽에서 물어보고 정합니다. */
+export class ExternalChangeError extends Error {
+  readonly path: string
+  /** 디스크에 적힌 지금 시각. */
+  readonly mtime: number
+
+  constructor(path: string, mtime: number) {
+    super(`"${path}" 이(가) 밖에서 바뀌었습니다.`)
+    this.name = 'ExternalChangeError'
+    this.path = path
+    this.mtime = mtime
+  }
 }
 
 export async function createDir(root: FileSystemDirectoryHandle, path: string): Promise<void> {

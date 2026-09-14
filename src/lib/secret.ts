@@ -79,7 +79,7 @@ export async function seal(plain: string): Promise<Sealed> {
  * 봉한 것을 풉니다. 열쇠가 바뀌었거나 값이 손상됐으면 던집니다.
  * 부르는 쪽에서 그때는 토큰이 없는 것으로 다루고 다시 받습니다.
  */
-export async function open(sealed: Sealed): Promise<string> {
+export async function unseal(sealed: Sealed): Promise<string> {
   const plain = await crypto.subtle.decrypt(
     { name: 'AES-GCM', iv: fromBase64(sealed.iv) },
     await loadKey(),
@@ -108,13 +108,34 @@ export interface Locked {
 
 /** 암호에서 열쇠를 끌어내는 횟수. 느린 기계에서도 반 초 안쪽입니다. */
 const ITERATIONS = 310_000
+/*
+ * 파일에 적힌 횟수를 그대로 믿지 않습니다.
+ * 누가 수십억으로 고쳐 둔 파일을 들여오면 풀다가 탭이 멎습니다. 우리가 쓰는 값의
+ * 여섯 배 남짓까지만 받고, 그 밖은 설정 파일이 아닌 것으로 봅니다.
+ */
+const MAX_ITERATIONS = 2_000_000
 
+/** base64 를 풀었을 때의 길이. 풀리지 않으면 -1. */
+function bytesIn(text: string): number {
+  try {
+    return atob(text).length
+  } catch {
+    return -1
+  }
+}
+
+/**
+ * 잠근 꼴이 맞는지. 파일에서 온 값이라 모양만 보지 않고 크기까지 봅니다.
+ * salt 16, iv 12 바이트는 우리가 만든 그대로이고, 본문은 GCM 꼬리표(16) 보다 커야 합니다.
+ */
 export function isLocked(value: unknown): value is Locked {
   const one = value as Locked
   return typeof value === 'object' && value !== null
     && one.v === 1 && one.kdf === 'PBKDF2-SHA-256'
-    && typeof one.iterations === 'number'
-    && typeof one.salt === 'string' && typeof one.iv === 'string' && typeof one.data === 'string'
+    && Number.isInteger(one.iterations) && one.iterations >= 1 && one.iterations <= MAX_ITERATIONS
+    && typeof one.salt === 'string' && bytesIn(one.salt) === 16
+    && typeof one.iv === 'string' && bytesIn(one.iv) === 12
+    && typeof one.data === 'string' && bytesIn(one.data) > 16
 }
 
 async function keyFromPassphrase(

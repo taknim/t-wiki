@@ -482,6 +482,49 @@ try {
   expect('짚어 준 묶음이 앞섬', pointed.group?.includes('GitHub 동기화'), JSON.stringify(pointed))
   await page.click('.sheet-close')
   await page.waitForTimeout(300)
+
+  /*
+   * 문서에 설정 갈래와 같은 id 를 가진 요소가 있어도 메뉴가 그쪽으로 굴러가면 안 됩니다.
+   * document 전체에서 찾으면 문서 쪽(먼저 그려진 것)이 잡힙니다.
+   */
+  step('17. 문서 안의 같은 id 가 설정 메뉴를 가로채지 못한다')
+  await page.evaluate(() => {
+    const root = window.__mockRoot
+    const sample = root._children.get('개발 환경.md')
+    root._children.set('가로채기.md', Object.assign(
+      Object.create(Object.getPrototypeOf(sample)),
+      { kind: 'file', name: '가로채기.md',
+        _data: '# 가로채기\n\n<div id="set-font">문서 안의 가짜 자리</div>\n' + '\n본문\n'.repeat(60),
+        _lastModified: Date.now() },
+    ))
+  })
+  await page.click('.tree-root button[aria-label="폴더 닫기"]').catch(() => {})
+  await page.waitForSelector('button:has-text("폴더 열기")', { timeout: 8000 })
+  await page.click('button:has-text("폴더 열기")')
+  await page.waitForSelector('.tree', { timeout: 10000 })
+  await page.click('.tree-row:has-text("가로채기") .tree-name')
+  await page.waitForTimeout(600)
+  await page.click('.mode-switch button[aria-label="미리보기"]')
+  await page.waitForTimeout(600)
+  const decoy = await page.evaluate(() => document.querySelectorAll('#set-font').length)
+  expect('같은 id 가 문서에 그려져 있음', decoy >= 1, String(decoy))
+  await open()
+  await page.click('.settings-nav .settings-nav-item:text-is("본문")')
+  await page.waitForTimeout(900)
+  const hijack = await page.evaluate(() => {
+    const box = document.querySelector('.settings-content').getBoundingClientRect()
+    const head = [...document.querySelectorAll('.settings-content .field-group-title')]
+      .find((one) => one.textContent === '본문')
+    return {
+      top: Math.round(head.getBoundingClientRect().top - box.top),
+      here: document.querySelector('.settings-nav-item.is-here')?.textContent ?? null,
+    }
+  })
+  console.log('  ' + JSON.stringify(hijack))
+  expect('설정 창 안의 본문 자리로 감', hijack.top >= -4 && hijack.top < 60, JSON.stringify(hijack))
+  expect('메뉴 강조도 본문', hijack.here === '본문', JSON.stringify(hijack))
+  await page.click('.sheet-close')
+  await page.waitForTimeout(300)
 } catch (cause) {
   fail('묶음이 도중에 멈춤', cause instanceof Error ? (cause.stack ?? cause.message) : String(cause))
 } finally {

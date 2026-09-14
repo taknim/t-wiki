@@ -19,7 +19,14 @@ interface ConfirmRequest {
   danger: boolean
 }
 
-type Request = (PromptRequest | ConfirmRequest) & {
+interface ChooseRequest {
+  kind: 'choose'
+  title: string
+  label: string
+  options: { id: string; label: string; danger?: boolean }[]
+}
+
+type Request = (PromptRequest | ConfirmRequest | ChooseRequest) & {
   settle: (value: string | boolean | null) => void
 }
 
@@ -61,6 +68,16 @@ export function DialogProvider({ children }: { children: ReactNode }) {
             settle: (result) => resolve(result === true),
           })
         }),
+      choose: ({ title, label, options }) =>
+        new Promise<string | null>((resolve) => {
+          setRequest({
+            kind: 'choose',
+            title,
+            label,
+            options,
+            settle: (result) => resolve(typeof result === 'string' ? result : null),
+          })
+        }),
     }),
     [],
   )
@@ -86,9 +103,10 @@ export function DialogProvider({ children }: { children: ReactNode }) {
       const answer = request.secret ? value : value.trim()
       if (!answer) return
       close(answer)
-    } else {
+    } else if (request.kind === 'confirm') {
       close(true)
     }
+    // 갈림길에는 Enter 로 고를 기본 답이 없습니다. 무엇을 잃을지 읽고 눌러야 합니다.
   }, [close, request, value])
 
   return (
@@ -129,19 +147,32 @@ export function DialogProvider({ children }: { children: ReactNode }) {
               >
                 취소
               </button>
-              <button
-                type="button"
-                className={request.kind === 'confirm' && request.danger ? 'btn btn-danger' : 'btn btn-primary'}
-                data-tip={
-                  request.kind === 'confirm' && request.danger
-                    ? '되돌릴 수 없습니다'
-                    : '입력한 대로 진행합니다 (Enter)'
-                }
-                onClick={submit}
-                autoFocus={request.kind === 'confirm'}
-              >
-                {request.confirmText}
-              </button>
+              {request.kind === 'choose' ? (
+                request.options.map((option) => (
+                  <button
+                    key={option.id}
+                    type="button"
+                    className={option.danger ? 'btn btn-danger' : 'btn btn-primary'}
+                    onClick={() => close(option.id)}
+                  >
+                    {option.label}
+                  </button>
+                ))
+              ) : (
+                <button
+                  type="button"
+                  className={request.kind === 'confirm' && request.danger ? 'btn btn-danger' : 'btn btn-primary'}
+                  data-tip={
+                    request.kind === 'confirm' && request.danger
+                      ? '되돌릴 수 없습니다'
+                      : '입력한 대로 진행합니다 (Enter)'
+                  }
+                  onClick={submit}
+                  autoFocus={request.kind === 'confirm'}
+                >
+                  {request.confirmText}
+                </button>
+              )}
             </div>
           </div>
         </div>

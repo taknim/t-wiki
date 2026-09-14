@@ -88,8 +88,11 @@ interface Options {
   root: FileSystemDirectoryHandle | null
   docs: DocIndex
   assets: AssetIndex
-  /** 동기화 전에 편집 중인 내용을 파일에 반영합니다. */
-  onBeforeSync: () => Promise<void>
+  /**
+   * 동기화 전에 편집 중인 내용을 파일에 반영합니다.
+   * 저절로 도는 회차인지 알려 줍니다. 그쪽은 타자가 멎기를 잠깐 기다릴 수 있습니다.
+   */
+  onBeforeSync: (trigger: 'manual' | 'auto') => Promise<void>
   /** 로컬 파일이 바뀌었을 때 볼트를 다시 읽습니다. */
   onLocalChanged: () => Promise<void>
 }
@@ -278,7 +281,7 @@ export function useGitHubSync({ root, docs, assets, onBeforeSync, onLocalChanged
     ): Promise<boolean> => {
       try {
         // 편집 중이던 내용이 아직 파일에 없으면 그대로 덮어써질 수 있습니다.
-        await callbacksRef.current.onBeforeSync()
+        await callbacksRef.current.onBeforeSync(trigger)
 
         const remote = await scanRemote(current)
         if (remote.truncated) {

@@ -389,18 +389,26 @@ export function SettingsPanel({
    */
   const [folded, setFolded] = useState<Set<TabId>>(() => new Set())
 
+  /*
+   * 갈래의 머리를 창 안에서만 찾습니다.
+   * 문서에 같은 id 를 가진 요소가 있으면 document 전체에서 찾을 때 그쪽이 잡혀,
+   * 메뉴가 엉뚱한 곳으로 굴러갑니다.
+   */
+  const byId = useCallback((id: string): HTMLElement | null =>
+    contentRef.current?.querySelector<HTMLElement>(`#${CSS.escape(id)}`) ?? null, [])
+
   /** 갈래 한 줄로 곧장 갑니다. 묶음 안에서 다시 굴려 찾지 않아도 됩니다. */
   const jumpToField = useCallback((tabId: TabId, fieldId: string) => {
     setTab(tabId)
     setField(fieldId)
     jumpingTo.current = tabId
-    document.getElementById(fieldId)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    byId(fieldId)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 
     window.clearTimeout(releaseTimer.current)
     releaseTimer.current = window.setTimeout(() => {
       jumpingTo.current = null
     }, 800)
-  }, [])
+  }, [byId])
 
   const jumpTo = useCallback((id: TabId) => {
     setTab(id)
@@ -460,7 +468,7 @@ export function SettingsPanel({
     let here: string | null = null
     for (const group of TABS) {
       for (const item of group.items) {
-        const element = document.getElementById(item.id)
+        const element = byId(item.id)
         if (element && element.getBoundingClientRect().top - top <= THRESHOLD) here = item.id
       }
     }
@@ -492,7 +500,7 @@ export function SettingsPanel({
 
     // 묶음 머리로 갈 때 굴림 자리로 갈래를 다시 고르지 않도록, 눌러서 뛸 때와 같이 잠시 막습니다.
     jumpingTo.current = group.id
-    const element = field ? document.getElementById(field) : sectionRefs[group.id].current
+    const element = field ? byId(field) : sectionRefs[group.id].current
     element?.scrollIntoView({ block: 'start' })
     setTab(group.id)
     setField(field)

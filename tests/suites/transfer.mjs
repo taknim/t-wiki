@@ -201,6 +201,27 @@ try {
   expect('테마도 따라옴', landed.theme === 'nord', String(landed.theme))
   await page.click('.sheet-close')
 
+  /*
+   * 파일에 적힌 반복 횟수를 그대로 믿으면, 수십억으로 고쳐 둔 파일을 들여올 때 풀다가
+   * 탭이 멎습니다. 그런 값은 잠근 꼴로 치지 않고 토큰만 빼고 들여와야 합니다.
+   */
+  step('4-3. 반복 횟수가 터무니없는 파일은 풀려 들지 않는다')
+  const bomb = JSON.parse(readFileSync(full.path, 'utf8'))
+  bomb.github.token.iterations = 2_000_000_000
+  const bombPath = join(DOWN, 'bomb.json')
+  writeFileSync(bombPath, JSON.stringify(bomb))
+  if (!(await page.locator('.settings-nav').count())) await openSettings()
+  await page.click('.settings-nav button:has-text("일반")')
+  await page.setInputFiles('#settings-bundle', bombPath)
+  await page.waitForSelector('.dialog', { timeout: 5000 })
+  const bombNote = await page.textContent('.dialog')
+  expect('토큰이 없는 것으로 봄', bombNote.includes('액세스 토큰은 들어 있지 않습니다'), bombNote.slice(0, 200))
+  await page.click('.dialog button:has-text("적용")')
+  // 암호 창이 뜨면 풀려고 든 것입니다. 잠깐 기다려도 창이 없어야 합니다.
+  await page.waitForTimeout(800)
+  expect('암호를 묻지 않음', (await page.locator('.dialog input[type="password"]').count()) === 0)
+  expect('화면이 멎지 않음', (await page.evaluate(() => 1 + 1)) === 2)
+
   step('5. 첫 폴더 설정은 그대로다')
   await closeVault()
   await openVault('first')
@@ -231,7 +252,6 @@ try {
   step('6. 엉뚱한 파일은 받지 않는다')
   await openSettings()
   const junk = join(DOWN, 'junk.json')
-  const { writeFileSync } = await import('node:fs')
   writeFileSync(junk, JSON.stringify({ hello: 'world' }))
   await page.setInputFiles('#settings-bundle', junk)
   await page.waitForTimeout(600)

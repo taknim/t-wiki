@@ -1,6 +1,6 @@
 import { del, get, set } from 'idb-keyval'
 import { vaultKeyFor } from './vaultKey'
-import { isSealed, open, seal, type Sealed } from './secret'
+import { isSealed, seal, unseal, type Sealed } from './secret'
 import type { GitHubConfig, LastCommit, SyncRun, SyncState } from '../types'
 
 const VAULT_HANDLE = 'mdwiki:vault-handle'
@@ -63,7 +63,7 @@ export async function loadGitHubConfig(vault: string): Promise<GitHubConfig | un
   }
 
   try {
-    return { ...stored, token: await open(stored.token) }
+    return { ...stored, token: await unseal(stored.token) }
   } catch {
     // 열쇠가 바뀌었거나 값이 상했습니다. 토큰만 비우고 나머지 설정은 살립니다.
     return { ...stored, token: '' }

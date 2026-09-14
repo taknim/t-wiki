@@ -44,9 +44,10 @@ export function Toc({ headings }: TocProps) {
 
   const go = (heading: Heading, event: MouseEvent) => {
     // 결과 화면이 떠 있으면 앵커가 알아서 데려다 줍니다. 손댈 것이 없습니다.
-    if (document.getElementById(heading.id)) return
+    const main = document.querySelector<HTMLElement>('.main')
+    if (main?.querySelector(`:scope > .doc-body > .preview #${CSS.escape(heading.id)}`)) return
 
-    const editor = document.querySelector<HTMLTextAreaElement>('.main .editor')
+    const editor = main?.querySelector<HTMLTextAreaElement>(':scope > .doc-body > .editor') ?? null
     if (!editor) return
 
     event.preventDefault()

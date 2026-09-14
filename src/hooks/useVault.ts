@@ -24,9 +24,12 @@ export interface Vault {
   reconnect: () => Promise<void>
   close: () => Promise<void>
   refresh: () => Promise<void>
-  save: (path: string, content: string) => Promise<void>
+  /** expectMtime 을 주면 그 시각과 디스크가 다를 때 ExternalChangeError 를 던집니다. */
+  save: (path: string, content: string, expectMtime?: number) => Promise<void>
   /** 마크다운이 아닌 텍스트 파일을 저장합니다. 문서 색인은 건드리지 않습니다. */
-  saveText: (path: string, content: string) => Promise<void>
+  saveText: (path: string, content: string, expectMtime?: number) => Promise<void>
+  /** 파일 하나를 디스크에서 다시 읽어 색인을 맞추고 내용을 돌려줍니다. */
+  reload: (path: string) => Promise<string>
   createDoc: (dirPath: string, name: string) => Promise<string>
   createFolder: (dirPath: string, name: string) => Promise<void>
   rename: (path: string, nextName: string) => Promise<string>
@@ -201,9 +204,9 @@ export function useVault(): Vault {
 
   /** 저장은 트리 전체를 다시 읽지 않고 해당 문서만 인덱스에서 갱신합니다. */
   const save = useCallback(
-    async (path: string, content: string) => {
+    async (path: string, content: string, expectMtime?: number) => {
       const root = requireRoot()
-      const lastModified = await fs.writeFile(root, path, content)
+      const lastModified = await fs.writeFile(root, path, content, expectMtime)
       setIndex((previous) => {
         const next = new Map(previous)
         next.set(path, { path, content, lastModified })
@@ -219,9 +222,9 @@ export function useVault(): Vault {
    * 매번 폴더를 다시 훑으면 저장할 때마다 느려집니다.
    */
   const saveText = useCallback(
-    async (path: string, content: string) => {
+    async (path: string, content: string, expectMtime?: number) => {
       const root = requireRoot()
-      const lastModified = await fs.writeFile(root, path, content)
+      const lastModified = await fs.writeFile(root, path, content, expectMtime)
       setAssets((previous) => {
         const next = new Map(previous)
         const entry = next.get(path)
@@ -235,6 +238,37 @@ export function useVault(): Vault {
           : { path, size, lastModified, syncable: isSyncable(path, size) })
         return next
       })
+    },
+    [requireRoot],
+  )
+
+  /**
+   * 파일 하나를 디스크에서 다시 읽습니다. 밖에서 고쳐진 것을 받아들일 때 씁니다.
+   * 폴더 전체를 다시 훑는 refresh 와 달리 그 파일의 내용과 시각만 새로 맞춥니다.
+   */
+  const reload = useCallback(
+    async (path: string): Promise<string> => {
+      const root = requireRoot()
+      const content = await fs.readFile(root, path)
+      const lastModified = await fs.fileMtime(root, path)
+      if (isMarkdown(path)) {
+        setIndex((previous) => {
+          const next = new Map(previous)
+          next.set(path, { path, content, lastModified })
+          return next
+        })
+      } else {
+        setAssets((previous) => {
+          const next = new Map(previous)
+          const entry = next.get(path)
+          const size = new TextEncoder().encode(content).length
+          next.set(path, entry
+            ? { ...entry, size, lastModified }
+            : { path, size, lastModified, syncable: isSyncable(path, size) })
+          return next
+        })
+      }
+      return content
     },
     [requireRoot],
   )
@@ -349,6 +383,7 @@ export function useVault(): Vault {
     refresh,
     save,
     saveText,
+    reload,
     createDoc,
     createFolder,
     rename,
