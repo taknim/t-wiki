@@ -835,13 +835,15 @@ export function SettingsPanel({
 
               <div className="row" style={{ alignItems: 'center', gap: 8 }}>
                 <label htmlFor="trash-days">며칠이 지나면</label>
+                {/* 자동 동기화 간격과 같은 칸. 네댓 글자면 넉넉하고, 화살표로 오르내립니다. */}
                 <input
                   id="trash-days"
-                  className="dialog-input"
+                  className="dialog-input interval-input"
                   type="number"
+                  inputMode="numeric"
                   min={1}
                   max={365}
-                  style={{ width: 90 }}
+                  step={1}
                   value={trashPolicy.days}
                   disabled={!trashPolicy.autoPurge}
                   onChange={(event) => changeTrash({ days: clampTrashDays(Number(event.target.value)) })}
