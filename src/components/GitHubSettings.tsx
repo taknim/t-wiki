@@ -24,12 +24,15 @@ export function GitHubSettings({ sync, onShowHistory }: GitHubSettingsProps) {
    */
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
+  // 토큰 칸 바로 아래에 띄울 말. 저 아래 실행 자리에 띄우면 무엇이 잘못됐는지 눈에 안 띕니다.
+  const [tokenError, setTokenError] = useState<string | null>(null)
   const [previousToken, setPreviousToken] = useState('')
   const hasToken = config.token.trim() !== ''
 
   const beginEditing = () => {
     setPreviousToken(config.token)
     setDraft('')
+    setTokenError(null)
     setEditing(true)
   }
   const cancelEditing = () => {
@@ -59,12 +62,33 @@ export function GitHubSettings({ sync, onShowHistory }: GitHubSettingsProps) {
 
   const connect = () =>
     run('토큰을 확인하는 중…', async () => {
-      if (!config.token.trim()) throw new Error('먼저 액세스 토큰을 붙여넣어 주세요.')
-      const me = await api.getViewer(config.token.trim())
-      setViewer(me.login)
-      setRepos(await api.listRepos(config.token.trim()))
-      // 쓸 수 있는 토큰이 들어왔으니 입력란은 거두고 별표로 돌아갑니다.
-      setEditing(false)
+      setTokenError(null)
+      const token = config.token.trim()
+      if (!token) {
+        setTokenError('먼저 액세스 토큰을 붙여넣어 주세요.')
+        return
+      }
+      try {
+        const me = await api.getViewer(token)
+        setViewer(me.login)
+        setRepos(await api.listRepos(token))
+        // 쓸 수 있는 토큰이 들어왔으니 입력란은 거두고 별표로 돌아갑니다.
+        setEditing(false)
+      } catch (cause) {
+        /*
+         * 잘못된 토큰.
+         *
+         * 앞서 확인해 둔 계정과 저장소 목록을 그대로 두면, 이번 토큰이 통한 것으로
+         * 읽혀 그 목록에서 저장소를 고르게 됩니다. 목록을 거두고 토큰도 비웁니다.
+         * 잘못된 값을 입력란에 남겨 두어 봐야 다시 지우는 수고만 듭니다.
+         */
+        setViewer(null)
+        setRepos(null)
+        setBranches(null)
+        update({ token: '' })
+        setDraft('')
+        setTokenError(cause instanceof Error ? cause.message : String(cause))
+      }
     })
 
   const chooseRepo = (fullName: string, defaultBranch: string) =>
@@ -100,6 +124,7 @@ export function GitHubSettings({ sync, onShowHistory }: GitHubSettingsProps) {
               autoComplete="off"
               onChange={(event) => {
                 setDraft(event.target.value)
+                setTokenError(null)
                 update({ token: event.target.value })
               }}
             />
@@ -140,6 +165,7 @@ export function GitHubSettings({ sync, onShowHistory }: GitHubSettingsProps) {
             확인
           </button>
         </div>
+        {tokenError && <p className="status status-error">{tokenError}</p>}
         <p className="hint">
           GitHub → Settings → Developer settings → <strong>Fine-grained personal access token</strong> 에서
           대상 저장소만 고르고 <strong>Repository permissions → Contents: Read and write</strong> 만 주세요.

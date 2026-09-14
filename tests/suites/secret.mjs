@@ -142,6 +142,44 @@ try {
   const now = onlyVault(await stored())
   expect('새 토큰이 봉해져 저장됨', now.token === 'pat' && now.sealed, JSON.stringify(now))
 
+  /*
+   * 잘못된 토큰으로 확인을 누르면, 앞서 띄워 둔 계정과 저장소 목록이 그대로 남아
+   * 이번 토큰이 통한 것으로 읽혔습니다. 그 목록에서 저장소를 고르게 되는 것입니다.
+   */
+  step('7-2. 잘못된 토큰이면 알리고, 값과 저장소 목록을 거둔다')
+  const before = await page.evaluate(() => ({
+    repos: document.querySelectorAll('.repo-list li').length,
+    viewer: document.querySelector('#set-token .pill-ok')?.textContent ?? null,
+  }))
+  console.log('  확인 전: ' + JSON.stringify(before))
+  expect('앞서 확인한 목록이 떠 있음', before.repos > 0 && before.viewer !== null, JSON.stringify(before))
+  await page.click('#set-token button:has-text("변경")')
+  await page.fill('#gh-token', 'wrong-token')
+  github.failOnce(401, 'Bad credentials')
+  await page.click('#set-token button:has-text("확인")')
+  await page.waitForTimeout(800)
+  const rejected = await page.evaluate(() => ({
+    error: document.querySelector('#set-token .status-error')?.textContent ?? null,
+    input: document.querySelector('#gh-token')?.value ?? null,
+    mask: document.querySelector('.token-mask') !== null,
+    repos: document.querySelectorAll('.repo-list li').length,
+    viewer: document.querySelector('#set-token .pill-ok')?.textContent ?? null,
+  }))
+  console.log('  ' + JSON.stringify(rejected))
+  expect('토큰 칸 아래에 잘못됐다고 알림',
+    (rejected.error ?? '').includes('토큰이 유효하지 않습니다'), JSON.stringify(rejected))
+  expect('입력란이 비워짐', rejected.input === '' && !rejected.mask, JSON.stringify(rejected))
+  expect('저장소 목록과 계정 표시가 거둬짐', rejected.repos === 0 && rejected.viewer === null, JSON.stringify(rejected))
+  expect('저장된 토큰도 비워짐', onlyVault(await stored()).token === '')
+  // 저장소·브랜치 같은 나머지 설정은 손대지 않습니다.
+  const kept = await page.evaluate(() => document.querySelector('#gh-owner')?.value ?? null)
+  expect('저장소 설정은 그대로', kept === 'tester', String(kept))
+  // 다시 치기 시작하면 알림은 걷힙니다.
+  await page.fill('#gh-token', 'pat')
+  await page.waitForTimeout(200)
+  expect('치기 시작하면 알림이 걷힘',
+    (await page.evaluate(() => document.querySelector('#set-token .status-error'))) === null)
+
   step('8. 글자 그대로 적혀 있던 옛 토큰은 읽는 김에 봉한다')
   await page.click('.sheet-close')
   await page.evaluate(async () => {
