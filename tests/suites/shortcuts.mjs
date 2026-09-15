@@ -34,9 +34,24 @@ try {
   await page.waitForSelector('.tree', { timeout: 10000 })
   await page.waitForTimeout(400)
 
-  step('1. ⌘/ 와 단추로 단축키 목록이 뜨고, Esc 로 닫힌다')
+  step('1. ⌘/ 와 단추로 단축키 목록이 단추 아래에 뜨고, Esc·바깥 누르기로 닫힌다')
   await press('Mod+/')
-  await page.waitForSelector('.sheet[aria-label="단축키"]', { timeout: 3000 })
+  await page.waitForSelector('.shortcuts-pop', { timeout: 3000 })
+  // 덮개도 닫기 단추도 없이, 단추 바로 아래에 붙습니다.
+  const placed = await page.evaluate(() => {
+    const pop = document.querySelector('.shortcuts-pop').getBoundingClientRect()
+    const anchor = document.querySelector('.topbar button[aria-label="단축키"]').getBoundingClientRect()
+    return {
+      overlay: document.querySelector('.overlay') !== null,
+      close: document.querySelector('.shortcuts-pop .sheet-close') !== null,
+      below: Math.round(pop.top - anchor.bottom),
+      rightGap: Math.round(anchor.right - pop.right),
+    }
+  })
+  console.log('  ' + JSON.stringify(placed))
+  expect('덮개가 없음', !placed.overlay, JSON.stringify(placed))
+  expect('닫기 단추가 없음', !placed.close, JSON.stringify(placed))
+  expect('단추 바로 아래, 오른쪽을 맞춤', placed.below >= 0 && placed.below <= 12 && Math.abs(placed.rightGap) <= 2, JSON.stringify(placed))
   const listed = await page.evaluate(() =>
     [...document.querySelectorAll('.shortcut-row')].map((one) => ({
       label: one.querySelector('.shortcut-label').textContent,
@@ -49,19 +64,29 @@ try {
   // ⌘N 은 브라우저가 가로채므로 사연이 적혀 있어야 합니다.
   const newDocRow = listed.find((one) => one.label.startsWith('새 문서'))
   expect('⌘N 사연이 적힘', newDocRow?.label.includes('가로채') ?? false, JSON.stringify(newDocRow))
-  await page.locator('.sheet[aria-label="단축키"]').screenshot({ path: join(HERE, '..', 'shots', 'shortcuts', '01-list.png') })
-  const width = Math.round((await page.locator('.sheet[aria-label="단축키"]').boundingBox()).width)
-  expect('창이 좁음', width <= 480, String(width))
+  await page.screenshot({ path: join(HERE, '..', 'shots', 'shortcuts', '01-list.png'), clip: { x: 700, y: 0, width: 600, height: 700 } })
+  const width = Math.round((await page.locator('.shortcuts-pop').boundingBox()).width)
+  expect('창이 좁음', width <= 460, String(width))
   await press('Escape')
   await page.waitForTimeout(300)
-  expect('Esc 로 닫힘', (await page.locator('.sheet[aria-label="단축키"]').count()) === 0)
+  expect('Esc 로 닫힘', (await page.locator('.shortcuts-pop').count()) === 0)
   await page.click('.topbar button[aria-label="단축키"]')
-  await page.waitForSelector('.sheet[aria-label="단축키"]', { timeout: 3000 })
+  await page.waitForSelector('.shortcuts-pop', { timeout: 3000 })
   ok('단추로도 뜸')
+  await page.mouse.click(600, 500)
+  await page.waitForTimeout(300)
+  expect('바깥을 누르면 닫힘', (await page.locator('.shortcuts-pop').count()) === 0)
+  await page.click('.topbar button[aria-label="단축키"]')
+  await page.waitForSelector('.shortcuts-pop', { timeout: 3000 })
+  await page.click('.topbar button[aria-label="단축키"]')
+  await page.waitForTimeout(300)
+  expect('단추를 다시 누르면 닫힘', (await page.locator('.shortcuts-pop').count()) === 0)
+  await press('Mod+/')
+  await page.waitForSelector('.shortcuts-pop', { timeout: 3000 })
   // 같은 글쇠를 다시 누르면 닫힙니다.
   await press('Mod+/')
   await page.waitForTimeout(300)
-  expect('⌘/ 를 다시 누르면 닫힘', (await page.locator('.sheet[aria-label="단축키"]').count()) === 0)
+  expect('⌘/ 를 다시 누르면 닫힘', (await page.locator('.shortcuts-pop').count()) === 0)
   // 단추는 설정 단추 바로 앞에 있습니다.
   const order = await page.evaluate(() =>
     [...document.querySelectorAll('.topbar button')].map((one) => one.getAttribute('aria-label') ?? one.textContent.trim()))
@@ -134,9 +159,14 @@ try {
   await press('Mod+Shift+2')
   await page.waitForTimeout(200)
   expect('즐겨찾기 탭', (await tab()) === '즐겨찾기', String(await tab()))
+  // 아직 담긴 것이 없으니 검색 칸이 잡힙니다. 옮겨 간 뒤 자리가 그쪽에 있어야 곧바로 화살표가 듣습니다.
+  expect('즐겨찾기가 비었으면 검색 칸에 자리', (await focused()) === 'input.search-input', String(await focused()))
   await press('Mod+Shift+1')
   await page.waitForTimeout(200)
   expect('폴더 탭', (await tab()) === '폴더', String(await tab()))
+  expect('트리의 고른 줄에 자리가 감', (await focused()) === 'div.tree-row', String(await focused()))
+  await page.keyboard.press('ArrowDown')
+  expect('곧바로 화살표가 들음', (await focused()) === 'div.tree-row')
   const railBefore = await page.evaluate(() => document.querySelector('.sidebar.is-rail') !== null)
   await press('Mod+Shift+b')
   await page.waitForTimeout(300)
@@ -195,12 +225,10 @@ try {
   await page.click('.tree-row:has-text("회고") .tree-tools button[aria-label="즐겨찾기에 담기"]')
   await press('Mod+Shift+2')
   await page.waitForTimeout(300)
-  await press('Mod+p')
-  await page.keyboard.press('ArrowDown')
   const favName = () => page.evaluate(() =>
     document.activeElement?.classList.contains('favorites-item')
       ? document.activeElement.querySelector('.favorites-name')?.textContent ?? null : null)
-  expect('↓ 로 첫 줄에 옴', (await favName()) !== null, String(await favName()))
+  expect('탭 단축키로 오면 첫 줄에 자리가 감', (await favName()) !== null, String(await focused()))
   await page.keyboard.press('ArrowDown')
   const second = await favName()
   expect('둘째 줄로 감', second !== null, String(second))

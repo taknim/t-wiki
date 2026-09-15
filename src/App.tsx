@@ -31,7 +31,7 @@ import { extractHeadings, parseFrontmatter, toggleTask } from './lib/markdown'
 import { ExternalChangeError } from './lib/fsAccess'
 import { TrashView } from './components/TrashView'
 import { KeyboardIcon, TrashIcon } from './components/icons'
-import { ShortcutsSheet } from './components/ShortcutsSheet'
+import { ShortcutsPopover } from './components/ShortcutsPopover'
 import { matches, SHORTCUTS } from './lib/shortcuts'
 import { readTrashPolicy } from './lib/saveOptions'
 import type { TrashItem } from './lib/trash'
@@ -879,6 +879,13 @@ export default function App() {
           if (!vault.tree) return
           applySidebarOpen(true)
           applySidebarTab(id === 'tab-tree' ? 'tree' : 'favorites')
+          // 옮겨 간 목록에 자리를 줍니다. 그래야 곧바로 화살표로 오갈 수 있습니다. 그려진 뒤에 잡습니다.
+          window.setTimeout(() => {
+            const target = id === 'tab-tree'
+              ? document.querySelector<HTMLElement>('.tree .tree-row.is-selected, .tree .tree-row')
+              : document.querySelector<HTMLElement>('.favorites-item')
+            ;(target ?? searchInput.current)?.focus()
+          }, 0)
           return
         case 'sidebar':
           if (!vault.tree) return
@@ -1214,16 +1221,20 @@ export default function App() {
               <span className="btn-label-ghost" aria-hidden="true">GitHub 동기화</span>
             </span>
           </button>
-          <button
-            type="button"
-            className="btn"
-            data-tip="단축키 목록을 봅니다 (⌘/)"
-            aria-label="단축키"
-            onClick={() => setShortcutsOpen(true)}
-          >
-            <KeyboardIcon />
-            <span>단축키</span>
-          </button>
+          <div className="shortcuts-anchor" data-shortcuts-anchor>
+            <button
+              type="button"
+              className={shortcutsOpen ? 'btn is-active' : 'btn'}
+              data-tip="단축키 목록을 봅니다 (⌘/)"
+              aria-label="단축키"
+              aria-expanded={shortcutsOpen}
+              onClick={() => setShortcutsOpen((open) => !open)}
+            >
+              <KeyboardIcon />
+              <span>단축키</span>
+            </button>
+            {shortcutsOpen && <ShortcutsPopover onClose={() => setShortcutsOpen(false)} />}
+          </div>
           <button
             type="button"
             className="btn"
@@ -1702,8 +1713,6 @@ export default function App() {
           onClose={() => setSettingsTab(null)}
         />
       )}
-
-      {shortcutsOpen && <ShortcutsSheet onClose={() => setShortcutsOpen(false)} />}
 
       {historyOpen && (
         <SyncHistorySheet

@@ -2052,7 +2052,24 @@ a.btn { text-decoration: none; color: inherit; display: inline-block; }
 
 /* ---------- 단축키 목록 ---------- */
 
-.sheet.sheet-narrow { width: min(460px, 100%); }
+/* 단추 아래에 안내처럼 붙습니다. 오른쪽 끝 단추라 오른쪽을 맞춥니다. */
+.shortcuts-anchor { position: relative; }
+.shortcuts-pop {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 60;
+  width: min(440px, calc(100vw - 16px));
+  max-height: min(70vh, 640px);
+  overflow: auto;
+  padding: 10px 14px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  background: var(--bg);
+  box-shadow: 0 10px 30px rgb(0 0 0 / 18%);
+  font-size: 13px;
+  text-align: start;
+}
 
 .shortcut-group + .shortcut-group { margin-top: 18px; }
 .shortcut-scope { margin: 0 0 6px; font-size: 12px; font-weight: 600; color: var(--text-muted); text-transform: none; }
