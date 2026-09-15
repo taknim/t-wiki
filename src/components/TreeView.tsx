@@ -34,6 +34,8 @@ interface TreeViewProps extends TreeActions {
   selectedPath: string | null
   expanded: Set<string>
   onToggle: (path: string) => void
+  /** 맨 위 줄에서 ↑ 를 눌렀을 때. 검색 칸으로 돌아갑니다. */
+  onLeaveTop: () => void
   /** 뿌리에 넣을 파일을 고르는 창을 엽니다. */
   onPickFiles: () => void
   onRefresh: () => void
@@ -41,7 +43,7 @@ interface TreeViewProps extends TreeActions {
 }
 
 export function TreeView({
-  root, rootName, onPickFiles, onRefresh, onCloseVault, ...props
+  root, rootName, onPickFiles, onRefresh, onCloseVault, onLeaveTop, ...props
 }: TreeViewProps) {
   const children = root.children ?? []
   // 뿌리 줄의 단추는 늘 뿌리를 가리킵니다. 폴더마다 필요한 것은 그 줄에 따로 있습니다.
@@ -61,6 +63,51 @@ export function TreeView({
   return (
     <div
       className="tree"
+      /*
+       * 자판으로 오르내립니다. 검색 결과와 같은 규칙입니다.
+       * 줄마다 듣기를 달지 않고 트리에서 한 번에 받습니다. 보이는 줄의 차례는
+       * 그려진 차례와 같으므로 DOM 을 그대로 훑으면 됩니다.
+       */
+      onKeyDown={(event) => {
+        const row = (event.target as HTMLElement).closest<HTMLElement>('.tree-row')
+        if (!row || row.parentElement === null) return
+        const rows = [...event.currentTarget.querySelectorAll<HTMLElement>('.tree-row')]
+        const at = rows.indexOf(row)
+        if (at === -1) return
+
+        if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+          event.preventDefault()
+          const next = rows[at + (event.key === 'ArrowDown' ? 1 : -1)]
+          if (next) next.focus()
+          // 맨 위에서 ↑ 는 검색 칸으로 돌아갑니다.
+          else if (event.key === 'ArrowUp') onLeaveTop()
+          return
+        }
+        if (event.key === 'Enter') {
+          event.preventDefault()
+          row.click()
+          return
+        }
+        // → 는 폴더를 펴고, ← 는 접습니다. 이미 접힌 폴더나 파일에서 ← 는 부모 폴더로 올라갑니다.
+        const caret = row.querySelector<HTMLButtonElement>(':scope > .tree-caret[aria-expanded]')
+        if (event.key === 'ArrowRight') {
+          if (caret && caret.getAttribute('aria-expanded') === 'false') {
+            event.preventDefault()
+            caret.click()
+          }
+          return
+        }
+        if (event.key === 'ArrowLeft') {
+          event.preventDefault()
+          if (caret && caret.getAttribute('aria-expanded') === 'true') {
+            caret.click()
+            return
+          }
+          const parent = row.parentElement.parentElement?.closest<HTMLElement>('.tree-branch')
+            ?.querySelector<HTMLElement>(':scope > .tree-row')
+          parent?.focus()
+        }
+      }}
       // 루트로 끌어다 놓으면 볼트 최상위로 옮깁니다.
       onDragOver={(event) => event.preventDefault()}
       onDrop={(event) => {
@@ -76,6 +123,7 @@ export function TreeView({
     >
       <div
         className={props.selectedPath === '' ? 'tree-row tree-root is-selected' : 'tree-row tree-root'}
+        tabIndex={0}
         onClick={() => props.onSelectDir('')}
       >
         <span className="tree-icon is-dir"><FolderIcon /></span>
@@ -149,6 +197,8 @@ function TreeRow({ node, depth, selectedPath, expanded, onToggle, ...actions }: 
           dropTarget ? 'is-drop-target' : '',
         ].filter(Boolean).join(' ')}
         style={{ paddingInlineStart: `${depth * 14 + 8}px` }}
+        // 고른 줄만 Tab 차례에 들고, 나머지는 화살표로 갑니다. 줄마다 Tab 을 세우면 수백 번 눌러야 합니다.
+        tabIndex={isSelected ? 0 : -1}
         draggable
         onDragStart={(event) => {
           event.dataTransfer.setData('text/mdwiki-path', node.path)

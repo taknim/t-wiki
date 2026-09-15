@@ -105,7 +105,8 @@ export function Editor({ value, path, onChange, onSave }: EditorProps) {
   )
 
   const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (event.metaKey || event.ctrlKey) {
+    // ⇧·⌥ 가 붙은 것은 앱 전역 단축키(⌘⇧E 보기 모드 등)입니다. 여기서 가로채지 않습니다.
+    if ((event.metaKey || event.ctrlKey) && !event.shiftKey && !event.altKey) {
       if (event.key === 's') {
         event.preventDefault()
         onSave()

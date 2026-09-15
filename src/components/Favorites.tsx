@@ -13,6 +13,8 @@ interface FavoritesProps {
   /** 폴더인지 가리려면 트리가 필요합니다. 색인에는 폴더가 없습니다. */
   root: VaultNode | null
   onOpen: (path: string) => void
+  /** 맨 위 줄에서 ↑ 를 눌렀을 때. 검색 칸으로 돌아갑니다. */
+  onLeaveTop: () => void
   onOpenDir: (path: string) => void
   onRemove: (path: string) => void
   /** 한 줄을 다른 줄의 앞이나 뒤로 옮깁니다. */
@@ -58,7 +60,7 @@ function iconFor(path: string, kind: 'dir' | 'file') {
  * 자리라, 아무 말 없이 빈 칸만 있으면 고장으로 보입니다.
  */
 export function Favorites({
-  paths, query, root, onOpen, onOpenDir, onRemove, onReorder,
+  paths, query, root, onOpen, onOpenDir, onRemove, onReorder, onLeaveTop,
 }: FavoritesProps) {
   /*
    * 끌고 있는 줄과, 지금 가리키는 자리.
@@ -87,7 +89,20 @@ export function Favorites({
   }
 
   return (
-    <ul className="favorites-list">
+    <ul
+      className="favorites-list"
+      // 자판으로 오르내립니다. 트리·검색 결과와 같은 규칙입니다. Enter 는 단추라 저절로 열립니다.
+      onKeyDown={(event) => {
+        if (event.altKey || (event.key !== 'ArrowDown' && event.key !== 'ArrowUp')) return
+        const items = [...event.currentTarget.querySelectorAll<HTMLElement>('.favorites-item')]
+        const at = items.indexOf((event.target as HTMLElement).closest('.favorites-item') as HTMLElement)
+        if (at === -1) return
+        event.preventDefault()
+        const next = items[at + (event.key === 'ArrowDown' ? 1 : -1)]
+        if (next) next.focus()
+        else if (event.key === 'ArrowUp') onLeaveTop()
+      }}
+    >
       {shown.map(({ path, kind }) => {
         const icon = iconFor(path, kind)
         const name = path.split('/').pop() ?? path

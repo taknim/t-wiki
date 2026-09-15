@@ -34,6 +34,9 @@ export const SHORTCUTS: Shortcut[] = [
   { id: 'new-doc', label: '새 문서', keys: { key: 'n', mod: true, alt: true }, scope: '앱 어디서나',
     note: '⌘N 은 브라우저가 새 창 열기로 가로채므로 ⌥ 를 더해 누릅니다' },
   { id: 'view-mode', label: '보기 모드 바꾸기 (편집 → 나란히 → 미리보기)', keys: { key: 'e', mod: true, shift: true }, scope: '앱 어디서나' },
+  { id: 'tab-tree', label: '옆줄을 폴더 트리로', keys: { key: '1', mod: true, shift: true }, scope: '앱 어디서나' },
+  { id: 'tab-favorites', label: '옆줄을 즐겨찾기로', keys: { key: '2', mod: true, shift: true }, scope: '앱 어디서나' },
+  { id: 'sidebar', label: '옆줄(폴더 트리) 접기 / 펴기', keys: { key: 'b', mod: true, shift: true }, scope: '앱 어디서나' },
   { id: 'settings', label: '설정 열기', keys: { key: ',', mod: true }, scope: '앱 어디서나' },
   { id: 'help', label: '이 단축키 목록', keys: { key: '/', mod: true }, scope: '앱 어디서나' },
 
@@ -45,7 +48,9 @@ export const SHORTCUTS: Shortcut[] = [
   { id: 'indent', label: '공백 두 칸 들여쓰기', keys: { key: 'Tab' }, scope: '편집기 안' },
 
   { id: 'close', label: '맨 위에 뜬 창 닫기', keys: { key: 'Escape' }, scope: '창·목록' },
-  { id: 'results', label: '검색 결과 사이 오르내리기 (맨 위에서 ↑ 는 검색 칸으로)', keys: { key: '↑ ↓' }, scope: '창·목록' },
+  { id: 'rows', label: '폴더 트리·즐겨찾기·검색 결과에서 줄 사이 오르내리기 (맨 위에서 ↑ 는 검색 칸으로)', keys: { key: '↑ ↓' }, scope: '창·목록' },
+  { id: 'open', label: '고른 줄 열기 (폴더는 고르기, 다시 누르면 펴고 접기)', keys: { key: 'Enter' }, scope: '창·목록' },
+  { id: 'fold', label: '폴더 트리에서 폴더 펴기 / 접기', keys: { key: '→ ←' }, scope: '창·목록' },
   { id: 'reorder', label: '즐겨찾기 줄 순서 바꾸기', keys: { key: '↑ ↓', alt: true }, scope: '창·목록' },
   { id: 'resize', label: '너비 손잡이에서 폭 조절 (Shift 는 큰 걸음, Home 은 처음 폭)', keys: { key: '← →' }, scope: '창·목록' },
 ]
@@ -72,6 +77,9 @@ export function matches(event: KeyboardEvent, keys: KeySpec): boolean {
   if (Boolean(keys.shift) !== event.shiftKey) return false
   if (Boolean(keys.alt) !== event.altKey) return false
   // ⌥ 를 누르면 맥에서 event.key 가 딴 글자(˜)가 됩니다. 물리 글쇠 이름으로 견줍니다.
-  const code = event.code.startsWith('Key') ? event.code.slice(3).toLowerCase() : null
+  // ⇧ 를 누르면 숫자 글쇠도 딴 글자(!)가 됩니다. 이쪽도 물리 글쇠 이름으로 견줍니다.
+  const code = event.code.startsWith('Key')
+    ? event.code.slice(3).toLowerCase()
+    : event.code.startsWith('Digit') ? event.code.slice(5) : null
   return event.key.toLowerCase() === keys.key.toLowerCase() || (code !== null && code === keys.key.toLowerCase())
 }

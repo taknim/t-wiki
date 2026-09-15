@@ -20,7 +20,8 @@ export function ShortcutsSheet({ onClose }: ShortcutsSheetProps) {
         if (event.target === event.currentTarget) onClose()
       }}
     >
-      <div className="sheet" role="dialog" aria-modal="true" aria-label="단축키">
+      {/* 두 칸짜리 표라 넓을 까닭이 없습니다. 좁게 둡니다. */}
+      <div className="sheet sheet-narrow" role="dialog" aria-modal="true" aria-label="단축키">
         <header className="sheet-head">
           <h2>단축키</h2>
           <button

@@ -544,6 +544,10 @@ button, input, select, textarea { font: inherit; color: inherit; }
 button.tree-caret { cursor: pointer; }
 button.tree-caret:hover { color: var(--text); }
 button.tree-caret:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 3px; }
+/* 자판으로 온 줄. 마우스로 고른 줄(is-selected)과 겹칠 수 있어 테두리로만 알립니다. */
+.tree-row:focus-visible, .favorites-item:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.tree-row:focus { outline: none; }
+.tree-row:focus-visible { outline: 2px solid var(--accent); }
 .tree-caret .icon { transition: transform 120ms ease; }
 .tree-caret.is-open .icon { transform: rotate(90deg); }
 @media (prefers-reduced-motion: reduce) {
@@ -2047,6 +2051,8 @@ a.btn { text-decoration: none; color: inherit; display: inline-block; }
 .trash-tools { display: flex; gap: 6px; flex-shrink: 0; }
 
 /* ---------- 단축키 목록 ---------- */
+
+.sheet.sheet-narrow { width: min(460px, 100%); }
 
 .shortcut-group + .shortcut-group { margin-top: 18px; }
 .shortcut-scope { margin: 0 0 6px; font-size: 12px; font-weight: 600; color: var(--text-muted); text-transform: none; }

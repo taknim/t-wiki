@@ -839,6 +839,10 @@ export default function App() {
    * 같은 일을 하는 것만 봅니다. 브라우저가 먼저 가져가는 글쇠(⌘N)는 오지 않으므로
    * 목록에 사연을 적어 두었습니다.
    */
+  const sidebarOpenRef = useRef(sidebarOpen)
+  useEffect(() => {
+    sidebarOpenRef.current = sidebarOpen
+  }, [sidebarOpen])
   const shortcutRefs = useRef({ handleNewDoc, currentDir, textPreview, hasDoc: false })
   useEffect(() => {
     shortcutRefs.current = {
@@ -870,6 +874,16 @@ export default function App() {
           if (!hasDoc) return
           setViewMode((mode) => (mode === 'edit' ? 'split' : mode === 'split' ? 'preview' : 'edit'))
           return
+        case 'tab-tree':
+        case 'tab-favorites':
+          if (!vault.tree) return
+          applySidebarOpen(true)
+          applySidebarTab(id === 'tab-tree' ? 'tree' : 'favorites')
+          return
+        case 'sidebar':
+          if (!vault.tree) return
+          applySidebarOpen(!sidebarOpenRef.current)
+          return
         case 'settings':
           setSettingsTab((open) => open ?? 'last')
           return
@@ -880,7 +894,7 @@ export default function App() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [applySidebarOpen, vault.tree])
+  }, [applySidebarOpen, applySidebarTab, vault.tree])
 
   const handleNewFolder = useCallback(
     async (dirPath: string) => {
@@ -1303,9 +1317,11 @@ export default function App() {
                       else setFavoriteQuery(event.target.value)
                     }}
                     onKeyDown={(event) => {
-                      // 아래 방향키로 결과 목록으로 내려갑니다.
+                      // 아래 방향키로 결과 목록, 검색어가 없으면 트리·즐겨찾기 첫 줄로 내려갑니다.
                       if (event.key !== 'ArrowDown') return
-                      const first = document.querySelector<HTMLButtonElement>('.search-results button')
+                      const first = document.querySelector<HTMLElement>(
+                        '.search-results button, .tree [tabindex], .favorites-item',
+                      )
                       if (!first) return
                       event.preventDefault()
                       first.focus()
@@ -1368,6 +1384,7 @@ export default function App() {
                 onRemove={toggleFavorite}
                 onReorder={(from, to, place) =>
                   applyFavorites(reorderFavorites(favorites, from, to, place))}
+                onLeaveTop={() => searchInput.current?.focus()}
               />
             ) : query.trim() ? (
               <SearchPanel
@@ -1409,6 +1426,7 @@ export default function App() {
                   }}
                   onRefresh={() => void vault.refresh()}
                   onCloseVault={() => void closeVault()}
+                  onLeaveTop={() => searchInput.current?.focus()}
                   expanded={expanded}
                   onToggle={toggleFolder}
                   onSelect={(path) => void (isMarkdown(path) ? openDoc(path) : openAsset(path))}
