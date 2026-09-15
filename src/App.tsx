@@ -30,7 +30,9 @@ import {
 import { extractHeadings, parseFrontmatter, toggleTask } from './lib/markdown'
 import { ExternalChangeError } from './lib/fsAccess'
 import { TrashView } from './components/TrashView'
-import { TrashIcon } from './components/icons'
+import { KeyboardIcon, TrashIcon } from './components/icons'
+import { ShortcutsSheet } from './components/ShortcutsSheet'
+import { matches, SHORTCUTS } from './lib/shortcuts'
 import { readTrashPolicy } from './lib/saveOptions'
 import type { TrashItem } from './lib/trash'
 import { entryKind, readFile } from './lib/fsAccess'
@@ -78,6 +80,7 @@ export default function App() {
   const [favoriteQuery, setFavoriteQuery] = useState('')
   // 'last' 는 지난번에 보던 자리로. 갈 곳이 정해진 부름(동기화 설정이 덜 됐을 때)만 묶음을 짚습니다.
   const [settingsTab, setSettingsTab] = useState<'general' | 'appearance' | 'sync' | 'last' | null>(null)
+  const [shortcutsOpen, setShortcutsOpen] = useState(false)
   const [reportOpen, setReportOpen] = useState(false)
   const [historyOpen, setHistoryOpen] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
@@ -829,6 +832,56 @@ export default function App() {
     [dialogs, openDoc, report, vault],
   )
 
+  /*
+   * 앱 전역 단축키.
+   *
+   * 편집기 안의 서식 단축키(⌘B 등)는 편집기가 제 자리에서 처리하고, 여기는 어디서 눌러도
+   * 같은 일을 하는 것만 봅니다. 브라우저가 먼저 가져가는 글쇠(⌘N)는 오지 않으므로
+   * 목록에 사연을 적어 두었습니다.
+   */
+  const shortcutRefs = useRef({ handleNewDoc, currentDir, textPreview, hasDoc: false })
+  useEffect(() => {
+    shortcutRefs.current = {
+      handleNewDoc, currentDir, textPreview,
+      hasDoc: selectedPath !== null && (isMarkdown(selectedPath) || textPreview !== null),
+    }
+  })
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      const hit = SHORTCUTS.find((one) => one.scope === '앱 어디서나' && matches(event, one.keys))
+      // ⌘N 이 오는 브라우저에서는 그것도 새 문서입니다.
+      const newDocPlain = event.key.toLowerCase() === 'n' && (event.metaKey || event.ctrlKey) && !event.altKey && !event.shiftKey
+      const id = hit?.id ?? (newDocPlain ? 'new-doc' : null)
+      if (!id) return
+      event.preventDefault()
+
+      const { handleNewDoc: newDoc, currentDir: dir, hasDoc } = shortcutRefs.current
+      switch (id) {
+        case 'search':
+          if (!vault.tree) return
+          applySidebarOpen(true)
+          // 옆줄이 접혀 있었으면 입력란이 이제야 그려집니다. 한 박자 뒤에 잡습니다.
+          window.setTimeout(() => searchInput.current?.select(), 0)
+          return
+        case 'new-doc':
+          if (vault.tree) void newDoc(dir)
+          return
+        case 'view-mode':
+          if (!hasDoc) return
+          setViewMode((mode) => (mode === 'edit' ? 'split' : mode === 'split' ? 'preview' : 'edit'))
+          return
+        case 'settings':
+          setSettingsTab((open) => open ?? 'last')
+          return
+        case 'help':
+          setShortcutsOpen((open) => !open)
+          return
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [applySidebarOpen, vault.tree])
+
   const handleNewFolder = useCallback(
     async (dirPath: string) => {
       const name = await dialogs.prompt({
@@ -1150,7 +1203,17 @@ export default function App() {
           <button
             type="button"
             className="btn"
-            data-tip="테마, 글꼴, GitHub 동기화를 설정합니다"
+            data-tip="단축키 목록을 봅니다 (⌘/)"
+            aria-label="단축키"
+            onClick={() => setShortcutsOpen(true)}
+          >
+            <KeyboardIcon />
+            <span>단축키</span>
+          </button>
+          <button
+            type="button"
+            className="btn"
+            data-tip="테마, 글꼴, GitHub 동기화를 설정합니다 (⌘,)"
             aria-label="설정"
             onClick={() => setSettingsTab('last')}
           >
@@ -1621,6 +1684,8 @@ export default function App() {
           onClose={() => setSettingsTab(null)}
         />
       )}
+
+      {shortcutsOpen && <ShortcutsSheet onClose={() => setShortcutsOpen(false)} />}
 
       {historyOpen && (
         <SyncHistorySheet

@@ -2045,3 +2045,32 @@ a.btn { text-decoration: none; color: inherit; display: inline-block; }
 .trash-name { font-weight: 600; overflow-wrap: anywhere; }
 .trash-meta { font-size: 12px; color: var(--text-muted); overflow-wrap: anywhere; }
 .trash-tools { display: flex; gap: 6px; flex-shrink: 0; }
+
+/* ---------- 단축키 목록 ---------- */
+
+.shortcut-group + .shortcut-group { margin-top: 18px; }
+.shortcut-scope { margin: 0 0 6px; font-size: 12px; font-weight: 600; color: var(--text-muted); text-transform: none; }
+.shortcut-list { list-style: none; margin: 0; padding: 0; }
+.shortcut-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 7px 0;
+  border-top: 1px solid var(--border);
+}
+.shortcut-row:first-child { border-top: 0; }
+.shortcut-label { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.shortcut-note { font-size: 12px; color: var(--text-muted); }
+.shortcut-keys {
+  flex-shrink: 0;
+  padding: 2px 8px;
+  border: 1px solid var(--border-strong);
+  border-bottom-width: 2px;
+  border-radius: 6px;
+  background: var(--bg-raised);
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text);
+  white-space: nowrap;
+}

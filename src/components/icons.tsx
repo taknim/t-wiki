@@ -330,3 +330,13 @@ export function InboundIcon(props: IconProps) {
     </Svg>
   )
 }
+
+/** 자판. 단축키 목록 단추에 씁니다. */
+export function KeyboardIcon(props: IconProps) {
+  return (
+    <Svg {...props} strokeWidth={1.6}>
+      <rect x="1.5" y="4" width="13" height="8.5" rx="1.5" />
+      <path d="M4 7h1M6.5 7h1M9 7h1M11.5 7h1M4 9.5h1M6.5 9.5h3.5M11.5 9.5h1" />
+    </Svg>
+  )
+}
