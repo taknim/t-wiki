@@ -245,20 +245,6 @@ function TreeRow({ node, depth, selectedPath, expanded, onToggle, ...actions }: 
               </button>
             </>
           )}
-          {/*
-            별 단추가 곧 표시입니다. 담긴 줄에서는 손을 얹지 않아도 이 단추만 켜진 채로
-            남고, 같은 자리를 누르면 뺍니다. 이름 앞에 별을 따로 찍으면 같은 뜻이 둘이 됩니다.
-          */}
-          <button
-            type="button"
-            className={isFavorite ? 'tree-fav is-on' : 'tree-fav'}
-            aria-label={isFavorite ? '즐겨찾기에서 빼기' : '즐겨찾기에 담기'}
-            aria-pressed={isFavorite}
-            data-tip={isFavorite ? '즐겨찾기에서 뺍니다' : '즐겨찾기에 담아 위쪽에 둡니다'}
-            onClick={() => actions.onToggleFavorite(node.path)}
-          >
-            <StarIcon filled={isFavorite} />
-          </button>
           <button
             type="button"
             aria-label="이름 바꾸기"
@@ -274,6 +260,21 @@ function TreeRow({ node, depth, selectedPath, expanded, onToggle, ...actions }: 
             onClick={() => actions.onDelete(node.path)}
           >
             <TrashIcon />
+          </button>
+          {/*
+            별 단추가 곧 표시입니다. 담긴 줄에서는 손을 얹지 않아도 이 단추만 켜진 채로
+            남고, 같은 자리를 누르면 뺍니다. 이름 앞에 별을 따로 찍으면 같은 뜻이 둘이 됩니다.
+            맨 끝에 둡니다. 손을 얹어 다른 단추가 나와도 별은 같은 자리에 있어야 합니다.
+          */}
+          <button
+            type="button"
+            className={isFavorite ? 'tree-fav is-on' : 'tree-fav'}
+            aria-label={isFavorite ? '즐겨찾기에서 빼기' : '즐겨찾기에 담기'}
+            aria-pressed={isFavorite}
+            data-tip={isFavorite ? '즐겨찾기에서 뺍니다' : '즐겨찾기에 담아 위쪽에 둡니다'}
+            onClick={() => actions.onToggleFavorite(node.path)}
+          >
+            <StarIcon filled={isFavorite} />
           </button>
         </span>
       </div>

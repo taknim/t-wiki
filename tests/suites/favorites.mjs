@@ -107,6 +107,24 @@ try {
   expect('이름 앞에 별을 따로 찍지 않음', marked.star === false, JSON.stringify(marked))
   expect('손을 얹지 않아도 켜진 별 단추만 보임',
     marked.on && marked.shown.length === 1 && marked.shown[0] === '즐겨찾기에서 빼기', JSON.stringify(marked))
+  // 손을 얹어 다른 단추가 나와도 별은 같은 자리(맨 끝)에 있어야 합니다. 자리가 튀면 누르다 빗나갑니다.
+  const restingRight = await page.evaluate(() => Math.round([...document.querySelectorAll('.tree-row')]
+    .find((one) => one.textContent.includes('개발 환경')).querySelector('.tree-fav').getBoundingClientRect().right))
+  await page.hover('.tree-row:has-text("개발 환경")')
+  await page.waitForTimeout(200)
+  const hovered = await page.evaluate(() => {
+    const row = [...document.querySelectorAll('.tree-row')].find((one) => one.textContent.includes('개발 환경'))
+    const buttons = [...row.querySelectorAll('.tree-tools button')].filter((one) => one.offsetParent !== null)
+    return {
+      count: buttons.length,
+      last: buttons[buttons.length - 1]?.classList.contains('tree-fav') ?? false,
+      right: Math.round(row.querySelector('.tree-fav').getBoundingClientRect().right),
+    }
+  })
+  console.log('  ' + JSON.stringify({ restingRight, ...hovered }))
+  expect('손을 얹으면 다른 단추도 나옴', hovered.count > 1, JSON.stringify(hovered))
+  expect('별은 맨 끝이고 자리가 그대로', hovered.last && hovered.right === restingRight, JSON.stringify({ restingRight, ...hovered }))
+  await page.mouse.move(5, 5)
 
   step('3. 폴더도 담긴다')
   await star('회사')
