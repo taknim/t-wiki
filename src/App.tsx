@@ -839,6 +839,29 @@ export default function App() {
    * 같은 일을 하는 것만 봅니다. 브라우저가 먼저 가져가는 글쇠(⌘N)는 오지 않으므로
    * 목록에 사연을 적어 두었습니다.
    */
+  /*
+   * 자판으로 옆줄 목록에 들어올 때 잡을 줄.
+   *
+   * 지금 열어 둔 것이 있으면 그 줄에서 시작합니다. 맨 위(뿌리)에서 시작하면 열어 둔
+   * 문서까지 한 줄씩 내려가야 해서 어색합니다. 없으면 첫 줄입니다.
+   * querySelector 에 선택자를 여럿 주면 DOM 차례로 첫 것을 돌려주지 선택자 차례가
+   * 아니므로, 고른 줄을 따로 먼저 찾습니다.
+   */
+  const listEntry = useCallback((): HTMLElement | null => {
+    const inTree = sidebarTabRef.current === 'tree'
+    const current = document.querySelector<HTMLElement>(
+      inTree ? '.tree .tree-row.is-selected' : '.favorites-item.is-current',
+    )
+    if (current) return current
+    return document.querySelector<HTMLElement>(
+      inTree ? '.tree .tree-row:not(.tree-root), .tree .tree-root' : '.favorites-item',
+    )
+  }, [])
+  const sidebarTabRef = useRef(sidebarTab)
+  useEffect(() => {
+    sidebarTabRef.current = sidebarTab
+  }, [sidebarTab])
+
   const sidebarOpenRef = useRef(sidebarOpen)
   useEffect(() => {
     sidebarOpenRef.current = sidebarOpen
@@ -881,10 +904,8 @@ export default function App() {
           applySidebarTab(id === 'tab-tree' ? 'tree' : 'favorites')
           // 옮겨 간 목록에 자리를 줍니다. 그래야 곧바로 화살표로 오갈 수 있습니다. 그려진 뒤에 잡습니다.
           window.setTimeout(() => {
-            const target = id === 'tab-tree'
-              ? document.querySelector<HTMLElement>('.tree .tree-row.is-selected, .tree .tree-row')
-              : document.querySelector<HTMLElement>('.favorites-item')
-            ;(target ?? searchInput.current)?.focus()
+            sidebarTabRef.current = id === 'tab-tree' ? 'tree' : 'favorites'
+            ;(listEntry() ?? searchInput.current)?.focus()
           }, 0)
           return
         case 'sidebar':
@@ -901,7 +922,7 @@ export default function App() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [applySidebarOpen, applySidebarTab, vault.tree])
+  }, [applySidebarOpen, applySidebarTab, listEntry, vault.tree])
 
   const handleNewFolder = useCallback(
     async (dirPath: string) => {
@@ -1328,11 +1349,9 @@ export default function App() {
                       else setFavoriteQuery(event.target.value)
                     }}
                     onKeyDown={(event) => {
-                      // 아래 방향키로 결과 목록, 검색어가 없으면 트리·즐겨찾기 첫 줄로 내려갑니다.
+                      // 아래 방향키로 결과 목록, 검색어가 없으면 트리·즐겨찾기의 지금 열어 둔 줄로 내려갑니다.
                       if (event.key !== 'ArrowDown') return
-                      const first = document.querySelector<HTMLElement>(
-                        '.search-results button, .tree [tabindex], .favorites-item',
-                      )
+                      const first = document.querySelector<HTMLElement>('.search-results button') ?? listEntry()
                       if (!first) return
                       event.preventDefault()
                       first.focus()
@@ -1396,6 +1415,7 @@ export default function App() {
                 onReorder={(from, to, place) =>
                   applyFavorites(reorderFavorites(favorites, from, to, place))}
                 onLeaveTop={() => searchInput.current?.focus()}
+                selectedPath={selectedDir ?? selectedPath}
               />
             ) : query.trim() ? (
               <SearchPanel

@@ -546,6 +546,8 @@ button.tree-caret:hover { color: var(--text); }
 button.tree-caret:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 3px; }
 /* 자판으로 온 줄. 마우스로 고른 줄(is-selected)과 겹칠 수 있어 테두리로만 알립니다. */
 .tree-row:focus-visible, .favorites-item:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+/* 즐겨찾기에서 지금 열어 둔 줄. 트리의 고른 줄과 같은 색입니다. */
+.favorites-item.is-current { background: var(--accent-soft); }
 .tree-row:focus { outline: none; }
 .tree-row:focus-visible { outline: 2px solid var(--accent); }
 .tree-caret .icon { transition: transform 120ms ease; }

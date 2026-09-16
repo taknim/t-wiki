@@ -13,6 +13,8 @@ interface FavoritesProps {
   /** 폴더인지 가리려면 트리가 필요합니다. 색인에는 폴더가 없습니다. */
   root: VaultNode | null
   onOpen: (path: string) => void
+  /** 지금 열어 둔 것(문서든 폴더든). 자판으로 들어올 때 이 줄에서 시작합니다. */
+  selectedPath: string | null
   /** 맨 위 줄에서 ↑ 를 눌렀을 때. 검색 칸으로 돌아갑니다. */
   onLeaveTop: () => void
   onOpenDir: (path: string) => void
@@ -60,7 +62,7 @@ function iconFor(path: string, kind: 'dir' | 'file') {
  * 자리라, 아무 말 없이 빈 칸만 있으면 고장으로 보입니다.
  */
 export function Favorites({
-  paths, query, root, onOpen, onOpenDir, onRemove, onReorder, onLeaveTop,
+  paths, query, root, onOpen, onOpenDir, onRemove, onReorder, onLeaveTop, selectedPath,
 }: FavoritesProps) {
   /*
    * 끌고 있는 줄과, 지금 가리키는 자리.
@@ -144,7 +146,8 @@ export function Favorites({
           >
             <button
               type="button"
-              className="favorites-item"
+              className={path === selectedPath ? 'favorites-item is-current' : 'favorites-item'}
+              aria-current={path === selectedPath ? 'true' : undefined}
               onClick={() => (kind === 'dir' ? onOpenDir(path) : onOpen(path))}
               /*
                * 끌지 못하는 사람도 자리를 바꿀 수 있어야 합니다.

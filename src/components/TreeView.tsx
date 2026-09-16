@@ -123,7 +123,7 @@ export function TreeView({
     >
       <div
         className={props.selectedPath === '' ? 'tree-row tree-root is-selected' : 'tree-row tree-root'}
-        tabIndex={0}
+        tabIndex={props.selectedPath === '' ? 0 : -1}
         onClick={() => props.onSelectDir('')}
       >
         <span className="tree-icon is-dir"><FolderIcon /></span>

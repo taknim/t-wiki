@@ -188,7 +188,11 @@ try {
    * 검색 결과에서 쓰던 규칙을 트리와 즐겨찾기에도 폅니다. 검색 칸에서 ↓ 로 내려가
    * 화살표로 줄을 오가고 Enter 로 엽니다. 맨 위에서 ↑ 는 검색 칸으로 돌아갑니다.
    */
-  step('7. 폴더 트리를 화살표로 오가고 Enter 로 연다')
+  step('7. 폴더 트리를 화살표로 오가고 Enter 로 연다 — 열어 둔 문서에서 시작한다')
+  /*
+   * 맨 위(뿌리)에서 시작하면 열어 둔 문서까지 한 줄씩 내려가야 합니다.
+   * 검색 칸에서 ↓ 로 들어오면 지금 열어 둔 줄(개발 환경.md)이 잡혀야 합니다.
+   */
   await press('Mod+p')
   await page.waitForTimeout(200)
   await page.keyboard.press('ArrowDown')
@@ -197,11 +201,9 @@ try {
     const el = document.activeElement
     return el?.classList.contains('tree-row') ? el.querySelector('.tree-name')?.textContent ?? null : `(${el?.tagName})`
   })
-  expect('↓ 로 뿌리 줄에 옴', (await rowName()) === '내 위키', String(await rowName()))
-  await page.keyboard.press('ArrowDown')
-  await page.keyboard.press('ArrowDown')
-  await page.keyboard.press('ArrowDown')
-  expect('세 줄 아래는 회사', (await rowName()) === '회사', String(await rowName()))
+  expect('↓ 로 열어 둔 문서 줄에 옴', (await rowName()) === '개발 환경.md', String(await rowName()))
+  await page.keyboard.press('ArrowUp')
+  expect('한 줄 위는 회사', (await rowName()) === '회사', String(await rowName()))
   await page.keyboard.press('ArrowRight')
   await page.waitForTimeout(200)
   expect('→ 로 폴더가 펴짐', (await page.locator('.tree-row:has-text("온보딩")').count()) === 1)
@@ -217,29 +219,41 @@ try {
   expect('← 로 폴더가 접힘', (await page.locator('.tree-row:has-text("온보딩")').count()) === 0)
   for (let at = 0; at < 4; at += 1) await page.keyboard.press('ArrowUp')
   expect('맨 위에서 ↑ 는 검색 칸으로', (await focused()) === 'input.search-input', String(await focused()))
+  // 아무것도 고르지 않았을 때는 뿌리가 아니라 첫 줄에서 시작합니다.
+  await page.click('.tree-root')
+  await page.waitForTimeout(200)
+  await press('Mod+p')
+  await page.keyboard.press('ArrowDown')
+  expect('뿌리를 골랐으면 뿌리 줄', (await rowName()) === '내 위키', String(await rowName()))
 
-  step('8. 즐겨찾기도 화살표로 오가고 Enter 로 연다')
-  await page.hover('.tree-row:has-text("개발 환경")')
-  await page.click('.tree-row:has-text("개발 환경") .tree-tools button[aria-label="즐겨찾기에 담기"]')
+  step('8. 즐겨찾기도 화살표로 오가고 Enter 로 연다 — 열어 둔 것에서 시작한다')
+  // 회고를 먼저 담아 첫 줄로 두고, 개발 환경을 열어 둔 채 들어갑니다. 첫 줄이 아니라 열어 둔 줄이 잡혀야 합니다.
   await page.hover('.tree-row:has-text("회고")')
   await page.click('.tree-row:has-text("회고") .tree-tools button[aria-label="즐겨찾기에 담기"]')
+  await page.hover('.tree-row:has-text("개발 환경")')
+  await page.click('.tree-row:has-text("개발 환경") .tree-tools button[aria-label="즐겨찾기에 담기"]')
+  await page.click('.tree-row:has-text("개발 환경") .tree-name')
+  await page.waitForTimeout(300)
   await press('Mod+Shift+2')
   await page.waitForTimeout(300)
   const favName = () => page.evaluate(() =>
     document.activeElement?.classList.contains('favorites-item')
       ? document.activeElement.querySelector('.favorites-name')?.textContent ?? null : null)
-  expect('탭 단축키로 오면 첫 줄에 자리가 감', (await favName()) !== null, String(await focused()))
-  await page.keyboard.press('ArrowDown')
-  const second = await favName()
-  expect('둘째 줄로 감', second !== null, String(second))
+  const favOrder = await page.evaluate(() => [...document.querySelectorAll('.favorites-name')].map((one) => one.textContent))
+  console.log('  즐겨찾기 차례: ' + JSON.stringify(favOrder) + ', 자리: ' + String(await favName()))
+  expect('첫 줄은 회고', favOrder[0] === '회고', JSON.stringify(favOrder))
+  expect('열어 둔 개발 환경 줄에 자리가 감', (await favName()) === '개발 환경.md', String(await favName()))
   await page.keyboard.press('ArrowUp')
+  expect('한 줄 위는 회고', (await favName()) === '회고', String(await favName()))
   await page.keyboard.press('ArrowUp')
   expect('맨 위에서 ↑ 는 검색 칸으로', (await focused()) === 'input.search-input', String(await focused()))
   await page.keyboard.press('ArrowDown')
+  expect('검색 칸에서 ↓ 도 열어 둔 줄로', (await favName()) === '개발 환경.md', String(await favName()))
+  await page.keyboard.press('ArrowUp')
   await page.keyboard.press('Enter')
   await page.waitForTimeout(500)
   const opened = await page.evaluate(() => document.querySelector('.doc-head h1')?.textContent ?? null)
-  expect('Enter 로 열림', opened !== null && opened !== '온보딩.md', String(opened))
+  expect('Enter 로 회고 폴더가 열림', opened === '회고', String(opened))
 } catch (cause) {
   fail('묶음이 도중에 멈춤', cause instanceof Error ? (cause.stack ?? cause.message) : String(cause))
 } finally {
