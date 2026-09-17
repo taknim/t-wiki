@@ -1117,6 +1117,7 @@ src/
     store.ts               IndexedDB (폴더 핸들, GitHub 설정, 동기화 기준점과 지난 결과)
     trash.ts               휴지통 (_t-wiki.trash 로 옮기기·되돌리기·비우기, _index.json)
     shortcuts.ts           단축키 표와 글쇠 견주기 (누르는 쪽과 목록 창이 함께 봄)
+  CLAUDE.md                Claude Code 가 이 저장소에서 지키는 작업 규칙 (어느 컴퓨터에서든 같게)
     secret.ts              액세스 토큰 봉하기·풀기 (브라우저 열쇠 AES-GCM, 파일용 암호 PBKDF2)
     markdown.ts            marked + DOMPurify, 위키링크·콜아웃·수식 확장, 지연 로딩
     diagrams.ts            mermaid 지연 로딩과 SVG 렌더
