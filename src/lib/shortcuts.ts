@@ -37,6 +37,7 @@ export const SHORTCUTS: Shortcut[] = [
   { id: 'tab-tree', label: '옆줄을 폴더 트리로', keys: { key: '1', mod: true, shift: true }, scope: '앱 어디서나' },
   { id: 'tab-favorites', label: '옆줄을 즐겨찾기로', keys: { key: '2', mod: true, shift: true }, scope: '앱 어디서나' },
   { id: 'sidebar', label: '옆줄(폴더 트리) 접기 / 펴기', keys: { key: 'b', mod: true, shift: true }, scope: '앱 어디서나' },
+  { id: 'sync', label: 'GitHub 동기화 실행 (설정이 덜 됐으면 설정을 엶)', keys: { key: 'g', mod: true, shift: true }, scope: '앱 어디서나' },
   { id: 'settings', label: '설정 열기', keys: { key: ',', mod: true }, scope: '앱 어디서나' },
   { id: 'help', label: '이 단축키 목록', keys: { key: '/', mod: true }, scope: '앱 어디서나' },
 

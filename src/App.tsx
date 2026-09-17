@@ -866,10 +866,10 @@ export default function App() {
   useEffect(() => {
     sidebarOpenRef.current = sidebarOpen
   }, [sidebarOpen])
-  const shortcutRefs = useRef({ handleNewDoc, currentDir, textPreview, hasDoc: false })
+  const shortcutRefs = useRef({ handleNewDoc, currentDir, textPreview, startSync, hasDoc: false })
   useEffect(() => {
     shortcutRefs.current = {
-      handleNewDoc, currentDir, textPreview,
+      handleNewDoc, currentDir, textPreview, startSync,
       hasDoc: selectedPath !== null && (isMarkdown(selectedPath) || textPreview !== null),
     }
   })
@@ -882,7 +882,7 @@ export default function App() {
       if (!id) return
       event.preventDefault()
 
-      const { handleNewDoc: newDoc, currentDir: dir, hasDoc } = shortcutRefs.current
+      const { handleNewDoc: newDoc, currentDir: dir, hasDoc, startSync: runSync } = shortcutRefs.current
       switch (id) {
         case 'search':
           if (!vault.tree) return
@@ -911,6 +911,10 @@ export default function App() {
         case 'sidebar':
           if (!vault.tree) return
           applySidebarOpen(!sidebarOpenRef.current)
+          return
+        case 'sync':
+          // 단추와 같은 길입니다. 설정이 덜 됐으면 실행 대신 설정 창을 엽니다.
+          if (vault.tree) runSync()
           return
         case 'settings':
           setSettingsTab((open) => open ?? 'last')

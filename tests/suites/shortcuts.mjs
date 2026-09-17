@@ -2,6 +2,7 @@ import { chromium } from 'playwright'
 import { readFileSync, mkdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { createGitHubMock } from '../github-mock.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 mkdirSync(join(HERE, '..', 'shots', 'shortcuts'), { recursive: true })
@@ -11,10 +12,12 @@ const ok = (n) => console.log('  ok  ' + n)
 const fail = (n, d) => { problems.push(n); console.log('FAIL  ' + n + '\n      ' + d) }
 const expect = (n, c, d = '') => (c ? ok(n) : fail(n, d))
 
+const github = createGitHubMock()
 const browser = await chromium.launch({ channel: 'chrome' })
 const page = await browser.newPage({ viewport: { width: 1300, height: 860 } })
 const errors = []
 page.on('pageerror', (e) => errors.push('pageerror: ' + e.message))
+await page.route('https://api.github.com/**', github.handler)
 await page.addInitScript(readFileSync(join(HERE, '..', 'mock-fs.js'), 'utf8'))
 await page.addInitScript(() => window.__installMockFs())
 
@@ -58,7 +61,7 @@ try {
       keys: one.querySelector('.shortcut-keys').textContent,
     })))
   console.log('  ' + listed.length + '줄: ' + listed.slice(0, 5).map((one) => one.keys).join(', ') + ' …')
-  for (const want of ['검색으로 가기', '새 문서', '보기 모드 바꾸기', '설정 열기', '이 단축키 목록', '굵게', '지금 바로 저장', '맨 위에 뜬 창 닫기']) {
+  for (const want of ['검색으로 가기', '새 문서', '보기 모드 바꾸기', 'GitHub 동기화 실행', '설정 열기', '이 단축키 목록', '굵게', '지금 바로 저장', '맨 위에 뜬 창 닫기']) {
     expect(`목록에 "${want}"`, listed.some((one) => one.label.includes(want)), JSON.stringify(listed.map((one) => one.label)))
   }
   // ⌘N 은 브라우저가 가로채므로 사연이 적혀 있어야 합니다.
@@ -254,6 +257,24 @@ try {
   await page.waitForTimeout(500)
   const opened = await page.evaluate(() => document.querySelector('.doc-head h1')?.textContent ?? null)
   expect('Enter 로 회고 폴더가 열림', opened === '회고', String(opened))
+
+  step('9. ⌘⇧G 는 GitHub 동기화를 돌린다')
+  // 아직 저장소를 맞추지 않았으니 단추와 같이 설정 창을 엽니다.
+  await press('Mod+Shift+g')
+  await page.waitForSelector('.settings-nav', { timeout: 3000 })
+  expect('설정이 덜 됐으면 설정 창', (await page.locator('.settings-nav button.is-active').textContent()).includes('GitHub'))
+  await page.fill('#gh-token', 'pat')
+  await page.fill('#gh-owner', 'tester')
+  await page.fill('.row input[placeholder="저장소 이름"]', 'wiki')
+  await page.waitForTimeout(400)
+  await press('Escape')
+  await page.waitForTimeout(300)
+  const commitsBefore = github.commitCount
+  await press('Mod+Shift+g')
+  await page.waitForFunction(() => !document.querySelector('.topbar button[disabled]'), undefined, { timeout: 30000 })
+  await page.waitForTimeout(600)
+  console.log(`  커밋 ${commitsBefore} → ${github.commitCount}`)
+  expect('맞춰 두었으면 실제로 돎', github.commitCount > commitsBefore, `${commitsBefore} -> ${github.commitCount}`)
 } catch (cause) {
   fail('묶음이 도중에 멈춤', cause instanceof Error ? (cause.stack ?? cause.message) : String(cause))
 } finally {
