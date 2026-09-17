@@ -95,7 +95,7 @@ export function Favorites({
       className="favorites-list"
       // 자판으로 오르내립니다. 트리·검색 결과와 같은 규칙입니다. Enter 는 단추라 저절로 열립니다.
       onKeyDown={(event) => {
-        if (event.altKey || (event.key !== 'ArrowDown' && event.key !== 'ArrowUp')) return
+        if (event.shiftKey || (event.key !== 'ArrowDown' && event.key !== 'ArrowUp')) return
         const items = [...event.currentTarget.querySelectorAll<HTMLElement>('.favorites-item')]
         const at = items.indexOf((event.target as HTMLElement).closest('.favorites-item') as HTMLElement)
         if (at === -1) return
@@ -151,10 +151,10 @@ export function Favorites({
               onClick={() => (kind === 'dir' ? onOpenDir(path) : onOpen(path))}
               /*
                * 끌지 못하는 사람도 자리를 바꿀 수 있어야 합니다.
-               * 화살표만으로는 줄 사이를 옮겨 다니는 것과 구별되지 않아 Alt 를 함께 씁니다.
+               * 화살표만으로는 줄 사이를 옮겨 다니는 것과 구별되지 않아 Shift 를 함께 씁니다.
                */
               onKeyDown={(event) => {
-                if (!event.altKey || (event.key !== 'ArrowUp' && event.key !== 'ArrowDown')) return
+                if (!event.shiftKey || (event.key !== 'ArrowUp' && event.key !== 'ArrowDown')) return
                 event.preventDefault()
                 const at = shown.findIndex((entry) => entry.path === path)
                 const up = event.key === 'ArrowUp'

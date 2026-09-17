@@ -66,7 +66,7 @@ try {
   }
   // ⌘N 은 브라우저가 가로채므로 사연이 적혀 있어야 합니다.
   const newDocRow = listed.find((one) => one.label.startsWith('새 문서'))
-  expect('⌘N 사연이 적힘', newDocRow?.label.includes('가로채') ?? false, JSON.stringify(newDocRow))
+  expect('⌘N 사연이 적힘', (newDocRow?.label.includes('가로채') ?? false) && newDocRow.keys.endsWith('D'), JSON.stringify(newDocRow))
   await page.screenshot({ path: join(HERE, '..', 'shots', 'shortcuts', '01-list.png'), clip: { x: 700, y: 0, width: 600, height: 700 } })
   const width = Math.round((await page.locator('.shortcuts-pop').boundingBox()).width)
   expect('창이 좁음', width <= 460, String(width))
@@ -117,9 +117,9 @@ try {
     ok('(옆줄 접기 단추를 찾지 못해 이 걸음은 건너뜀)')
   }
 
-  step('3. ⌥⌘N 은 새 문서 창을 연다')
+  step('3. ⌘⇧D 는 새 문서 창을 연다')
   await press('Escape')
-  await press('Mod+Alt+n')
+  await press('Mod+Shift+d')
   await page.waitForSelector('.dialog', { timeout: 3000 })
   const asked = await page.textContent('.dialog')
   expect('새 문서를 묻는 창', asked.includes('새 문서'), asked.slice(0, 80))

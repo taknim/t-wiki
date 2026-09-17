@@ -28,11 +28,11 @@ export interface Shortcut {
 export const SHORTCUTS: Shortcut[] = [
   { id: 'search', label: '검색으로 가기', keys: { key: 'p', mod: true }, scope: '앱 어디서나' },
   /*
-   * ⌘N 은 크롬이 새 창 열기로 먼저 가져가 페이지까지 오지 않습니다(맥·윈도 모두).
-   * 그래서 ⌥ 를 더한 것도 같은 일로 둡니다. ⌘N 이 오는 브라우저에서는 그것도 됩니다.
+   * ⌘N 은 크롬이 새 창, ⌘⇧N 은 시크릿 창으로 먼저 가져가 페이지까지 오지 않습니다(맥·윈도 모두).
+   * 그래서 D(document) 를 씁니다. ⌘N 이 오는 브라우저에서는 그것도 같은 일입니다.
    */
-  { id: 'new-doc', label: '새 문서', keys: { key: 'n', mod: true, alt: true }, scope: '앱 어디서나',
-    note: '⌘N 은 브라우저가 새 창 열기로 가로채므로 ⌥ 를 더해 누릅니다' },
+  { id: 'new-doc', label: '새 문서', keys: { key: 'd', mod: true, shift: true }, scope: '앱 어디서나',
+    note: '⌘N·⌘⇧N 은 브라우저가 새 창으로 가로채므로 D 를 씁니다' },
   { id: 'view-mode', label: '보기 모드 바꾸기 (편집 → 나란히 → 미리보기)', keys: { key: 'e', mod: true, shift: true }, scope: '앱 어디서나' },
   { id: 'tab-tree', label: '옆줄을 폴더 트리로', keys: { key: '1', mod: true, shift: true }, scope: '앱 어디서나' },
   { id: 'tab-favorites', label: '옆줄을 즐겨찾기로', keys: { key: '2', mod: true, shift: true }, scope: '앱 어디서나' },
@@ -52,7 +52,7 @@ export const SHORTCUTS: Shortcut[] = [
   { id: 'rows', label: '폴더 트리·즐겨찾기·검색 결과에서 줄 사이 오르내리기 (맨 위에서 ↑ 는 검색 칸으로)', keys: { key: '↑ ↓' }, scope: '창·목록' },
   { id: 'open', label: '고른 줄 열기 (폴더는 고르기, 다시 누르면 펴고 접기)', keys: { key: 'Enter' }, scope: '창·목록' },
   { id: 'fold', label: '폴더 트리에서 폴더 펴기 / 접기', keys: { key: '→ ←' }, scope: '창·목록' },
-  { id: 'reorder', label: '즐겨찾기 줄 순서 바꾸기', keys: { key: '↑ ↓', alt: true }, scope: '창·목록' },
+  { id: 'reorder', label: '즐겨찾기 줄 순서 바꾸기', keys: { key: '↑ ↓', shift: true }, scope: '창·목록' },
   { id: 'resize', label: '너비 손잡이에서 폭 조절 (Shift 는 큰 걸음, Home 은 처음 폭)', keys: { key: '← →' }, scope: '창·목록' },
 ]
 

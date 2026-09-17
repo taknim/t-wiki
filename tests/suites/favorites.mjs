@@ -432,7 +432,7 @@ try {
 
   step('19. 끌지 않고 자판으로도 옮긴다')
   await page.click('.favorites-list li:first-child .favorites-item')
-  await page.keyboard.press('Alt+ArrowDown')
+  await page.keyboard.press('Shift+ArrowDown')
   await page.waitForTimeout(400)
   const byKey = await listed()
   console.log('  ' + JSON.stringify(byKey))
