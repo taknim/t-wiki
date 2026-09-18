@@ -3,7 +3,8 @@ import { isAttachment, isMarkdown } from '../attachments'
 import * as fs from '../fsAccess'
 import { loadAssetHashes, saveAssetHashes } from '../store'
 import * as api from './api'
-import { displayPath } from '../paths'
+import { displayPath, FAVORITES_FILE } from '../paths'
+import { mergeFavorites } from '../favorites'
 
 /**
  * git 이 파일 내용에 매기는 것과 같은 해시를 계산합니다: sha1("blob <바이트수>\0" + 내용).
@@ -337,6 +338,20 @@ export async function applyPlan(options: ApplyOptions): Promise<ApplyResult> {
     const sha = remote.files.get(path)
     // 저장소에 없으면 부딪힐 것도 없습니다. 새로 올리는 셈입니다.
     if (!sha) return stageUpload(path, 'add')
+
+    /*
+     * 즐겨찾기 파일은 어느 쪽을 고르지 않고 합칩니다.
+     *
+     * 두 기기가 저마다 담아 두면 늘 부딪힙니다. 여느 파일처럼 한쪽을 고르거나 사본을
+     * 남기면, 한 기기에서 담은 것이 다른 기기에서는 사라진 것처럼 보였습니다.
+     * 목록은 합쳐도 잃을 것이 없으므로, 설정한 부딪힘 처리와 상관없이 합쳐서 양쪽에 둡니다.
+     */
+    if (path === FAVORITES_FILE) {
+      const merged = mergeFavorites(await fs.readFile(root, path), await api.getBlobText(config, sha))
+      await fs.writeFile(root, path, merged)
+      localChanged = true
+      return stageUpload(path, 'update')
+    }
 
     if (config.conflictPolicy === 'remote-wins') return download(path)
     if (config.conflictPolicy === 'local-wins') return stageUpload(path, 'update')

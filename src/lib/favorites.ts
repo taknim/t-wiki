@@ -49,3 +49,27 @@ export function reorderFavorites(
   rest.splice(place === 'before' ? at : at + 1, 0, from)
   return rest
 }
+
+/**
+ * 두 벌의 즐겨찾기를 하나로 합칩니다.
+ *
+ * 즐겨찾기 파일은 두 기기가 저마다 고쳐 두기 마련입니다. 여느 파일처럼 부딪힘으로
+ * 다루면 한쪽 것이 사본으로 밀려나고 다른 쪽 것만 남아, 한 기기에서 담은 것이
+ * 다른 기기에서 사라진 것처럼 보입니다. 목록은 합쳐도 잃을 것이 없습니다.
+ * 이쪽 차례를 지키고, 저쪽에만 있는 것을 뒤에 답니다.
+ */
+export function mergeFavorites(mine: string, theirs: string): string {
+  const parse = (raw: string): string[] => {
+    try {
+      const parsed: unknown = JSON.parse(raw)
+      return Array.isArray(parsed)
+        ? parsed.filter((one): one is string => typeof one === 'string' && one.length > 0)
+        : []
+    } catch {
+      return []
+    }
+  }
+  const ours = parse(mine)
+  const merged = [...ours, ...parse(theirs).filter((one) => !ours.includes(one))]
+  return favoritesFileBody(merged)
+}
