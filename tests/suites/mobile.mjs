@@ -157,6 +157,61 @@ try {
   await page.keyboard.press('Escape')
   await page.waitForTimeout(300)
 
+  /*
+   * 좁은 화면에서 나란히 보기는 원문과 결과가 위아래로 서는데, 사이에 손잡이가 없어
+   * 몫을 정할 수 없었습니다. 손잡이를 눕혀 두고 위아래로 끌어 정합니다.
+   */
+  step('6-4. 나란히 보기에서 위아래 몫을 손잡이로 정한다')
+  await page.click('.menu-toggle')
+  await page.waitForTimeout(300)
+  await page.click('.tree-row:has-text("개발 환경") .tree-name')
+  await page.waitForTimeout(500)
+  await page.click('.mode-switch button[aria-label="나란히"]')
+  await page.waitForTimeout(400)
+  const split = () => page.evaluate(() => {
+    const editor = document.querySelector('.main .editor').getBoundingClientRect()
+    const preview = document.querySelector('.main .preview').getBoundingClientRect()
+    const bar = document.querySelector('.split-resizer')
+    const r = bar?.getBoundingClientRect()
+    return {
+      stacked: preview.top >= editor.bottom,
+      editorH: Math.round(editor.height),
+      previewH: Math.round(preview.height),
+      handle: bar ? { w: Math.round(r.width), h: Math.round(r.height), shown: getComputedStyle(bar).display !== 'none',
+        orientation: bar.getAttribute('aria-orientation'), cursor: getComputedStyle(bar).cursor, y: Math.round(r.top) } : null,
+    }
+  })
+  const before = await split()
+  console.log('  ' + JSON.stringify(before))
+  expect('위아래로 섬', before.stacked, JSON.stringify(before))
+  expect('사이에 누운 손잡이가 있음',
+    before.handle?.shown && before.handle.w > before.handle.h && before.handle.orientation === 'horizontal'
+      && before.handle.cursor === 'row-resize', JSON.stringify(before))
+  expect('처음엔 반반', Math.abs(before.editorH - before.previewH) < 20, JSON.stringify(before))
+  // 손잡이를 위로 끌어 원문 칸을 줄입니다.
+  await page.mouse.move(195, before.handle.y + 3)
+  await page.mouse.down()
+  await page.mouse.move(195, before.handle.y - 150, { steps: 8 })
+  await page.mouse.up()
+  await page.waitForTimeout(300)
+  const dragged = await split()
+  console.log('  ' + JSON.stringify(dragged))
+  expect('끌면 원문이 줄고 결과가 늘어남',
+    dragged.editorH < before.editorH - 80 && dragged.previewH > before.previewH + 80, JSON.stringify(dragged))
+  // 자판으로도: 누워 있으니 위아래 화살표입니다.
+  await page.focus('.split-resizer')
+  await page.keyboard.press('Shift+ArrowDown')
+  await page.waitForTimeout(200)
+  const keyed = await split()
+  expect('↓ 로 원문이 다시 늘어남', keyed.editorH > dragged.editorH + 20, JSON.stringify(keyed))
+  await page.keyboard.press('Home')
+  await page.waitForTimeout(200)
+  const home = await split()
+  expect('Home 으로 반반', Math.abs(home.editorH - home.previewH) < 20, JSON.stringify(home))
+  await page.screenshot({ path: join(HERE, '..', 'shots', 'mobile', '06-split.png') })
+  await page.click('.mode-switch button[aria-label="편집"]')
+  await page.waitForTimeout(200)
+
   step('7. 넓게 펴면 예전처럼 본문 옆에 선다')
   await page.click('.menu-toggle')
   await page.waitForTimeout(300)

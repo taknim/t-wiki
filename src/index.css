@@ -1070,9 +1070,23 @@ a.btn { text-decoration: none; color: inherit; display: inline-block; }
   .topbar .btn span:not(.btn-label-ghost) { display: none; }
   .topbar .btn { padding: 6px 8px; }
   .vault-name { display: none; }
-  /* 좁으면 위아래로 눕히므로 좌우 손잡이는 뜻이 없습니다. */
-  .doc-body.mode-split { grid-template-columns: 1fr; }
-  .split-resizer { display: none; }
+  /*
+   * 좁으면 원문과 결과를 위아래로 눕힙니다. 손잡이도 함께 눕혀, 위아래 몫을
+   * 넓은 화면에서 좌우 몫을 정하듯 끌어서 정합니다. 몫(--split-a)은 같은 값을 씁니다.
+   */
+  .doc-body.mode-split {
+    grid-template-columns: 1fr;
+    grid-template-rows: var(--split-a, 50%) 7px minmax(0, 1fr);
+  }
+  .split-resizer { cursor: row-resize; }
+  .split-resizer::after {
+    inset-block: 3px auto;
+    inset-inline: 0;
+    width: auto;
+    height: 1px;
+  }
+  .split-resizer:hover::after,
+  .split-resizer:focus-visible::after { width: auto; height: 2px; }
   .doc-head { padding-inline: 12px; }
   .preview, .editor, .asset-view { padding-inline: 12px; }
 }
