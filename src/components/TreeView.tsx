@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { VaultNode } from '../types'
 import {
   ChevronIcon, ClipIcon, DocIcon, DocPlusIcon, FolderCloseIcon, FolderIcon, FolderPlusIcon,
-  ImageIcon, PencilIcon, RefreshIcon, StarIcon, TrashIcon,
+  ImageIcon, MoveIcon, PencilIcon, RefreshIcon, StarIcon, TrashIcon,
 } from './icons'
 import { attachmentKind } from '../lib/attachments'
 import { isMarkdown } from '../lib/attachments'
@@ -16,6 +16,8 @@ export interface TreeActions {
   onRename: (path: string) => void
   onDelete: (path: string) => void
   onMove: (from: string, targetDir: string) => void
+  /** 옮겨 갈 폴더를 고르는 창을 엽니다. 끌 수 없는 손가락·자판을 위한 길입니다. */
+  onMoveTo: (path: string) => void
   /** 컴퓨터에서 끌어다 놓은 파일을 그 폴더에 넣습니다. */
   onDropFiles: (targetDir: string, files: File[]) => void
   /** 그 폴더에 넣을 파일을 고르는 창을 엽니다. */
@@ -302,6 +304,14 @@ function TreeRow({ node, depth, selectedPath, expanded, onToggle, ...actions }: 
             onClick={() => actions.onRename(node.path)}
           >
             <PencilIcon />
+          </button>
+          <button
+            type="button"
+            aria-label="옮기기"
+            data-tip="다른 폴더로 옮깁니다. 끌어다 놓는 대신 폴더를 골라 옮길 때 씁니다"
+            onClick={() => actions.onMoveTo(node.path)}
+          >
+            <MoveIcon />
           </button>
           <button
             type="button"

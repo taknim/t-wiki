@@ -349,3 +349,13 @@ export function MenuIcon(props: IconProps) {
     </Svg>
   )
 }
+
+/** 폴더로 옮기기. 폴더에 화살표가 들어갑니다. */
+export function MoveIcon(props: IconProps) {
+  return (
+    <Svg {...props} strokeWidth={1.6}>
+      <path d="M1.5 4.5a1 1 0 0 1 1-1h3l1.5 1.5h6.5a1 1 0 0 1 1 1V12a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1z" />
+      <path d="M5.5 9h4M8 7.5L9.5 9 8 10.5" />
+    </Svg>
+  )
+}

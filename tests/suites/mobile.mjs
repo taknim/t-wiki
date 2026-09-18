@@ -85,7 +85,7 @@ try {
   step('4. 폴더를 고르면 서랍은 그대로 열려 있다')
   await page.click('.menu-toggle')
   await page.waitForTimeout(300)
-  await page.click('.tree-row:has-text("회사")')
+  await page.click('.tree-row:has-text("회사") .tree-name')
   await page.waitForTimeout(400)
   expect('폴더를 골라도 열린 채', (await layout()).shown === true)
 
@@ -102,7 +102,7 @@ try {
   step('6. 손을 얹을 수 없어도 고른 줄의 단추는 보인다')
   await page.click('.menu-toggle')
   await page.waitForTimeout(300)
-  await page.click('.tree-row:has-text("회고")')
+  await page.click('.tree-row:has-text("회고") .tree-name')
   await page.waitForTimeout(300)
   const tools = await page.evaluate(() => {
     const row = [...document.querySelectorAll('.tree-row')].find((one) => one.textContent.includes('회고'))
@@ -212,9 +212,65 @@ try {
   await page.click('.mode-switch button[aria-label="편집"]')
   await page.waitForTimeout(200)
 
-  step('7. 넓게 펴면 예전처럼 본문 옆에 선다')
-  await page.click('.menu-toggle')
+  /*
+   * 손가락으로는 끌어다 놓을 수 없습니다. 손전화 브라우저는 손가락으로 시작한 끌기를
+   * HTML 끌어놓기로 올려 주지 않습니다. 줄 단추로 폴더를 골라 옮깁니다.
+   */
+  step('6-5. 끌지 않고 단추로 폴더를 골라 옮긴다')
+  // 앞 걸음에서 서랍이 열린 채일 수 있습니다. 열려 있지 않을 때만 엽니다.
+  if (!(await layout()).shown) {
+    await page.click('.menu-toggle')
+    await page.waitForTimeout(300)
+  }
+  await page.click('.tree-row:has-text("개발 환경") .tree-name')
+  await page.waitForTimeout(400)
+  if (!(await layout()).shown) {
+    await page.click('.menu-toggle')
+    await page.waitForTimeout(300)
+  }
+  // 고른 줄의 단추가 보입니다(손을 얹을 수 없는 기기).
+  await page.click('.tree-row.is-selected .tree-tools button[aria-label="옮기기"]')
+  await page.waitForSelector('.sheet[aria-label="옮길 폴더 고르기"]', { timeout: 3000 })
+  const choices = await page.evaluate(() =>
+    [...document.querySelectorAll('.move-item')].map((one) => ({
+      name: one.querySelector('span')?.textContent, disabled: one.disabled,
+    })))
+  console.log('  ' + JSON.stringify(choices))
+  expect('뿌리와 폴더들이 늘어섬', choices.some((one) => one.name === '회사') && choices[0].name === '내 위키', JSON.stringify(choices))
+  expect('지금 있는 자리(뿌리)는 고를 수 없음', choices[0].disabled === true, JSON.stringify(choices))
+  await page.click('.move-item:has-text("회사")')
+  await page.waitForTimeout(800)
+  const moved = await page.evaluate(async () => ({
+    there: await window.__vaultText('회사/개발 환경.md'),
+    here: await window.__vaultText('개발 환경.md'),
+    sheet: document.querySelector('.sheet[aria-label="옮길 폴더 고르기"]') !== null,
+    title: document.querySelector('.doc-head h1')?.textContent ?? null,
+  }))
+  expect('파일이 그 폴더로 감', moved.there !== null && moved.here === null, JSON.stringify({ there: moved.there !== null, here: moved.here }))
+  expect('창이 닫히고 열어 둔 문서는 그대로', !moved.sheet && moved.title === '개발 환경.md', JSON.stringify(moved))
+
+  // 폴더는 제 안으로 옮길 수 없습니다. 옮기면서 열어 둔 문서의 자리가 바뀌어 서랍이 닫혔으니 다시 엽니다.
+  if (!(await layout()).shown) {
+    await page.click('.menu-toggle')
+    await page.waitForTimeout(300)
+  }
+  await page.click('.tree-row:has-text("회사") .tree-name')
   await page.waitForTimeout(300)
+  await page.click('.tree-row.is-selected .tree-tools button[aria-label="옮기기"]')
+  await page.waitForSelector('.sheet[aria-label="옮길 폴더 고르기"]', { timeout: 3000 })
+  const forDir = await page.evaluate(() =>
+    [...document.querySelectorAll('.move-item')].filter((one) => one.disabled).map((one) => one.querySelector('span')?.textContent))
+  console.log('  폴더를 옮길 때 막힌 것: ' + JSON.stringify(forDir))
+  expect('제 자신은 막힘', forDir.includes('회사'), JSON.stringify(forDir))
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(300)
+  expect('Esc 로 닫힘', (await page.locator('.sheet[aria-label="옮길 폴더 고르기"]').count()) === 0)
+
+  step('7. 넓게 펴면 예전처럼 본문 옆에 선다')
+  if (!(await layout()).shown) {
+    await page.click('.menu-toggle')
+    await page.waitForTimeout(300)
+  }
   await page.setViewportSize({ width: 1200, height: 800 })
   await page.waitForTimeout(400)
   const wide = await layout()

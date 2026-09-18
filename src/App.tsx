@@ -33,6 +33,7 @@ import { TrashView } from './components/TrashView'
 import { KeyboardIcon, TrashIcon } from './components/icons'
 import { ShortcutsPopover } from './components/ShortcutsPopover'
 import { SyncProgress } from './components/SyncProgress'
+import { MoveSheet } from './components/MoveSheet'
 import { matches, SHORTCUTS } from './lib/shortcuts'
 import { readTrashPolicy } from './lib/saveOptions'
 import type { TrashItem } from './lib/trash'
@@ -83,6 +84,8 @@ export default function App() {
   // 'last' 는 지난번에 보던 자리로. 갈 곳이 정해진 부름(동기화 설정이 덜 됐을 때)만 묶음을 짚습니다.
   const [settingsTab, setSettingsTab] = useState<'general' | 'appearance' | 'sync' | 'last' | null>(null)
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
+  /** 옮길 폴더를 고르는 창에 올라와 있는 것. 없으면 닫힘. */
+  const [moving, setMoving] = useState<string | null>(null)
   const [reportOpen, setReportOpen] = useState(false)
   const [historyOpen, setHistoryOpen] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
@@ -1517,6 +1520,7 @@ export default function App() {
                   onRename={(path) => void handleRename(path)}
                   onDelete={(path) => void handleDelete(path)}
                   onMove={(from, dir) => void handleMove(from, dir)}
+                  onMoveTo={(path) => setMoving(path)}
                   onDropFiles={(dir, files) => void handleAddFiles(files, dir)}
                   favorites={favorites}
                   onToggleFavorite={toggleFavorite}
@@ -1778,6 +1782,19 @@ export default function App() {
           onOfficePreview={applyOfficePreview}
           onShowHistory={() => setHistoryOpen(true)}
           onClose={() => setSettingsTab(null)}
+        />
+      )}
+
+      {moving !== null && vault.tree && (
+        <MoveSheet
+          path={moving}
+          tree={vault.tree}
+          onPick={(dir) => {
+            const from = moving
+            setMoving(null)
+            void handleMove(from, dir)
+          }}
+          onClose={() => setMoving(null)}
         />
       )}
 
