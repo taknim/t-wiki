@@ -15,6 +15,8 @@ export interface DocEntry {
   path: string
   content: string
   lastModified: number
+  /** 바이트 크기. 다시 훑을 때 안 바뀐 파일을 골라내는 잣대입니다. */
+  size: number
 }
 
 export type DocIndex = Map<string, DocEntry>

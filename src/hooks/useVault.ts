@@ -116,12 +116,20 @@ export function useVault(): Vault {
   /** 휴지통에 든 것. 훑을 때 함께 읽습니다. */
   const [trash, setTrash] = useState<TrashItem[]>([])
 
+  // 지난 색인. 다시 훑을 때 안 바뀐 문서를 도로 읽지 않으려면 붙들고 있어야 합니다.
+  const indexRef = useRef<DocIndex>(new Map())
+  useEffect(() => {
+    indexRef.current = index
+  }, [index])
+
   const scan = useCallback(async (root: FileSystemDirectoryHandle) => {
     setStatus('loading')
     setRead(0)
     try {
       // 몇 개까지 읽었는지 알려 줍니다. 큰 폴더는 여는 데 한참 걸립니다.
-      const result = await fs.scanVault(root, setRead)
+      // 같은 폴더를 다시 훑는 것이면 지난 색인을 넘겨 안 바뀐 본문은 건너뜁니다.
+      const same = rootRef.current !== null && (await root.isSameEntry(rootRef.current).catch(() => false))
+      const result = await fs.scanVault(root, setRead, same ? indexRef.current : undefined)
       setTree(result.tree)
       setIndex(result.index)
       setAssets(result.assets)
@@ -228,7 +236,7 @@ export function useVault(): Vault {
       const lastModified = await fs.writeFile(root, path, content, expectMtime)
       setIndex((previous) => {
         const next = new Map(previous)
-        next.set(path, { path, content, lastModified })
+        next.set(path, { path, content, lastModified, size: new TextEncoder().encode(content).length })
         return next
       })
     },
@@ -273,7 +281,7 @@ export function useVault(): Vault {
       if (isMarkdown(path)) {
         setIndex((previous) => {
           const next = new Map(previous)
-          next.set(path, { path, content, lastModified })
+          next.set(path, { path, content, lastModified, size: new TextEncoder().encode(content).length })
           return next
         })
       } else {

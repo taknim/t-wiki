@@ -32,6 +32,7 @@ import { ExternalChangeError } from './lib/fsAccess'
 import { TrashView } from './components/TrashView'
 import { KeyboardIcon, TrashIcon } from './components/icons'
 import { ShortcutsPopover } from './components/ShortcutsPopover'
+import { SyncProgress } from './components/SyncProgress'
 import { matches, SHORTCUTS } from './lib/shortcuts'
 import { readTrashPolicy } from './lib/saveOptions'
 import type { TrashItem } from './lib/trash'
@@ -1256,6 +1257,7 @@ export default function App() {
               running={sync.status.phase === 'running'}
             />
           )}
+          <div className="sync-anchor" data-sync-anchor>
           <button
             type="button"
             className={sync.status.phase === 'error' ? 'btn btn-warned' : 'btn'}
@@ -1281,6 +1283,9 @@ export default function App() {
               <span className="btn-label-ghost" aria-hidden="true">GitHub 동기화</span>
             </span>
           </button>
+          {/* 도는 동안만 붙습니다. 무엇을 옮기고 있는지는 단추 안에 적을 자리가 없습니다. */}
+          {sync.status.phase === 'running' && <SyncProgress status={sync.status} />}
+          </div>
           <div className="shortcuts-anchor" data-shortcuts-anchor>
             <button
               type="button"

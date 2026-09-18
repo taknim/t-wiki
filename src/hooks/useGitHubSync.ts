@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type {
-  AssetIndex, DocIndex, GitHubConfig, LastCommit, SyncLogLine, SyncPlanItem, SyncRun,
+  AssetIndex, DocIndex, GitHubConfig, LastCommit, SyncAction, SyncLogLine, SyncPlanItem, SyncRun,
 } from '../types'
 import { applyPlan, buildPlan, localShas, scanRemote } from '../lib/github/sync'
 import { vaultKeyFor } from '../lib/vaultKey'
@@ -36,10 +36,21 @@ export const DEFAULT_GITHUB_CONFIG: GitHubConfig = {
 
 export type SyncPhase = 'idle' | 'running' | 'done' | 'error' | 'blocked' | 'needs-confirm'
 
+/** 진행 중에 지금 무엇을 다루는지. 단추 아래 창에 한 줄씩 적습니다. */
+export interface SyncStep {
+  path: string
+  action: SyncAction | 'commit'
+}
+
 export interface SyncStatus {
   phase: SyncPhase
   message: string
-  progress: { done: number; total: number } | null
+  progress: {
+    done: number
+    total: number
+    /** 지금 것과 방금 지난 것 몇 줄. 앞이 최근입니다. */
+    steps: SyncStep[]
+  } | null
 }
 
 export interface SyncReport {
@@ -336,15 +347,27 @@ export function useGitHubSync({ root, docs, assets, onBeforeSync, onLocalChanged
           return false
         }
 
-        setStatus({ phase: 'running', message: '동기화하는 중…', progress: { done: 0, total: pending.length } })
+        setStatus({ phase: 'running', message: '동기화하는 중…', progress: { done: 0, total: pending.length, steps: [] } })
 
+        // 갈래는 계획에서 찾습니다. 진행 알림에는 경로만 실려 옵니다.
+        const actionOf = new Map(plan.map((item) => [item.path, item.action]))
         const result = await applyPlan({
           root: vault,
           config: current,
           plan,
           remote,
           synced,
-          onProgress: (done, total) => setStatus((previous) => ({ ...previous, progress: { done, total } })),
+          onProgress: (done, total, path) => setStatus((previous) => {
+            const before = previous.progress?.steps ?? []
+            const step: SyncStep | null = path === ''
+              ? null
+              : { path, action: actionOf.get(path) ?? 'commit' }
+            // 같은 줄이 되풀이되면 한 번만, 최근 것이 앞으로. 넉 줄이면 무엇이 오가는지 보이기에 넉넉합니다.
+            const steps = step
+              ? [step, ...before.filter((one) => one.path !== step.path)].slice(0, 4)
+              : before
+            return { ...previous, progress: { done, total, steps } }
+          }),
         })
 
         await saveSyncState(key, signature, result.synced)

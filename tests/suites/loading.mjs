@@ -86,6 +86,44 @@ try {
   console.log('  ' + JSON.stringify(done))
   expect('읽는 중 표시가 사라짐', done.loading === 0, JSON.stringify(done))
   expect('트리가 나옴', done.rows > 300, JSON.stringify(done))
+
+  /*
+   * 파일을 하나 넣거나 이름을 바꿀 때마다 폴더를 다시 훑는데, 그때 본문 300개를 도로
+   * 읽으면 손전화에서는 목록이 한참 뒤에야 바뀝니다. 크기와 시각이 그대로인 문서는
+   * 본문을 다시 읽지 않아야 합니다. 본문을 읽은 횟수(File.text)를 셉니다.
+   */
+  step('4. 다시 훑을 때 안 바뀐 문서의 본문은 도로 읽지 않는다')
+  await page.evaluate(() => {
+    window.__reads = 0
+    const text = File.prototype.text
+    File.prototype.text = function () {
+      window.__reads += 1
+      return text.call(this)
+    }
+  })
+  // 다시 훑는 동안은 트리가 그대로 보여 끝난 때를 화면으로 알 수 없습니다. 넉넉히 기다립니다(300개 × 6ms).
+  await page.click('.tree-root button[aria-label="새로고침"]')
+  await page.waitForTimeout(3500)
+  const rescan = await page.evaluate(() => window.__reads)
+  console.log(`  다시 훑기: 본문 읽기 ${rescan}번`)
+  expect('본문을 하나도 다시 읽지 않음', rescan === 0, String(rescan))
+
+  // 하나를 밖에서 고치면 그것만 다시 읽어야 합니다. 시각을 앞으로 밀어 바뀐 것으로 만듭니다.
+  await page.evaluate(() => {
+    window.__reads = 0
+    const file = window.__mockRoot._children.get('쪽지 007.md')
+    file._data = '# 쪽지 7 (고침)\n'
+    file._lastModified += 1000
+  })
+  await page.click('.tree-root button[aria-label="새로고침"]')
+  await page.waitForTimeout(3500)
+  const changed = await page.evaluate(() => window.__reads)
+  console.log('  하나 고친 뒤: 본문 읽기 ' + changed + '번')
+  expect('바뀐 것만 다시 읽음', changed === 1, String(changed))
+  await page.click('.tree-row:has-text("쪽지 007") .tree-name')
+  await page.waitForTimeout(500)
+  const shown = await page.evaluate(() => document.querySelector('.main .editor')?.value ?? null)
+  expect('고친 내용이 들어옴', (shown ?? '').includes('고침'), String(shown))
 } catch (cause) {
   fail('묶음이 도중에 멈춤', cause instanceof Error ? (cause.stack ?? cause.message) : String(cause))
 } finally {

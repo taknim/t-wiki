@@ -58,15 +58,24 @@ function sortNodes(nodes: VaultNode[]): VaultNode[] {
  * 한참 걸리는데, 그동안 화면이 비어 있으면 빈 폴더를 연 것처럼 보입니다.
  * 너무 잦게 알리면 그리는 일이 읽는 일보다 무거워지므로 뭉텅이로 셉니다.
  */
+/**
+ * 폴더를 통째로 훑습니다.
+ *
+ * `previous` 를 주면 **크기와 수정 시각이 그대로인 문서는 본문을 다시 읽지 않고**
+ * 지난 색인의 것을 그대로 씁니다. 파일을 하나 넣거나 이름을 바꿀 때마다 수백 개의
+ * 본문을 도로 읽으면, 특히 손전화에서는 목록이 한참 뒤에야 바뀝니다.
+ * 바뀐 것을 놓칠 수는 없습니다. 크기나 시각이 하나라도 다르면 다시 읽습니다.
+ */
 export async function scanVault(
   root: FileSystemDirectoryHandle,
   onCount?: (read: number) => void,
+  previous?: DocIndex,
 ): Promise<{ tree: VaultNode; index: DocIndex; assets: AssetIndex }> {
   const index: DocIndex = new Map()
   const assets: AssetIndex = new Map()
   const tree: VaultNode = { kind: 'dir', name: root.name, path: '', children: [] }
   const tally = { read: 0, told: 0 }
-  await walk(root, '', tree, index, assets, onCount ? tally : null, onCount)
+  await walk(root, '', tree, index, assets, onCount ? tally : null, onCount, previous)
   onCount?.(tally.read)
   return { tree, index, assets }
 }
@@ -82,6 +91,7 @@ async function walk(
   assets: AssetIndex,
   tally: { read: number; told: number } | null,
   onCount?: (read: number) => void,
+  previous?: DocIndex,
 ): Promise<void> {
   const children: VaultNode[] = []
   for await (const [name, handle] of dir.entries()) {
@@ -98,7 +108,7 @@ async function walk(
 
     if (handle.kind === 'directory') {
       const child: VaultNode = { kind: 'dir', name, path, children: [] }
-      await walk(handle as FileSystemDirectoryHandle, path, child, index, assets, tally, onCount)
+      await walk(handle as FileSystemDirectoryHandle, path, child, index, assets, tally, onCount, previous)
       children.push(child)
       continue
     }
@@ -106,8 +116,11 @@ async function walk(
     const file = await (handle as FileSystemFileHandle).getFile()
 
     if (isMarkdown(name)) {
-      const content = await file.text()
-      index.set(path, { path, content, lastModified: file.lastModified })
+      const known = previous?.get(path)
+      const content = known && known.lastModified === file.lastModified && known.size === file.size
+        ? known.content
+        : await file.text()
+      index.set(path, { path, content, lastModified: file.lastModified, size: file.size })
       children.push({ kind: 'file', name, path, lastModified: file.lastModified, size: file.size })
       continue
     }
