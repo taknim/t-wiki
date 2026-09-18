@@ -117,7 +117,49 @@ try {
   expect('다른 줄은 그대로 감춤', tools.othersShown === 0, JSON.stringify(tools))
   await page.screenshot({ path: join(HERE, '..', 'shots', 'mobile', '03-tools.png') })
 
+  /*
+   * 단축키 목록은 단추 오른쪽에 맞춰 뜨는데, 좁은 화면에서는 왼쪽이 화면 밖으로 잘렸습니다.
+   * 화면 안에 들어오도록 자리와 너비를 맞춰야 합니다.
+   */
+  step('6-2. 단축키 목록이 화면 안에 다 들어온다')
+  await page.mouse.click(385, 700)
+  await page.waitForTimeout(300)
+  await page.click('.topbar button[aria-label="단축키"]')
+  await page.waitForSelector('.shortcuts-pop', { timeout: 3000 })
+  const pop = await page.evaluate(() => {
+    const r = document.querySelector('.shortcuts-pop').getBoundingClientRect()
+    return { left: Math.round(r.left), right: Math.round(r.right), width: Math.round(r.width), vw: window.innerWidth }
+  })
+  console.log('  ' + JSON.stringify(pop))
+  expect('왼쪽이 잘리지 않음', pop.left >= 0, JSON.stringify(pop))
+  expect('오른쪽도 화면 안', pop.right <= pop.vw, JSON.stringify(pop))
+  expect('화면 폭에 맞춰 좁아짐', pop.width <= pop.vw - 16 && pop.width > 300, JSON.stringify(pop))
+  await page.screenshot({ path: join(HERE, '..', 'shots', 'mobile', '04-shortcuts.png') })
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(200)
+
+  // 설정 창의 왼쪽 메뉴는 좁은 화면에서 창의 반을 먹어 감춥니다. 본문의 머리를 굴려 찾습니다.
+  step('6-3. 설정 창에서는 왼쪽 메뉴가 감춰진다')
+  await page.click('.topbar button[aria-label="설정"]')
+  await page.waitForSelector('.settings-content', { timeout: 3000 })
+  const nav = await page.evaluate(() => {
+    const menu = document.querySelector('.settings-nav')
+    return {
+      shown: menu ? getComputedStyle(menu).display !== 'none' : false,
+      contentLeft: Math.round(document.querySelector('.settings-content').getBoundingClientRect().left),
+      heads: document.querySelectorAll('.settings-content .field-group-title').length,
+    }
+  })
+  console.log('  ' + JSON.stringify(nav))
+  expect('메뉴가 감춰짐', nav.shown === false, JSON.stringify(nav))
+  expect('본문 머리는 그대로 있음', nav.heads >= 10, JSON.stringify(nav))
+  await page.screenshot({ path: join(HERE, '..', 'shots', 'mobile', '05-settings.png') })
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(300)
+
   step('7. 넓게 펴면 예전처럼 본문 옆에 선다')
+  await page.click('.menu-toggle')
+  await page.waitForTimeout(300)
   await page.setViewportSize({ width: 1200, height: 800 })
   await page.waitForTimeout(400)
   const wide = await layout()

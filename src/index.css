@@ -1552,16 +1552,13 @@ a.btn { text-decoration: none; color: inherit; display: inline-block; }
   scrollbar-gutter: stable;
 }
 
-@media (max-width: 640px) {
-  /* 좁은 화면에서는 메뉴를 위로 눕힙니다. */
-  .settings-layout { flex-direction: column; }
-  .settings-nav {
-    flex: 0 0 auto;
-    flex-direction: row;
-    border-inline-end: 0;
-    border-block-end: 1px solid var(--border);
-    overflow-x: auto;
-  }
+/*
+ * 좁은 화면에서는 왼쪽 메뉴를 감춥니다.
+ * 위로 눕혀 두었더니 창의 반을 메뉴가 먹어 정작 설정이 몇 줄 안 보였습니다.
+ * 본문에 같은 머리가 차례로 서 있으니 굴려서 찾으면 됩니다.
+ */
+@media (max-width: 720px) {
+  .settings-nav { display: none; }
 }
 
 /* ---------- 첨부 미리보기 ---------- */
@@ -2095,14 +2092,14 @@ a.btn { text-decoration: none; color: inherit; display: inline-block; }
 
 /* ---------- 단축키 목록 ---------- */
 
-/* 단추 아래에 안내처럼 붙습니다. 오른쪽 끝 단추라 오른쪽을 맞춥니다. */
+/*
+ * 단추 아래에 안내처럼 붙습니다. 자리와 너비는 화면 폭에 맞춰 스크립트가 잽니다.
+ * 단추 오른쪽에 그냥 맞춰 두면 좁은 화면에서 왼쪽이 화면 밖으로 잘립니다.
+ */
 .shortcuts-anchor { position: relative; }
 .shortcuts-pop {
-  position: absolute;
-  top: calc(100% + 6px);
-  right: 0;
+  position: fixed;
   z-index: 60;
-  width: min(440px, calc(100vw - 16px));
   max-height: min(70vh, 640px);
   overflow: auto;
   padding: 10px 14px 12px;
