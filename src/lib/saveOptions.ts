@@ -353,3 +353,11 @@ export function writeTrashPolicy(policy: TrashPolicy): void {
     // 저장이 막혀 있어도 이번에는 그대로 적용됩니다.
   }
 }
+
+/**
+ * 좁은 화면인지. 옆줄을 본문 옆이 아니라 위에 서랍처럼 띄우는 문턱입니다.
+ * CSS 의 @media (max-width: 720px) 와 같은 값이어야 합니다.
+ */
+export const NARROW_QUERY = '(max-width: 720px)'
+export const isNarrow = (): boolean =>
+  typeof window !== 'undefined' && window.matchMedia(NARROW_QUERY).matches

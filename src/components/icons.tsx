@@ -340,3 +340,12 @@ export function KeyboardIcon(props: IconProps) {
     </Svg>
   )
 }
+
+/** 줄 셋. 좁은 화면에서 옆줄을 여는 단추입니다. */
+export function MenuIcon(props: IconProps) {
+  return (
+    <Svg {...props} strokeWidth={1.8}>
+      <path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11" />
+    </Svg>
+  )
+}

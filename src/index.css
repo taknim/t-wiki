@@ -1039,11 +1039,52 @@ a.btn { text-decoration: none; color: inherit; display: inline-block; }
   max-width: 80vw;
 }
 
+/*
+ * 좁은 화면(손전화).
+ *
+ * 옆줄이 화면을 반 넘게 먹어 본문이 몇 글자씩 끊겼습니다. 옆줄을 본문 옆이 아니라
+ * **본문 위에 서랍처럼** 띄웁니다. 열면 본문을 덮고, 문서를 고르면 저절로 닫힙니다.
+ * 접힌 옆줄(rail)은 여기서는 아예 그리지 않고, 머리줄의 메뉴 단추가 그 자리를 맡습니다.
+ */
+/* 머리줄의 메뉴 단추. 넓은 화면에서는 옆줄 자체에 접고 펴는 단추가 있어 감춥니다. */
+.topbar .menu-toggle { display: none; }
 @media (max-width: 720px) {
-  .sidebar { width: 220px; }
+  .sidebar {
+    position: fixed;
+    inset-block: 0;
+    inset-inline-start: 0;
+    width: min(88vw, 360px);
+    z-index: 40;
+    box-shadow: 8px 0 24px rgb(0 0 0 / 22%);
+  }
+  .sidebar.is-rail { display: none; }
+  .sidebar-resizer { display: none; }
+  .sidebar-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 39;
+    background: rgb(0 0 0 / 35%);
+  }
+  .topbar .menu-toggle { display: inline-flex; }
+  /* 머리줄은 아이콘만 남깁니다. 글자까지 세우면 두 줄로 접힙니다. */
+  .topbar .btn span:not(.btn-label-ghost) { display: none; }
+  .topbar .btn { padding: 6px 8px; }
+  .vault-name { display: none; }
   /* 좁으면 위아래로 눕히므로 좌우 손잡이는 뜻이 없습니다. */
   .doc-body.mode-split { grid-template-columns: 1fr; }
   .split-resizer { display: none; }
+  .doc-head { padding-inline: 12px; }
+  .preview, .editor, .asset-view { padding-inline: 12px; }
+}
+/*
+ * 손을 얹을 수 없는 기기(손전화)에서는 줄 단추가 영영 안 보입니다.
+ * 고른 줄에서는 늘 보이게 둡니다. 눌러 고르고 나서 단추를 씁니다.
+ */
+@media (hover: none) {
+  /* 손을 얹는 일이 없으니 안내 말풍선도 뜻이 없습니다. 눌렀을 때 뜨면 손가락에 가려 방해만 됩니다. */
+  .tooltip { display: none; }
+  .tree-row.is-selected .tree-tools { display: flex; }
+  .tree-row.is-favorite.is-selected .tree-tools button:not(.tree-fav) { display: inline-flex; }
 }
 
 /* ---------- 저장소 선택 ---------- */

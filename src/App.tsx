@@ -10,7 +10,7 @@ import { Favorites } from './components/Favorites'
 import { SyncCountdown } from './components/SyncCountdown'
 import { ViewModeSwitch } from './components/ViewModeSwitch'
 import {
-  FolderIcon, GitHubIcon, SettingsIcon, SidebarCloseIcon, SidebarOpenIcon, StarIcon, SyncIcon, XIcon,
+  FolderIcon, GitHubIcon, MenuIcon, SettingsIcon, SidebarCloseIcon, SidebarOpenIcon, StarIcon, SyncIcon, XIcon,
 } from './components/icons'
 import { TextPreview } from './components/TextPreview'
 import { SettingsPanel } from './components/SettingsPanel'
@@ -40,6 +40,7 @@ import { DEFAULT_VIEW_MODE, loadSession, saveSession } from './lib/session'
 import { formatTidyFor, textPreviewKind, trimWhitespace } from './lib/textPreview'
 import {
   clampSidebarWidth, DEFAULT_SIDEBAR_WIDTH, maxSidebarWidth, MIN_SIDEBAR_WIDTH,
+  isNarrow, NARROW_QUERY,
   readImageBackdrop, readImagePreview, readOfficePreview, readSaveOptions, readSidebarOpen,
   readSidebarTab, readSidebarWidth, readSplitRatio, writeImageBackdrop, writeImagePreview,
   writeOfficePreview, writeSidebarOpen, writeSidebarTab, writeSidebarWidth, writeSplitRatio,
@@ -531,7 +532,18 @@ export default function App() {
   // 파일 고르기 창을 어디서 열었는지 기억해 둡니다. 창은 하나를 돌려 씁니다.
   const pickerDir = useRef<string | null>(null)
   const searchInput = useRef<HTMLInputElement>(null)
-  const [sidebarOpen, setSidebarOpen] = useState(readSidebarOpen)
+  /*
+   * 좁은 화면에서는 옆줄이 본문을 덮는 서랍입니다. 처음에는 닫힌 채로 시작합니다 —
+   * 열어 둔 채 시작하면 본문이 보이지 않아 무엇이 열렸는지 알 수 없습니다.
+   */
+  const [sidebarOpen, setSidebarOpen] = useState(() => readSidebarOpen() && !isNarrow())
+  const [narrow, setNarrow] = useState(isNarrow)
+  useEffect(() => {
+    const query = window.matchMedia(NARROW_QUERY)
+    const onChange = () => setNarrow(query.matches)
+    query.addEventListener('change', onChange)
+    return () => query.removeEventListener('change', onChange)
+  }, [])
 
   /** 화면과 저장을 한 자리에서 맞춥니다. 설정을 들여올 때도 이 길로 들어옵니다. */
   const applySidebarOpen = useCallback((open: boolean) => {
@@ -652,6 +664,18 @@ export default function App() {
     () => ({ docs: vault.index, texts, tree: vault.tree }),
     [vault.index, texts, vault.tree],
   )
+
+  /*
+   * 서랍에서 문서를 고르면 닫습니다. 고른 문서를 읽으려고 고른 것이지 서랍을 보려고
+   * 고른 것이 아닙니다. 폴더를 골랐을 때는 그 안을 더 둘러보려는 것이라 닫지 않습니다.
+   */
+  const narrowRef = useRef(narrow)
+  useEffect(() => {
+    narrowRef.current = narrow
+  }, [narrow])
+  useEffect(() => {
+    if (selectedPath !== null && narrowRef.current) setSidebarOpen(false)
+  }, [selectedPath])
 
   const applySidebarTab = useCallback((tab: SidebarTab) => {
     setSidebarTab(tab)
@@ -1210,6 +1234,17 @@ export default function App() {
     <div className="app">
       <header className="topbar">
         <div className="topbar-left">
+          {vault.tree && (
+            <button
+              type="button"
+              className="btn btn-icon menu-toggle"
+              aria-label="옆줄 열기"
+              data-tip="폴더 트리와 즐겨찾기를 엽니다"
+              onClick={() => applySidebarOpen(true)}
+            >
+              <MenuIcon />
+            </button>
+          )}
           <strong className="brand">t-WiKi</strong>
           <span className="vault-name">{vault.vaultName}</span>
         </div>
@@ -1274,6 +1309,9 @@ export default function App() {
       </header>
 
       <div className="body">
+        {narrow && sidebarOpen && (
+          <div className="sidebar-backdrop" role="presentation" onClick={() => applySidebarOpen(false)} />
+        )}
         <aside
           className={sidebarOpen ? 'sidebar' : 'sidebar is-rail'}
           style={{ '--sidebar-w': `${sidebarWidth}px` } as CSSProperties}
