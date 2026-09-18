@@ -147,19 +147,29 @@ try {
    * 끌어다 놓기는 마우스를 손으로 움직여서는 일어나지 않습니다. dragTo 를 씁니다.
    * 옮겨 갈 자리에 같은 이름이 있으면 묻고, 고른 대로 해야 합니다.
    */
-  step('6. 같은 이름이 없으면 그냥 옮겨진다')
+  step('6. 옮기기 전에 한 번 묻고, 취소하면 그대로다')
   await page.click('.tree-row:has-text("첨부") .tree-caret')
   await page.waitForTimeout(300)
   await page.locator('.tree-row:has-text("도표.svg")')
     .dragTo(page.locator('.tree-row:has-text("회고")'))
-  await page.waitForTimeout(700)
-  const moved = await page.evaluate(() => ({
-    dialog: document.querySelectorAll('.dialog').length,
-    there: window.__vaultText('회고/도표.svg') !== null,
+  await page.waitForSelector('.dialog', { timeout: 5000 })
+  const askedMove = await page.evaluate(() => ({
+    title: document.querySelector('.dialog h2')?.textContent ?? null,
+    label: document.querySelector('.dialog-label')?.textContent.replace(/\s+/g, ' ').trim() ?? null,
+    buttons: [...document.querySelectorAll('.dialog-actions button')].map((one) => one.textContent),
   }))
-  console.log('  ' + JSON.stringify(moved))
-  expect('묻지 않고 옮김', moved.dialog === 0, JSON.stringify(moved))
-  expect('옮긴 자리에 있음', await page.evaluate(() => window.__vaultText('회고/도표.svg')) !== null)
+  console.log('  ' + JSON.stringify(askedMove))
+  expect('옮길지 물음', (askedMove.title ?? '').includes('옮길까요'), JSON.stringify(askedMove))
+  expect('어디서 어디로인지 밝힘', (askedMove.label ?? '').includes('/첨부/도표.svg') && (askedMove.label ?? '').includes('/회고'), String(askedMove.label))
+  await page.click('.dialog-actions button:has-text("취소")')
+  await page.waitForTimeout(500)
+  expect('취소하면 그대로', await page.evaluate(async () => (await window.__vaultText('첨부/도표.svg')) !== null && (await window.__vaultText('회고/도표.svg')) === null))
+  await page.locator('.tree-row:has-text("도표.svg")')
+    .dragTo(page.locator('.tree-row:has-text("회고")'))
+  await page.waitForSelector('.dialog', { timeout: 5000 })
+  await page.click('.dialog-actions button:has-text("옮기기")')
+  await page.waitForTimeout(700)
+  expect('옮기기를 고르면 옮겨짐', await page.evaluate(() => window.__vaultText('회고/도표.svg')) !== null)
 
   step('7. 같은 이름이 있으면 묻고, 취소하면 둘 다 그대로다')
   await page.click('.tree-row:has-text("회고") .tree-caret')

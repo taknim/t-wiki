@@ -97,6 +97,12 @@ export interface GitHubSync {
 
 interface Options {
   root: FileSystemDirectoryHandle | null
+  /**
+   * 폴더를 다 읽었는지. 읽는 동안에는 돌지 않습니다.
+   * 반쯤 읽힌 색인으로 돌면 아직 안 읽은 파일이 "로컬에서 사라짐"으로 잡혀 저장소에서 지워지거나
+   * 다시 내려받힙니다. 손전화처럼 느린 기기에서는 읽는 데 한참 걸려 그 틈이 넓습니다.
+   */
+  ready: boolean
   docs: DocIndex
   assets: AssetIndex
   /**
@@ -140,7 +146,7 @@ async function runExclusively<T>(task: () => Promise<T>): Promise<T | typeof BUS
   })
 }
 
-export function useGitHubSync({ root, docs, assets, onBeforeSync, onLocalChanged }: Options): GitHubSync {
+export function useGitHubSync({ root, ready, docs, assets, onBeforeSync, onLocalChanged }: Options): GitHubSync {
   const [config, setConfig] = useState<GitHubConfig>(DEFAULT_GITHUB_CONFIG)
   const [loaded, setLoaded] = useState(false)
   const [status, setStatus] = useState<SyncStatus>(IDLE)
@@ -170,6 +176,10 @@ export function useGitHubSync({ root, docs, assets, onBeforeSync, onLocalChanged
   const vaultKeyRef = useRef<string | null>(null)
   // 사용자가 "이 대상으로 진행" 을 누른 서명. 한 번 확인하면 다시 묻지 않습니다.
   const confirmedRef = useRef<string | null>(null)
+  const readyRef = useRef(ready)
+  useEffect(() => {
+    readyRef.current = ready
+  }, [ready])
   const callbacksRef = useRef({ onBeforeSync, onLocalChanged })
 
   // ref 쓰기는 렌더가 아니라 커밋 뒤에 해야 합니다.
@@ -410,6 +420,14 @@ export function useGitHubSync({ root, docs, assets, onBeforeSync, onLocalChanged
   const run = useCallback(async (trigger: 'manual' | 'auto' = 'manual') => {
     const vault = rootRef.current
     if (busyRef.current || !vault) return
+
+    // 폴더를 아직 읽는 중이면 돌지 않습니다. 자동 회차는 조용히 건너뛰고 다음 차례를 기다립니다.
+    if (!readyRef.current) {
+      if (trigger === 'manual') {
+        setStatus({ phase: 'blocked', message: '폴더를 아직 읽는 중입니다. 다 읽은 뒤에 동기화해 주세요.', progress: null })
+      }
+      return
+    }
 
     // 중복 실행 막기와 진행 표시를 먼저 겁니다.
     // 설정을 읽는 동안 버튼이 열려 있으면 같은 탭에서 두 번 눌릴 수 있습니다.

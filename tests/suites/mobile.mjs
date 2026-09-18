@@ -239,6 +239,9 @@ try {
   expect('뿌리와 폴더들이 늘어섬', choices.some((one) => one.name === '회사') && choices[0].name === '내 위키', JSON.stringify(choices))
   expect('지금 있는 자리(뿌리)는 고를 수 없음', choices[0].disabled === true, JSON.stringify(choices))
   await page.click('.move-item:has-text("회사")')
+  // 폴더를 고른 뒤에도 한 번 묻습니다. 끌어다 놓을 때와 같은 문입니다.
+  await page.waitForSelector('.dialog', { timeout: 3000 })
+  await page.click('.dialog-actions button:has-text("옮기기")')
   await page.waitForTimeout(800)
   const moved = await page.evaluate(async () => ({
     there: await window.__vaultText('회사/개발 환경.md'),

@@ -246,6 +246,7 @@ export default function App() {
 
   const sync = useGitHubSync({
     root: vault.root,
+    ready: vault.status === 'ready',
     docs: vault.index,
     assets: vault.assets,
     /*
@@ -1142,6 +1143,20 @@ export default function App() {
         const target = targetDir ? `${targetDir}/${name}` : name
         const standing = vault.root ? await entryKind(vault.root, target) : null
 
+        /*
+         * 같은 이름이 없어도 한 번 묻습니다. 끌다가 엉뚱한 폴더에 놓는 일이 잦고, 옮기고
+         * 나면 어디로 갔는지 찾아야 합니다. 같은 이름이 있으면 아래에서 덮을지를 묻는
+         * 창 하나로 갈음합니다. 두 번 묻지 않습니다.
+         */
+        if (standing === null) {
+          const ok = await dialogs.confirm({
+            title: '옮길까요?',
+            label: `${displayPath(from)}\n→ ${displayPath(targetDir)}`,
+            confirmText: '옮기기',
+          })
+          if (!ok) return
+        }
+
         if (standing !== null) {
           const ok = await dialogs.confirm({
             title: '같은 이름이 이미 있습니다',
@@ -1284,14 +1299,16 @@ export default function App() {
             type="button"
             className={sync.status.phase === 'error' ? 'btn btn-warned' : 'btn'}
             data-tip={
-              sync.status.phase === 'running'
+              vault.status === 'loading'
+                ? '폴더를 아직 읽는 중입니다. 다 읽은 뒤에 동기화할 수 있습니다'
+                : sync.status.phase === 'running'
                 ? syncProgressTip
                 : sync.isConfigured
                   ? `${sync.config.owner}/${sync.config.repo} 와 지금 동기화합니다`
                   : '아직 저장소가 지정되지 않았습니다. 눌러서 설정하세요'
             }
             onClick={startSync}
-            disabled={sync.status.phase === 'running'}
+            disabled={sync.status.phase === 'running' || vault.status === 'loading'}
             style={syncFillStyle}
           >
             {sync.status.phase === 'running' ? <SyncIcon className="is-spinning" /> : <GitHubIcon />}

@@ -2,6 +2,7 @@ import { chromium } from 'playwright'
 import { readFileSync, mkdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { createGitHubMock } from '../github-mock.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 mkdirSync(join(HERE, '..', 'shots', 'loading'), { recursive: true })
@@ -11,10 +12,12 @@ const ok = (n) => console.log('  ok  ' + n)
 const fail = (n, d) => { problems.push(n); console.log('FAIL  ' + n + '\n      ' + d) }
 const expect = (n, c, d = '') => (c ? ok(n) : fail(n, d))
 
+const github = createGitHubMock()
 const browser = await chromium.launch({ channel: 'chrome' })
 const page = await browser.newPage({ viewport: { width: 1200, height: 760 } })
 const errors = []
 page.on('pageerror', (e) => errors.push('pageerror: ' + e.message))
+await page.route('https://api.github.com/**', github.handler)
 await page.addInitScript(readFileSync(join(HERE, '..', 'mock-fs.js'), 'utf8'))
 await page.addInitScript(() => {
   window.__installMockFs()
@@ -124,6 +127,43 @@ try {
   await page.waitForTimeout(500)
   const shown = await page.evaluate(() => document.querySelector('.main .editor')?.value ?? null)
   expect('고친 내용이 들어옴', (shown ?? '').includes('고침'), String(shown))
+
+  /*
+   * 반쯤 읽힌 색인으로 동기화가 돌면 아직 안 읽은 파일이 "로컬에서 사라짐"으로 잡힙니다.
+   * 손전화처럼 느린 기기에서는 읽는 데 한참 걸려 그 틈이 넓습니다. 읽는 동안은 막아야 합니다.
+   */
+  step('5. 폴더를 읽는 동안에는 동기화가 돌지 않는다')
+  await page.click('button[aria-label="설정"]')
+  await page.waitForSelector('.settings-nav')
+  await page.click('.settings-nav button:has-text("GitHub 동기화")')
+  await page.fill('#gh-token', 'pat')
+  await page.fill('#gh-owner', 'tester')
+  await page.fill('.row input[placeholder="저장소 이름"]', 'wiki')
+  await page.waitForTimeout(300)
+  await page.click('.sheet-close')
+  await page.waitForTimeout(300)
+  // 다시 읽기를 걸어 두고(2초 남짓) 그 틈에 동기화를 누릅니다.
+  await page.click('.tree-root button[aria-label="새로고침"]')
+  await page.waitForTimeout(200)
+  const during = await page.evaluate(() => {
+    const button = [...document.querySelectorAll('.topbar button')].find((one) => one.textContent.includes('GitHub 동기화'))
+    return { disabled: button?.disabled ?? null, tip: button?.getAttribute('data-tip') ?? null }
+  })
+  console.log('  읽는 동안 단추: ' + JSON.stringify(during))
+  expect('단추가 잠김', during.disabled === true && (during.tip ?? '').includes('읽는 중'), JSON.stringify(during))
+  // 단축키로도 돌지 않습니다.
+  await page.keyboard.press(process.platform === 'darwin' ? 'Meta+Shift+g' : 'Control+Shift+g')
+  await page.waitForTimeout(700)
+  const toast = await page.evaluate(() => document.querySelector('.toast')?.textContent ?? null)
+  console.log('  알림: ' + String(toast))
+  expect('읽는 중이라고 알림', (toast ?? '').includes('읽는 중'), String(toast))
+  expect('저장소에 아무 요청도 가지 않음', github.lastAuth() === null && github.commitCount === 0, `${github.lastAuth()} / ${github.commitCount}`)
+  // 다 읽으면 돕니다.
+  await page.waitForTimeout(3500)
+  await page.click('.topbar button:has-text("GitHub 동기화")')
+  await page.waitForFunction(() => !document.querySelector('.topbar button[disabled]'), undefined, { timeout: 60000 })
+  await page.waitForTimeout(500)
+  expect('다 읽은 뒤에는 돎', github.commitCount === 1, String(github.commitCount))
 } catch (cause) {
   fail('묶음이 도중에 멈춤', cause instanceof Error ? (cause.stack ?? cause.message) : String(cause))
 } finally {
