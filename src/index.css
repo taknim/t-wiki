@@ -2206,5 +2206,15 @@ a.btn { text-decoration: none; color: inherit; display: inline-block; }
 }
 .move-item:hover, .move-item:focus-visible { background: var(--bg-raised); outline: none; }
 .move-item:disabled { color: var(--text-muted); cursor: default; background: transparent; }
+/*
+ * 지금 있는 자리. 고를 수 없어 흐려지는데, 그러면 어디서 옮기는지가 도리어 눈에 안 띕니다.
+ * 트리의 고른 줄과 같은 음영에 테두리를 둘러 먼저 보이게 합니다.
+ */
+.move-item.is-here:disabled {
+  color: var(--text);
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1.5px var(--accent);
+}
+.move-item.is-here .move-here { color: var(--accent); font-weight: 600; }
 .move-item .tree-icon, .move-item svg { flex: none; color: var(--warn); }
 .move-here { margin-inline-start: auto; font-size: 11px; color: var(--text-muted); }

@@ -861,6 +861,25 @@ export default function App() {
   )
 
   /*
+   * 폴더를 열어 둔 채 새로 고침하거나 떠나면 묻습니다.
+   *
+   * 손전화에서는 화면을 아래로 당기기만 해도 새로 고침이 되어, 보던 자리를 잃고
+   * 폴더 권한부터 다시 받아야 합니다. 브라우저가 띄우는 물음(취소 / 새로 고침)이라
+   * 글귀는 정할 수 없지만, 취소하면 아무 일도 없습니다. 폴더를 열지 않았을 때는 잃을 것이
+   * 없으니 묻지 않습니다.
+   */
+  useEffect(() => {
+    if (!vault.tree) return
+    const ask = (event: BeforeUnloadEvent) => {
+      event.preventDefault()
+      // 옛 브라우저는 이 값이 있어야 묻습니다. 글귀 자체는 쓰이지 않습니다.
+      event.returnValue = ''
+    }
+    window.addEventListener('beforeunload', ask)
+    return () => window.removeEventListener('beforeunload', ask)
+  }, [vault.tree])
+
+  /*
    * 앱 전역 단축키.
    *
    * 편집기 안의 서식 단축키(⌘B 등)는 편집기가 제 자리에서 처리하고, 여기는 어디서 눌러도

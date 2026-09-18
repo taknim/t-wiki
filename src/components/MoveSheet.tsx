@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import { useEscapeClose } from '../hooks/useEscapeClose'
 import type { VaultNode } from '../types'
 import { displayPath, fileNameOf } from '../lib/paths'
@@ -22,6 +23,16 @@ interface MoveSheetProps {
  */
 export function MoveSheet({ path, tree, onPick, onClose }: MoveSheetProps) {
   useEscapeClose(onClose)
+
+  /*
+   * 뜨자마자 지금 있는 자리가 가운데에 오게 굴립니다.
+   * 폴더가 많으면 지금 자리가 아래로 밀려 어디서 옮기는지부터 찾아야 합니다.
+   */
+  const body = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const here = body.current?.querySelector<HTMLElement>('.move-item.is-here')
+    here?.scrollIntoView({ block: 'center' })
+  }, [])
 
   const parent = path.split('/').slice(0, -1).join('/')
   const isDir = (node: VaultNode | null): boolean => node?.kind === 'dir'
@@ -54,7 +65,7 @@ export function MoveSheet({ path, tree, onPick, onClose }: MoveSheetProps) {
             ×
           </button>
         </header>
-        <div className="sheet-body">
+        <div ref={body} className="sheet-body">
           <p className="hint" style={{ marginTop: 0 }}>
             <strong>{fileNameOf(path)}</strong> 을(를) 옮깁니다. 지금은 {displayPath(parent)} 에 있습니다.
           </p>
@@ -65,7 +76,7 @@ export function MoveSheet({ path, tree, onPick, onClose }: MoveSheetProps) {
                 <li key={folder.path}>
                   <button
                     type="button"
-                    className="move-item"
+                    className={folder.path === parent ? 'move-item is-here' : 'move-item'}
                     style={{ paddingInlineStart: `${12 + folder.depth * 16}px` }}
                     disabled={blocked}
                     data-tip={folder.path === parent
