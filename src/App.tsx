@@ -621,11 +621,19 @@ export default function App() {
     return key ? await loadFavorites(key) : []
   }, [])
 
+  /*
+   * 폴더를 다 읽었을 때 즐겨찾기 파일을 읽습니다. 손잡이가 붙었을 때가 아니라.
+   *
+   * 새로 고침 뒤에는 손잡이가 먼저 붙고, 읽고 쓸 권한은 사람이 "다시 열기"를 누른 뒤에야
+   * 옵니다. 손잡이가 붙자마자 읽으면 권한이 없어 실패하고, 그 뒤로는 손잡이가 바뀌지 않아
+   * 다시 읽지 않았습니다. 데스크톱은 권한이 처음부터 있어 드러나지 않았고, 방문마다 다시
+   * 묻는 안드로이드에서는 즐겨찾기가 늘 비어 보였습니다.
+   */
   useEffect(() => {
     let cancelled = false
     void (async () => {
-      if (!vault.root) {
-        if (!cancelled) setFavorites([])
+      if (!vault.root || vault.status !== 'ready') {
+        if (!vault.root && !cancelled) setFavorites([])
         return
       }
       const saved = await loadFavoritesFor(vault.root)
@@ -634,7 +642,7 @@ export default function App() {
     return () => {
       cancelled = true
     }
-  }, [vault.root, loadFavoritesFor])
+  }, [vault.root, vault.status, loadFavoritesFor])
 
   /** 화면과 파일을 한 자리에서 맞춥니다. 이름을 바꾸거나 옮길 때도 이 길로 들어옵니다. */
   const applyFavorites = useCallback((next: string[]) => {

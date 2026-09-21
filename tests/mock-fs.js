@@ -27,6 +27,20 @@ window.__installMockFs = function installMockFs() {
     async requestPermission() { return 'granted' }
   }
 
+  /*
+   * 폴더 권한 흉내.
+   *
+   * 진짜 브라우저는 새로 고침 뒤 손잡이는 돌려주되 읽고 쓸 권한은 사람이 눌러야 다시 줍니다.
+   * 그 사이를 흉내 내려면 권한이 없을 때 읽기·쓰기가 실제로 막혀야 합니다.
+   * `window.__permission` 이 'prompt' 면 막히고, requestPermission 을 부르면 'granted' 가 됩니다.
+   */
+  window.__permission = window.__permission ?? 'granted'
+  const guard = () => {
+    if (window.__permission !== 'granted') {
+      throw new DOMException('The request is not allowed by the user agent', 'NotAllowedError')
+    }
+  }
+
   class MemDir {
     constructor(name) {
       this.kind = 'directory'
@@ -34,6 +48,7 @@ window.__installMockFs = function installMockFs() {
       this._children = new Map()
     }
     async getDirectoryHandle(name, options) {
+      guard()
       let child = this._children.get(name)
       if (!child) {
         if (!options?.create) throw new DOMException(name + ' not found', 'NotFoundError')
@@ -44,6 +59,7 @@ window.__installMockFs = function installMockFs() {
       return child
     }
     async getFileHandle(name, options) {
+      guard()
       let child = this._children.get(name)
       if (!child) {
         if (!options?.create) throw new DOMException(name + ' not found', 'NotFoundError')
@@ -54,14 +70,19 @@ window.__installMockFs = function installMockFs() {
       return child
     }
     async removeEntry(name) {
+      guard()
       if (!this._children.has(name)) throw new DOMException(name + ' not found', 'NotFoundError')
       this._children.delete(name)
     }
     async *entries() {
+      guard()
       for (const pair of [...this._children]) yield pair
     }
-    async queryPermission() { return 'granted' }
-    async requestPermission() { return 'granted' }
+    async queryPermission() { return window.__permission }
+    async requestPermission() {
+      window.__permission = 'granted'
+      return 'granted'
+    }
     async isSameEntry(other) { return other?.name === this.name && other?.kind === this.kind }
     /** 이 폴더 아래에 있으면 경로 조각을, 아니면 null. 실제 브라우저와 같습니다. */
     async resolve(other) {
@@ -102,6 +123,28 @@ window.__installMockFs = function installMockFs() {
 
   window.showDirectoryPicker = async () => root
   window.__mockRoot = root
+
+  /*
+   * 저장소에 넣어 둔 손잡이 되살리기.
+   *
+   * 진짜 손잡이는 IndexedDB 에 넣었다 꺼내도 그대로지만, 이 흉내는 꺼내면 메서드를 잃은
+   * 빈 껍데기가 됩니다. 앱이 손잡이를 꺼내는 자리(`mdwiki:vault-handle`)만 가로채,
+   * 무언가 저장되어 있었으면 지금 살아 있는 뿌리를 대신 돌려줍니다. 새로 고침 뒤에
+   * "다시 열기" 로 이어지는 길을 시험할 수 있습니다.
+   * 원하는 묶음만 켭니다(`window.__restoreHandle = true`). 다른 묶음들은 새로 고침 뒤
+   * "폴더 열기" 화면에서 다시 시작하는 것을 전제로 짜여 있습니다.
+   */
+  const nativeGet = IDBObjectStore.prototype.get
+  const resultOf = Object.getOwnPropertyDescriptor(IDBRequest.prototype, 'result').get
+  IDBObjectStore.prototype.get = function (key) {
+    const request = nativeGet.call(this, key)
+    if (key === 'mdwiki:vault-handle' && window.__restoreHandle) {
+      Object.defineProperty(request, 'result', {
+        get: () => (resultOf.call(request) ? window.__mockRoot : undefined),
+      })
+    }
+    return request
+  }
 
   /** 볼트 안 파일의 내용. 앱이 정말 그 자리에 그 내용을 썼는지 볼 때 씁니다. */
   window.__vaultText = async (path) => {
