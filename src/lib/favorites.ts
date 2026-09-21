@@ -14,12 +14,20 @@ export async function readFavoritesFile(
   root: FileSystemDirectoryHandle,
 ): Promise<string[] | null> {
   try {
-    const raw = await fs.readFile(root, FAVORITES_FILE)
+    return parseFavorites(await fs.readFile(root, FAVORITES_FILE))
+  } catch {
+    // 파일이 없거나 읽을 수 없으면 담아 둔 것이 없는 셈입니다.
+    return null
+  }
+}
+
+/** 파일 글을 목록으로. 글자 목록으로 읽히지 않으면 null. 사람이 손으로 고친 글도 이리로 옵니다. */
+export function parseFavorites(raw: string): string[] | null {
+  try {
     const parsed: unknown = JSON.parse(raw)
     if (!Array.isArray(parsed)) return null
     return parsed.filter((one): one is string => typeof one === 'string' && one.length > 0)
   } catch {
-    // 파일이 없거나 읽을 수 없으면 담아 둔 것이 없는 셈입니다.
     return null
   }
 }
@@ -59,17 +67,7 @@ export function reorderFavorites(
  * 이쪽 차례를 지키고, 저쪽에만 있는 것을 뒤에 답니다.
  */
 export function mergeFavorites(mine: string, theirs: string): string {
-  const parse = (raw: string): string[] => {
-    try {
-      const parsed: unknown = JSON.parse(raw)
-      return Array.isArray(parsed)
-        ? parsed.filter((one): one is string => typeof one === 'string' && one.length > 0)
-        : []
-    } catch {
-      return []
-    }
-  }
-  const ours = parse(mine)
-  const merged = [...ours, ...parse(theirs).filter((one) => !ours.includes(one))]
+  const ours = parseFavorites(mine) ?? []
+  const merged = [...ours, ...(parseFavorites(theirs) ?? []).filter((one) => !ours.includes(one))]
   return favoritesFileBody(merged)
 }

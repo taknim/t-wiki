@@ -49,7 +49,7 @@ import {
 } from './lib/saveOptions'
 import { displayPath, FAVORITES_FILE, fileNameOf, isAppFile, TRASH_DIR } from './lib/paths'
 import { loadFavorites } from './lib/store'
-import { favoritesFileBody, readFavoritesFile, reorderFavorites } from './lib/favorites'
+import { favoritesFileBody, parseFavorites, readFavoritesFile, reorderFavorites } from './lib/favorites'
 import { vaultKeyFor } from './lib/vaultKey'
 import type { CSSProperties } from 'react'
 import type { ImageBackdrop, SidebarTab, ViewMode, VaultNode } from './types'
@@ -183,6 +183,16 @@ export default function App() {
       if (isMarkdown(path)) await vault.save(path, snapshot, known)
       else await vault.saveText(path, snapshot, known)
       heldRef.current = null
+
+      /*
+       * 즐겨찾기 파일을 손으로 고쳐 저장했으면 목록도 그 글을 따릅니다.
+       * 파일이 곧 목록인데, 저장만 되고 화면은 옛것을 들고 있으면 고친 것이 없어 보입니다.
+       * 목록으로 읽히지 않는 글(JSON 이 깨졌거나 배열이 아님)은 화면을 건드리지 않습니다.
+       */
+      if (path === FAVORITES_FILE) {
+        const parsed = parseFavorites(snapshot)
+        if (parsed !== null) setFavorites(parsed)
+      }
 
       if (tidied !== null) {
         // 정돈한 내용으로 화면도 맞춥니다. 벗어나는 길이라 입력과 부딪히지 않습니다.

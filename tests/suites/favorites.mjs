@@ -461,6 +461,35 @@ try {
   expect('보이던 둘만 자리를 바꿈', all[1] === byKey[2] && all[2] === byKey[1],
     JSON.stringify(all))
 
+  /*
+   * 즐겨찾기 파일은 곧 목록입니다. 검색으로 찾아 열어 손으로 고쳐 저장하면 목록도 그 글을
+   * 따라야 합니다. 저장만 되고 화면이 옛것을 들고 있으면 고친 것이 없어 보입니다.
+   */
+  step('20-2. 즐겨찾기 파일을 손으로 고쳐 저장하면 목록이 따라온다')
+  const before20 = await listed()
+  await showTab('폴더')
+  // 트리에는 감춰 두었지만 본문 검색에는 잡힙니다. 담긴 이름으로 찾으면 그 파일이 함께 나옵니다.
+  await page.fill('.search-input', before20[0].replace(/\.md$/, ''))
+  await page.waitForTimeout(800)
+  await page.click('.search-results button:has-text("_t-wiki.favorites")')
+  await page.waitForSelector('.main .editor', { timeout: 8000 })
+  await page.click('.mode-switch button[aria-label="편집"]').catch(() => {})
+  await page.waitForTimeout(300)
+  // 첫 줄 하나만 남기고 나머지를 지웁니다.
+  const keep = before20[0]
+  const onlyOne = await page.evaluate((name) => {
+    const editor = document.querySelector('.main .editor')
+    const paths = JSON.parse(editor.value)
+    return paths.filter((one) => one.endsWith(name))
+  }, keep)
+  await page.fill('.main .editor', JSON.stringify(onlyOne, null, 2) + '\n')
+  await page.waitForTimeout(1500)
+  expect('저장됨', (await page.evaluate(() => document.querySelector('.pill')?.textContent)) === '저장됨')
+  await page.fill('.search-input', '')
+  const after20 = await listed()
+  console.log('  ' + JSON.stringify(before20) + ' → ' + JSON.stringify(after20))
+  expect('목록이 고친 글을 따름', after20.length === 1 && after20[0] === keep, JSON.stringify(after20))
+
   step('21. 콘솔 오류')
   const real = errors.filter((l) => !l.includes('404') && !l.includes('Failed to load resource'))
   if (real.length > 0) fail('콘솔', real.join('\n      '))
