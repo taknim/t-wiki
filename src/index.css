@@ -909,6 +909,10 @@ mark { background: var(--mark); color: inherit; border-radius: 2px; }
   overflow-wrap: anywhere;
 }
 .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+/* 숫자 칸들은 한 줄에 나란히. 칸마다 이름표를 위에 답니다. */
+.dialog-fields { display: flex; gap: 12px; }
+.dialog-field { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--text-muted); }
+.dialog-field .dialog-input { width: 7em; }
 
 .sheet {
   width: min(720px, 100%);

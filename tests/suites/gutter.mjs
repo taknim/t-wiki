@@ -163,38 +163,63 @@ try {
    * 긴 문서에서 몇백 번째 줄을 굴려 찾는 것은 더딥니다. 행·열 표시를 누르면 자리를 물어
    * 그리로 데려다 줍니다. 열은 줄 길이를 넘으면 줄 끝으로, 행은 줄 수를 넘으면 마지막 줄로.
    */
-  step('5. 행·열 표시를 누르면 자리를 물어 그리로 뛰어간다')
+  step('5. 행·열 표시를 누르면 칸마다 따로 물어 그리로 뛰어간다')
   await page.click('.info-caret')
-  await page.waitForSelector('.dialog input', { timeout: 3000 })
-  const offered = await page.inputValue('.dialog input')
-  expect('지금 자리가 미리 적혀 있음', offered === '4:4', offered)
-  await page.fill('.dialog input', '40:3')
+  await page.waitForSelector('.dialog-field input', { timeout: 3000 })
+  const offered = await page.evaluate(() => [...document.querySelectorAll('.dialog-field input')].map((one) => one.value))
+  expect('행·열 칸이 따로 있고 지금 자리가 미리 적혀 있음', offered.join(':') === '4:4', JSON.stringify(offered))
+  await page.fill('.dialog-field:has-text("행") input', '40')
+  await page.fill('.dialog-field:has-text("열") input', '3')
   await page.keyboard.press('Enter')
   await page.waitForTimeout(400)
-  const landed = await page.evaluate(() => {
+  const where = () => page.evaluate(() => {
     const editor = document.querySelector('.main .editor')
     const before = editor.value.slice(0, editor.selectionStart)
+    const top = editor.scrollTop
     return { line: before.split('\n').length, column: editor.selectionStart - before.lastIndexOf('\n'),
-      focused: document.activeElement === editor, scrolled: editor.scrollTop > 0,
-      pill: document.querySelector('.pill')?.textContent }
+      focused: document.activeElement === editor, scrollTop: Math.round(top),
+      pill: document.querySelector('.pill')?.textContent,
+      // 커서 줄이 화면 안에 있는지. 줄 높이는 번호 칸에서 가져옵니다.
+      visible: (() => {
+        const rows = [...document.querySelectorAll('.editor-gutter-line')]
+        const at = before.split('\n').length - 1
+        const above = rows.slice(0, at).reduce((sum, one) => sum + one.getBoundingClientRect().height, 0)
+        return above >= top && above + rows[at].getBoundingClientRect().height <= top + editor.clientHeight
+      })() }
   })
+  const landed = await where()
   console.log('  ' + JSON.stringify(landed))
   expect('40행 3열에 커서가 섬', landed.line === 40 && landed.column === 3, JSON.stringify(landed))
-  expect('편집기에 초점이 있고 그 줄까지 굴러감', landed.focused && landed.scrolled, JSON.stringify(landed))
+  expect('편집기에 초점이 있고 그 줄이 화면 안에 있음', landed.focused && landed.scrollTop > 0 && landed.visible, JSON.stringify(landed))
   // 물음 창을 닫은 Enter 가 편집기로 새어 들어 줄바꿈을 끼워 넣은 적이 있습니다.
   expect('글은 손대지 않음', landed.pill === '저장됨', String(landed.pill))
   expect('표시도 따라 바뀜', (await caret()) === '행 40 열 3', String(await caret()))
-  // 행만 적으면 그 줄 첫 칸. 줄 수를 넘으면 마지막 줄.
+  /*
+   * 앞쪽 줄로 되돌아갈 때. 그 자리까지의 글만 담아 scrollHeight 를 재던 때는 내용이 칸보다
+   * 짧으면 칸 높이로 눌려, 3행으로 가자는데 아래로 굴러가 커서가 화면 밖에 남았습니다.
+   */
   await page.click('.info-caret')
-  await page.waitForSelector('.dialog input', { timeout: 3000 })
-  await page.fill('.dialog input', '999')
+  await page.waitForSelector('.dialog-field input', { timeout: 3000 })
+  await page.fill('.dialog-field:has-text("행") input', '3')
+  await page.fill('.dialog-field:has-text("열") input', '1')
+  await page.keyboard.press('Enter')
+  await page.waitForTimeout(400)
+  const back = await where()
+  console.log('  ' + JSON.stringify(back))
+  // 둘째 줄이 접혀 높으므로 0 까지는 아니지만, 위로 돌아와 커서 줄이 보여야 합니다.
+  expect('3행으로 되돌아오면 위로 굴러 그 줄이 보임', back.line === 3 && back.scrollTop < landed.scrollTop && back.visible, JSON.stringify(back))
+  // 행만 적고 열을 비우면 그 줄 첫 칸. 줄 수를 넘으면 마지막 줄.
+  await page.click('.info-caret')
+  await page.waitForSelector('.dialog-field input', { timeout: 3000 })
+  await page.fill('.dialog-field:has-text("행") input', '999')
+  await page.fill('.dialog-field:has-text("열") input', '')
   await page.keyboard.press('Enter')
   await page.waitForTimeout(300)
-  expect('넘치는 행은 마지막 줄 첫 칸', (await caret()) === '행 65 열 1', String(await caret()))
+  expect('넘치는 행은 마지막 줄, 빈 열은 첫 칸', (await caret()) === '행 65 열 1', String(await caret()))
   // 취소하면 자리는 그대로.
   await page.click('.info-caret')
-  await page.waitForSelector('.dialog input', { timeout: 3000 })
-  await page.fill('.dialog input', '2')
+  await page.waitForSelector('.dialog-field input', { timeout: 3000 })
+  await page.fill('.dialog-field:has-text("행") input', '2')
   await page.keyboard.press('Escape')
   await page.waitForTimeout(300)
   expect('취소하면 그대로', (await caret()) === '행 65 열 1', String(await caret()))

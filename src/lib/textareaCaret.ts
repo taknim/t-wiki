@@ -20,17 +20,21 @@ export interface SelectionBox {
   containerRight: number
 }
 
-/** 선택 영역의 화면(viewport) 좌표. 선택이 비어 있으면 null. */
-export function selectionBox(textarea: HTMLTextAreaElement): SelectionBox | null {
-  const { selectionStart, selectionEnd, value } = textarea
-  if (selectionStart === selectionEnd) return null
-
+/**
+ * 글상자의 보이지 않는 사본. from~to 를 span 으로 감싸 그 자리를 잽니다.
+ * 폭은 계산된 width 가 아니라 clientWidth 로 둡니다. width 에는 굴림대 자리까지 들어 있어
+ * 긴 줄이 접히는 자리가 글상자와 달라졌습니다.
+ */
+function measure(textarea: HTMLTextAreaElement, from: number, to: number) {
+  const { value } = textarea
   const source = getComputedStyle(textarea)
   const mirror = document.createElement('div')
 
   for (const property of COPIED_STYLES) {
     mirror.style[property] = source[property]
   }
+  mirror.style.boxSizing = 'border-box'
+  mirror.style.width = `${textarea.clientWidth}px`
   mirror.style.position = 'absolute'
   mirror.style.top = '0'
   mirror.style.left = '-9999px'
@@ -41,18 +45,37 @@ export function selectionBox(textarea: HTMLTextAreaElement): SelectionBox | null
 
   const marker = document.createElement('span')
   // 선택이 줄바꿈으로 끝나면 span 높이가 0 이 되므로 보이지 않는 글자를 덧붙입니다.
-  marker.textContent = value.slice(selectionStart, selectionEnd) + '​'
+  marker.textContent = value.slice(from, to) + '​'
 
   mirror.append(
-    document.createTextNode(value.slice(0, selectionStart)),
+    document.createTextNode(value.slice(0, from)),
     marker,
-    document.createTextNode(value.slice(selectionEnd)),
+    document.createTextNode(value.slice(to)),
   )
   document.body.append(mirror)
 
   const markerRect = marker.getBoundingClientRect()
   const mirrorRect = mirror.getBoundingClientRect()
   mirror.remove()
+  return { markerRect, mirrorRect }
+}
+
+/**
+ * 그 글자 자리가 글상자 내용의 위에서 몇 픽셀 아래인지(굴림과 무관).
+ * 글상자의 scrollHeight 로 재는 길은 안 됩니다. 내용이 칸보다 짧으면 칸 높이로 눌려
+ * 앞쪽 줄이 모두 같은 값을 냅니다.
+ */
+export function offsetTopOf(textarea: HTMLTextAreaElement, offset: number): number {
+  const { markerRect, mirrorRect } = measure(textarea, offset, offset)
+  return markerRect.top - mirrorRect.top
+}
+
+/** 선택 영역의 화면(viewport) 좌표. 선택이 비어 있으면 null. */
+export function selectionBox(textarea: HTMLTextAreaElement): SelectionBox | null {
+  const { selectionStart, selectionEnd } = textarea
+  if (selectionStart === selectionEnd) return null
+
+  const { markerRect, mirrorRect } = measure(textarea, selectionStart, selectionEnd)
 
   const bounds = textarea.getBoundingClientRect()
   const offsetTop = markerRect.top - mirrorRect.top - textarea.scrollTop

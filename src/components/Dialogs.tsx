@@ -11,6 +11,14 @@ interface PromptRequest {
   secret: boolean
 }
 
+interface NumbersRequest {
+  kind: 'numbers'
+  title: string
+  label: string
+  fields: { id: string; label: string; value: number; min: number }[]
+  confirmText: string
+}
+
 interface ConfirmRequest {
   kind: 'confirm'
   title: string
@@ -26,18 +34,22 @@ interface ChooseRequest {
   options: { id: string; label: string; danger?: boolean }[]
 }
 
-type Request = (PromptRequest | ConfirmRequest | ChooseRequest) & {
-  settle: (value: string | boolean | null) => void
+type Answer = string | boolean | Record<string, number> | null
+
+type Request = (PromptRequest | NumbersRequest | ConfirmRequest | ChooseRequest) & {
+  settle: (value: Answer) => void
 }
 
 export function DialogProvider({ children }: { children: ReactNode }) {
   const [request, setRequest] = useState<Request | null>(null)
   const [value, setValue] = useState('')
+  // 숫자 칸들의 글. 숫자로 바꾸는 것은 답할 때 한 번에 합니다. 치는 도중의 빈칸을 거절하지 않으려고요.
+  const [values, setValues] = useState<Record<string, string>>({})
   const inputRef = useRef<HTMLInputElement>(null)
 
   // 초기값은 다이얼로그를 여는 쪽에서 미리 넣어두므로, 여기서는 선택만 해줍니다.
   useEffect(() => {
-    if (request?.kind === 'prompt') {
+    if (request?.kind === 'prompt' || request?.kind === 'numbers') {
       requestAnimationFrame(() => inputRef.current?.select())
     }
   }, [request])
@@ -55,6 +67,18 @@ export function DialogProvider({ children }: { children: ReactNode }) {
             confirmText,
             secret,
             settle: (result) => resolve(typeof result === 'string' ? result : null),
+          })
+        }),
+      numbers: ({ title, label, fields, confirmText = '확인' }) =>
+        new Promise<Record<string, number> | null>((resolve) => {
+          setValues(Object.fromEntries(fields.map((field) => [field.id, String(field.value)])))
+          setRequest({
+            kind: 'numbers',
+            title,
+            label,
+            fields,
+            confirmText,
+            settle: (result) => resolve(result !== null && typeof result === 'object' ? result : null),
           })
         }),
       confirm: ({ title, label, confirmText = '확인', danger = false }) =>
@@ -83,7 +107,7 @@ export function DialogProvider({ children }: { children: ReactNode }) {
   )
 
   const close = useCallback(
-    (result: string | boolean | null) => {
+    (result: Answer) => {
       request?.settle(result)
       setRequest(null)
     },
@@ -103,11 +127,18 @@ export function DialogProvider({ children }: { children: ReactNode }) {
       const answer = request.secret ? value : value.trim()
       if (!answer) return
       close(answer)
+    } else if (request.kind === 'numbers') {
+      const answer: Record<string, number> = {}
+      for (const field of request.fields) {
+        const parsed = Number.parseInt(values[field.id] ?? '', 10)
+        answer[field.id] = Number.isNaN(parsed) ? field.min : Math.max(field.min, parsed)
+      }
+      close(answer)
     } else if (request.kind === 'confirm') {
       close(true)
     }
     // 갈림길에는 Enter 로 고를 기본 답이 없습니다. 무엇을 잃을지 읽고 눌러야 합니다.
-  }, [close, request, value])
+  }, [close, request, value, values])
 
   return (
     <DialogContext.Provider value={api}>
@@ -137,6 +168,29 @@ export function DialogProvider({ children }: { children: ReactNode }) {
                   if (event.key === 'Escape') close(null)
                 }}
               />
+            )}
+            {request.kind === 'numbers' && (
+              <div className="dialog-fields">
+                {request.fields.map((field, at) => (
+                  <label key={field.id} className="dialog-field">
+                    <span>{field.label}</span>
+                    <input
+                      ref={at === 0 ? inputRef : undefined}
+                      className="dialog-input"
+                      type="number"
+                      inputMode="numeric"
+                      min={field.min}
+                      value={values[field.id] ?? ''}
+                      autoFocus={at === 0}
+                      onChange={(event) => setValues((current) => ({ ...current, [field.id]: event.target.value }))}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter') submit()
+                        if (event.key === 'Escape') close(null)
+                      }}
+                    />
+                  </label>
+                ))}
+              </div>
             )}
             <div className="dialog-actions">
               <button

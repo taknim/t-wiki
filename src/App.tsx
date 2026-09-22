@@ -5,7 +5,7 @@ import { Preview } from './components/Preview'
 import { AssetView } from './components/AssetView'
 import { FolderView } from './components/FolderView'
 import { InfoBar, type SelectionInfo } from './components/InfoBar'
-import { caretAt, jumpInEditor, offsetOf, parseLineColumn } from './lib/editorJump'
+import { caretAt, jumpInEditor, offsetOf } from './lib/editorJump'
 import { SearchPanel } from './components/SearchPanel'
 import { Favorites } from './components/Favorites'
 import { SyncCountdown } from './components/SyncCountdown'
@@ -866,19 +866,20 @@ export default function App() {
   }
 
   /*
-   * 행·열 표시를 누르면 갈 자리를 묻습니다. "12" 만 적으면 그 줄 첫 칸, "12:5" 면 그 줄 다섯째 칸.
+   * 행·열 표시를 누르면 갈 자리를 칸마다 따로 묻습니다. 열을 비우면 그 줄 첫 칸.
    * 편집기는 목차와 같은 길로 찾습니다. 편집기가 없는(미리보기만 보는) 때는 표시 자체가 없습니다.
    */
   const handleGoTo = useCallback(async () => {
-    const answer = await dialogs.prompt({
+    const answer = await dialogs.numbers({
       title: '자리로 가기',
-      label: '행, 또는 행:열 (예: 120 또는 120:8)',
-      defaultValue: caret ? `${caret.line}:${caret.column}` : '',
+      label: '갈 행과 열. 줄 수를 넘으면 마지막 줄로, 줄 길이를 넘으면 줄 끝으로 갑니다.',
+      fields: [
+        { id: 'line', label: '행', value: caret?.line ?? 1, min: 1 },
+        { id: 'column', label: '열', value: caret?.column ?? 1, min: 1 },
+      ],
       confirmText: '가기',
     })
-    if (answer === null) return
-    const target = parseLineColumn(answer)
-    if (!target) { flash('행과 열은 숫자로 적어 주세요.'); return }
+    if (!answer) return
     const editor = document.querySelector<HTMLTextAreaElement>('.main > .doc-body > .editor-frame > .editor')
     if (!editor) return
     /*
@@ -886,9 +887,9 @@ export default function App() {
      * 편집기에 초점을 주면 같은 Enter 의 keypress 가 편집기로 들어가 줄바꿈이 하나 끼었습니다.
      */
     await new Promise((settle) => window.setTimeout(settle, 0))
-    jumpInEditor(editor, offsetOf(editor.value, target.line, target.column))
+    jumpInEditor(editor, offsetOf(editor.value, answer.line, answer.column))
     setCaret(caretAt(editor.value, editor.selectionStart))
-  }, [caret, dialogs, flash])
+  }, [caret, dialogs])
 
   const handleNewDoc = useCallback(
     async (dirPath: string) => {

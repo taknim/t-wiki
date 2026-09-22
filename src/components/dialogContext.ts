@@ -9,6 +9,16 @@ export interface DialogApi {
     /** 암호처럼 가려서 받을지. 앞뒤 빈칸도 그대로 둡니다. */
     secret?: boolean
   }) => Promise<string | null>
+  /**
+   * 숫자 몇 개를 칸마다 따로 받습니다(행·열처럼). 칸의 id 로 값을 돌려주고, 물러서면 null.
+   * 비워 둔 칸은 min 으로 칩니다 — 열을 비우면 그 줄 첫 칸으로 가는 식입니다.
+   */
+  numbers: (options: {
+    title: string
+    label: string
+    fields: { id: string; label: string; value: number; min: number }[]
+    confirmText?: string
+  }) => Promise<Record<string, number> | null>
   confirm: (options: {
     title: string
     label: string

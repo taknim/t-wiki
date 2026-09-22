@@ -1,3 +1,5 @@
+import { offsetTopOf } from './textareaCaret'
+
 /*
  * 편집기에서 그 줄이 화면 위쪽 어디쯤에 서게 할지.
  * 맨 위에 딱 붙이면 앞뒤 문맥이 보이지 않아 어디로 왔는지 알기 어렵습니다.
@@ -7,21 +9,15 @@ const FROM_TOP = 4
 /**
  * 글자 자리를 짚어 커서를 그 줄에 세우고, 편집기를 그만큼 굴려 줍니다.
  *
- * 얼마나 굴려야 하는지는 재 볼 길이 마땅치 않아, 그 자리까지의 글만 잠깐 담아 높이를
- * 재고 곧바로 되돌립니다. 값은 같은 자리에서 제자리로 돌려놓으므로 고쳐졌다고 잡히지 않습니다.
+ * 예전에는 그 자리까지의 글만 잠깐 담아 scrollHeight 를 재고 되돌렸습니다. 그런데 내용이
+ * 칸보다 짧으면 scrollHeight 가 칸 높이로 눌려, 앞쪽 줄로 가자고 해도 아래로 굴러갔습니다.
+ * 지금은 사본에서 그 글자의 세로 자리를 잽니다. 값을 손대지 않으니 더 안전하기도 합니다.
+ *
+ * 커서를 먼저 옮기고 굴리기는 맨 나중에 합니다. focus 를 부르면 브라우저가 커서를
+ * 보여 주려고 제멋대로 굴리므로, 굴리는 일이 맨 뒤에 와야 합니다.
  */
 export function jumpInEditor(editor: HTMLTextAreaElement, offset: number) {
-  const full = editor.value
-  editor.value = full.slice(0, offset)
-  const upTo = editor.scrollHeight
-  editor.value = full
-
-  /*
-   * 커서를 먼저 옮기고 굴리기는 맨 나중에 합니다.
-   *
-   * 값을 되돌리면 커서는 글 맨 끝으로 갑니다. 그 상태로 focus 를 부르면 브라우저가
-   * 맨 끝을 보여 주려고 바닥까지 굴려 버립니다. 굴리는 일이 맨 뒤에 와야 합니다.
-   */
+  const upTo = offsetTopOf(editor, offset)
   editor.focus()
   editor.setSelectionRange(offset, offset)
   editor.scrollTop = Math.max(0, upTo - editor.clientHeight / FROM_TOP)
@@ -41,15 +37,6 @@ export function offsetOf(text: string, line: number, column: number): number {
   return offset + col
 }
 
-/**
- * "12", "12:5", "12,5", "12 5" 처럼 적은 것을 행·열로 읽습니다. 열이 없으면 1.
- * 숫자가 하나도 없으면 null.
- */
-export function parseLineColumn(input: string): { line: number; column: number } | null {
-  const numbers = input.match(/\d+/g)
-  if (!numbers) return null
-  return { line: Number(numbers[0]), column: numbers[1] ? Number(numbers[1]) : 1 }
-}
 
 /** 커서 위치. 줄은 줄바꿈으로, 열은 그 줄 안의 글자 수로 셉니다(둘 다 1부터). */
 export function caretAt(text: string, offset: number): { line: number; column: number } {
