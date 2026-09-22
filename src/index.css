@@ -714,9 +714,17 @@ mark { background: var(--mark); color: inherit; border-radius: 2px; }
   tab-size: 2;
 }
 .editor:focus { outline: none; }
+/*
+ * 번호 칸은 틀 위에 띄웁니다(absolute). 흐름에 두면 번호 수백 줄의 높이가 틀의 크기로
+ * 잡혀 틀이 글상자보다 길어지고, 그러면 글상자 대신 본문 칸 전체가 굴러갔습니다.
+ * 띄우면 틀의 크기는 글상자만으로 정해집니다. 글상자는 그만큼 왼쪽 여백을 둡니다.
+ */
 .editor-gutter {
-  flex: none;
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
   width: 3.2em;
+  box-sizing: content-box;
   overflow: hidden;
   padding-inline-end: 8px;
   border-inline-end: 1px solid var(--border);
@@ -729,6 +737,8 @@ mark { background: var(--mark); color: inherit; border-radius: 2px; }
   user-select: none;
 }
 .editor-gutter-pad { height: 16px; }
+/* 번호 칸(3.2em + 8px + 1px) 만큼 글을 밀어 둡니다. */
+.has-gutter .editor { padding-inline-start: calc(3.2em + 8px + 1px + 12px); }
 .editor-gutter-line { box-sizing: border-box; }
 /*
  * 거울은 글상자와 같은 자리에 같은 폭으로 놓되 보이지 않습니다.
@@ -741,7 +751,7 @@ mark { background: var(--mark); color: inherit; border-radius: 2px; }
   visibility: hidden;
   pointer-events: none;
   box-sizing: border-box;
-  padding: 0 20px;
+  /* 좌우 여백도 글상자를 재서 스크립트가 맞춥니다. 번호 칸이 있으면 왼쪽이 더 넓습니다. */
   font-family: var(--mono);
   font-size: 13px;
   line-height: var(--doc-leading, 1.7);

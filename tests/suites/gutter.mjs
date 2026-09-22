@@ -81,6 +81,27 @@ try {
   expect('접힌 줄은 그만큼 높음', numbered.heights[1] >= numbered.heights[0] * 2 && numbered.heights[2] >= numbered.heights[0] - 1, JSON.stringify(numbered.heights))
   // 번호 높이를 다 더하면 글상자의 글 높이와 같아야 나란히 섭니다.
   expect('번호가 글과 나란히 섬', Math.abs(numbered.total - numbered.inner) <= 4, `${numbered.total} vs ${numbered.inner}`)
+  /*
+   * 번호 수백 줄을 흐름에 두면 그 높이가 틀의 크기로 잡혀 본문 칸 전체가 굴러갔습니다.
+   * 굴러가는 것은 글상자여야 하고, 본문 칸은 제자리여야 합니다.
+   */
+  await page.click('.main .editor')
+  await page.keyboard.press('Control+End')
+  await page.mouse.wheel(0, 3000)
+  await page.waitForTimeout(400)
+  const scrolled = await page.evaluate(() => ({
+    main: document.querySelector('.main').scrollTop,
+    editor: Math.round(document.querySelector('.main .editor').scrollTop),
+    gutter: Math.round(document.querySelector('.editor-gutter').scrollTop),
+    frameH: Math.round(document.querySelector('.editor-frame').getBoundingClientRect().height),
+    bodyH: Math.round(document.querySelector('.doc-body').getBoundingClientRect().height),
+  }))
+  console.log('  ' + JSON.stringify(scrolled))
+  expect('본문 칸은 제자리, 글상자만 굴러감', scrolled.main === 0 && scrolled.editor > 0, JSON.stringify(scrolled))
+  expect('번호도 함께 굴러감', Math.abs(scrolled.gutter - scrolled.editor) <= 1, JSON.stringify(scrolled))
+  expect('틀이 글상자보다 길어지지 않음', scrolled.frameH <= scrolled.bodyH + 1, JSON.stringify(scrolled))
+  await page.mouse.wheel(0, -5000)
+  await page.waitForTimeout(300)
   await page.screenshot({ path: join(HERE, '..', 'shots', 'gutter', '01-gutter.png'), clip: { x: 430, y: 60, width: 670, height: 320 } })
 
   step('3. 낫표 자리가 오른쪽 아래에 행·열로 적힌다')
@@ -96,10 +117,13 @@ try {
   await page.waitForTimeout(200)
   const at = await caret()
   console.log('  ' + String(at))
-  expect('넷째 줄 셋째 열', at === '4행 3열', String(at))
+  expect('넷째 줄 셋째 열, 라벨이 먼저', at === '행 4 열 3', String(at))
   await page.keyboard.press('ArrowRight')
   await page.waitForTimeout(150)
-  expect('한 칸 오른쪽', (await caret()) === '4행 4열', String(await caret()))
+  expect('한 칸 오른쪽', (await caret()) === '행 4 열 4', String(await caret()))
+  // 크기·시각보다 앞에 섭니다.
+  const order = await page.evaluate(() => [...document.querySelectorAll('.info-bar .info-meta')].map((one) => one.className.includes('info-caret') ? 'caret' : 'meta'))
+  expect('크기 앞에 섬', order[0] === 'caret', JSON.stringify(order))
 
   step('4. 미리보기만 볼 때는 낫표 자리가 사라지고, 끄면 줄 번호도 사라진다')
   await page.click('.mode-switch button[aria-label="미리보기"]')

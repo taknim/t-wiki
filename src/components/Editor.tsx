@@ -71,9 +71,12 @@ export function Editor({ value, path, onChange, onSave, lineNumbers = false, onC
       const glass = mirror.current
       const textarea = ref.current
       if (!glass || !textarea) return
-      // 거울을 글상자의 글 자리에 정확히 포갭니다. 굴림대가 서면 그만큼 좁아지는 것까지.
+      // 거울을 글상자의 글 자리에 정확히 포갭니다. 굴림대가 서면 그만큼 좁아지는 것과 좌우 여백까지.
+      const style = getComputedStyle(textarea)
       glass.style.left = `${textarea.offsetLeft}px`
       glass.style.width = `${textarea.clientWidth}px`
+      glass.style.paddingLeft = style.paddingLeft
+      glass.style.paddingRight = style.paddingRight
       setHeights([...glass.children].map((row) => (row as HTMLElement).getBoundingClientRect().height))
     }
     measure()
@@ -197,6 +200,8 @@ export function Editor({ value, path, onChange, onSave, lineNumbers = false, onC
             {lines.map((_, at) => (
               <div key={at} className="editor-gutter-line" style={{ height: heights[at] }}>{at + 1}</div>
             ))}
+            {/* 아래 여백도 글상자와 같아야 끝까지 굴렸을 때 번호가 따라옵니다. */}
+            <div className="editor-gutter-pad" />
           </div>
           {/* 거울. 보이지 않지만 글상자와 같은 폭·글꼴·접기로 줄마다 한 덩이씩 놓습니다. */}
           <div ref={mirror} className="editor-mirror" aria-hidden="true">

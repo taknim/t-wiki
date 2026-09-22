@@ -148,6 +148,12 @@ export function InfoBar({
           폴더도 파일과 같은 차례(크기 · 시각)로 늘어놓고, 그 앞에 항목 수만 더 답니다.
           고른 것에 따라 자리가 바뀌면 눈이 매번 다시 훑어야 합니다.
         */}
+        {caret && (
+          <span className="info-meta info-caret" data-tip="편집기에서 낫표가 선 행과 열">
+            행 {caret.line} 열 {caret.column}
+          </span>
+        )}
+
         {info.kind === 'dir' && (
           <span className="info-meta" data-tip="하위 항목 개수">
             항목 {info.itemCount ?? 0}개
@@ -157,12 +163,6 @@ export function InfoBar({
         <span className="info-meta" data-tip={info.kind === 'dir' ? '폴더 크기' : '파일 크기'}>
           {formatBytes(info.size)}
         </span>
-
-        {caret && (
-          <span className="info-meta info-caret" data-tip="편집기에서 낫표가 선 행과 열">
-            {caret.line}행 {caret.column}열
-          </span>
-        )}
 
         {info.lastModified !== null && (
           <span
