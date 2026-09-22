@@ -1,4 +1,4 @@
-import { extensionOf } from './attachments'
+import { CODE_EXTENSIONS, extensionOf } from './attachments'
 
 /** 글자 파일을 어떤 방식으로 보여 줄지. null 이면 보여 줄 것이 없어 편집기만 씁니다. */
 export type TextPreviewKind = 'table' | 'code' | 'html' | null
@@ -6,17 +6,28 @@ export type TextPreviewKind = 'table' | 'code' | 'html' | null
 export function textPreviewKind(path: string): TextPreviewKind {
   const extension = extensionOf(path)
   if (extension === 'csv' || extension === 'tsv') return 'table'
-  if (['json', 'yaml', 'yml', 'xml'].includes(extension)) return 'code'
+  if (['json', 'yaml', 'yml', 'xml'].includes(extension) || CODE_EXTENSIONS.includes(extension)) return 'code'
   if (extension === 'html' || extension === 'htm') return 'html'
   return null
 }
 
-/** 하이라이팅에 쓸 언어 이름. highlight.js 는 html 도 xml 로 다룹니다. */
+/*
+ * 확장자와 강조기가 부르는 이름이 다른 것들. 없는 것은 확장자 그대로가 곧 이름입니다.
+ * jsx·tsx 는 따로 없어 javascript·typescript 로 읽고, toml·properties 는 ini 와 꼴이 같아 그리로 보냅니다.
+ */
+const LANGUAGE_BY_EXTENSION: Record<string, string> = {
+  yml: 'yaml', htm: 'xml', html: 'xml',
+  mjs: 'javascript', cjs: 'javascript', js: 'javascript', jsx: 'javascript',
+  ts: 'typescript', tsx: 'typescript',
+  py: 'python', sh: 'bash', zsh: 'bash', kt: 'kotlin', kts: 'kotlin', rs: 'rust',
+  h: 'c', cc: 'cpp', hpp: 'cpp', cs: 'csharp', rb: 'ruby', pl: 'perl',
+  toml: 'ini', properties: 'ini', patch: 'diff', gql: 'graphql',
+}
+
+/** 하이라이팅에 쓸 언어 이름. */
 export function highlightLanguage(path: string): string {
   const extension = extensionOf(path)
-  if (extension === 'yml') return 'yaml'
-  if (extension === 'htm' || extension === 'html') return 'xml'
-  return extension
+  return LANGUAGE_BY_EXTENSION[extension] ?? extension
 }
 
 export function delimiterFor(path: string): string {

@@ -8,9 +8,22 @@
 
 export const IMAGE_EXTENSIONS = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'avif', 'bmp', 'ico']
 
+/*
+ * 코드 파일. 편집기에서 고치고, 미리보기는 실행이 아니라 문법 강조로만 보여 줍니다.
+ * 강조기(highlight.js 의 common 벌)가 아는 말만 둡니다. 모르는 말을 두면 흰 글로만 나옵니다.
+ * 확장자 → 강조기가 부르는 이름은 textPreview.ts 의 highlightLanguage 에 있습니다.
+ */
+export const CODE_EXTENSIONS = [
+  'sql', 'js', 'mjs', 'cjs', 'jsx', 'ts', 'tsx', 'py', 'sh', 'bash', 'zsh',
+  'java', 'kt', 'kts', 'go', 'rs', 'c', 'h', 'cpp', 'cc', 'hpp', 'cs', 'swift',
+  'rb', 'php', 'lua', 'pl', 'r', 'css', 'scss', 'less', 'ini', 'toml', 'properties',
+  'diff', 'patch', 'graphql', 'gql', 'makefile',
+]
+
 export const DOCUMENT_EXTENSIONS = [
   'pdf', 'txt', 'csv', 'tsv', 'json', 'yaml', 'yml', 'xml', 'html', 'htm',
   'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'hwp', 'hwpx',
+  ...CODE_EXTENSIONS,
 ]
 
 /** 표로 그릴 수 있는 엑셀. 옛 이진 형식(xls)도 읽습니다. */
@@ -20,7 +33,7 @@ const SHEET_EXTENSIONS = ['xlsx', 'xlsm', 'xls', 'csv2']
 const WORD_EXTENSIONS = ['docx']
 
 /** 글자로 되어 있어 편집기에서 고쳐 쓸 수 있는 형식. */
-const TEXT_EXTENSIONS = ['txt', 'csv', 'tsv', 'json', 'yaml', 'yml', 'xml', 'html', 'htm']
+const TEXT_EXTENSIONS = ['txt', 'csv', 'tsv', 'json', 'yaml', 'yml', 'xml', 'html', 'htm', ...CODE_EXTENSIONS]
 
 const ATTACHMENT_EXTENSIONS = new Set([...IMAGE_EXTENSIONS, ...DOCUMENT_EXTENSIONS])
 
@@ -104,6 +117,8 @@ const MIME_BY_EXTENSION: Record<string, string> = {
   ico: 'image/x-icon',
   pdf: 'application/pdf', txt: 'text/plain', csv: 'text/csv', tsv: 'text/tab-separated-values',
   json: 'application/json', yaml: 'text/yaml', yml: 'text/yaml',
+  // 코드 파일은 모두 글자입니다. 브라우저가 형식을 비워 두어도 글자로 읽히게 합니다.
+  ...Object.fromEntries(CODE_EXTENSIONS.map((extension) => [extension, 'text/plain'])),
 }
 
 /**

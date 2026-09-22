@@ -478,6 +478,7 @@ git 은 한 번 올린 바이너리를 이력에 영구히 남겨서, 지워도 
 | 마크다운 | `md` |
 | 이미지 | `png` `jpg` `jpeg` `gif` `webp` `svg` `avif` `bmp` `ico` |
 | 문서 | `pdf` `txt` `csv` `tsv` `json` `yaml` `yml` `xml` `html` `htm` `doc` `docx` `xls` `xlsx` `ppt` `pptx` `hwp` `hwpx` |
+| 코드 | `sql` `js` `mjs` `cjs` `jsx` `ts` `tsx` `py` `sh` `bash` `zsh` `java` `kt` `kts` `go` `rs` `c` `h` `cpp` `cc` `hpp` `cs` `swift` `rb` `php` `lua` `pl` `r` `css` `scss` `less` `ini` `toml` `properties` `diff` `patch` `graphql` `gql` `makefile` |
 
 - **5 MB 를 넘는 첨부는 동기화하지 않습니다.** 목록에는 보이고 미리보기도 되지만,
   이 컴퓨터에만 남습니다. 마크다운에는 이 제한이 없습니다.
@@ -491,6 +492,7 @@ git 은 한 번 올린 바이너리를 이력에 영구히 남겨서, 지워도 
 | --- | --- | --- |
 | `csv` `tsv` | 가능 | **표**로 그립니다 |
 | `json` `yaml` `yml` `xml` | 가능 | 색을 입혀 보여 줍니다 |
+| 코드 (`sql` `py` `js` `ts` … 위 표) | 가능 | **실행하지 않고 문법 강조만** 해서 보여 줍니다. 강조기(highlight.js common)가 아는 말만 받으며, `jsx`·`tsx` 는 javascript·typescript 로, `toml`·`properties` 는 `ini` 로 읽습니다 |
 | `html` `htm` | 가능 | **실제로 그려서** 보여 줍니다 |
 | `txt` | 가능 | 그릴 것이 없어 편집기만 씁니다 |
 | `xlsx` `xls` | — | **표**로 그립니다. 시트가 여럿이면 탭으로 오갑니다 |
