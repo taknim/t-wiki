@@ -113,7 +113,32 @@ try {
   await page.waitForTimeout(300)
   await page.screenshot({ path: join(HERE, '..', 'shots', 'gutter', '01-gutter.png'), clip: { x: 430, y: 60, width: 670, height: 320 } })
 
-  step('3. 낫표 자리가 오른쪽 아래에 행·열로 적힌다')
+  /*
+   * 줄 간격은 CSS 변수로만 바뀝니다. 그 뒤 번호가 옛 높이로 남아 글과 어긋났습니다.
+   * 번호 높이의 합이 글 높이와 다시 같아야 합니다.
+   */
+  step('3. 줄 간격을 바꿔도 번호가 글과 나란히 선다')
+  const before = await gutter()
+  await page.click('button[aria-label="설정"]')
+  await page.waitForSelector('.settings-nav')
+  await page.click('.settings-nav button:has-text("모양")')
+  await page.waitForTimeout(300)
+  await page.click('[aria-label="줄 간격"] button:text-is("아주 넓게")')
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(500)
+  const wider = await gutter()
+  console.log('  ' + JSON.stringify({ before: before.heights.slice(0, 3), after: wider.heights.slice(0, 3), total: wider.total, inner: wider.inner }))
+  expect('줄이 더 높아짐', wider.heights[0] > before.heights[0], `${before.heights[0]} → ${wider.heights[0]}`)
+  expect('번호가 여전히 글과 나란히 섬', Math.abs(wider.total - wider.inner) <= 4, `${wider.total} vs ${wider.inner}`)
+  await page.click('button[aria-label="설정"]')
+  await page.waitForSelector('.settings-nav')
+  await page.click('.settings-nav button:has-text("모양")')
+  await page.waitForTimeout(300)
+  await page.click('[aria-label="줄 간격"] button:text-is("보통")')
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(500)
+
+  step('4. 낫표 자리가 오른쪽 아래에 행·열로 적힌다')
   await page.click('.main .editor')
   // 스크립트로 옮긴 자리는 글쇠를 한 번 오가야 화면에 실립니다(사람은 늘 글쇠나 마우스로 옮깁니다).
   await page.evaluate(() => {
@@ -134,7 +159,7 @@ try {
   const order = await page.evaluate(() => [...document.querySelectorAll('.info-bar .info-meta')].map((one) => one.className.includes('info-caret') ? 'caret' : 'meta'))
   expect('크기 앞에 섬', order[0] === 'caret', JSON.stringify(order))
 
-  step('4. 미리보기만 볼 때는 낫표 자리가 사라지고, 끄면 줄 번호도 사라진다')
+  step('5. 미리보기만 볼 때는 낫표 자리가 사라지고, 끄면 줄 번호도 사라진다')
   await page.click('.mode-switch button[aria-label="미리보기"]')
   await page.waitForTimeout(300)
   expect('편집기가 없으면 자리도 없음', (await caret()) === null, String(await caret()))

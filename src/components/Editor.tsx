@@ -80,9 +80,15 @@ export function Editor({ value, path, onChange, onSave, lineNumbers = false, onC
       setHeights([...glass.children].map((row) => (row as HTMLElement).getBoundingClientRect().height))
     }
     measure()
-    // 폭이 바뀌면 접히는 자리가 바뀝니다. 창을 늘이고 줄일 때 다시 잽니다.
+    /*
+     * 폭이 바뀌면 접히는 자리가 바뀝니다. 창을 늘이고 줄일 때 다시 잽니다.
+     * 줄 간격 설정은 CSS 변수로만 바뀌어 여기서는 알 길이 없습니다. 그래서 거울의 첫 줄도
+     * 함께 지켜봅니다 — 줄 높이가 바뀌면 첫 줄부터 높이가 달라지니 그때 다시 잽니다.
+     * 이걸 빼먹었더니 줄 간격을 바꾼 뒤 번호가 옛 높이로 남아 글과 어긋났습니다.
+     */
     const watcher = new ResizeObserver(measure)
     if (ref.current) watcher.observe(ref.current)
+    if (mirror.current?.firstElementChild) watcher.observe(mirror.current.firstElementChild)
     return () => watcher.disconnect()
   }, [lineNumbers, value])
 
