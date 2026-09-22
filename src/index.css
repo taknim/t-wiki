@@ -751,6 +751,13 @@ mark { background: var(--mark); color: inherit; border-radius: 2px; }
   visibility: hidden;
   pointer-events: none;
   box-sizing: border-box;
+  /*
+   * 높이를 0 으로 눌러 둡니다. 띄워 둔 것이라 흐름에는 안 끼지만, 아래로 삐져나온 만큼은
+   * 본문 칸의 굴림 범위에 들어가서 굴림대가 하나 더 생기고 화면이 아래로 넘어갔습니다.
+   * 안엣것은 그대로 그려지므로 줄 높이는 여전히 잴 수 있습니다.
+   */
+  height: 0;
+  overflow: hidden;
   /* 좌우 여백도 글상자를 재서 스크립트가 맞춥니다. 번호 칸이 있으면 왼쪽이 더 넓습니다. */
   font-family: var(--mono);
   font-size: 13px;

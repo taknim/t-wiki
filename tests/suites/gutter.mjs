@@ -98,6 +98,15 @@ try {
   }))
   console.log('  ' + JSON.stringify(scrolled))
   expect('본문 칸은 제자리, 글상자만 굴러감', scrolled.main === 0 && scrolled.editor > 0, JSON.stringify(scrolled))
+  /*
+   * 거울이 아래로 삐져나오면 본문 칸의 굴림 범위에 들어가 굴림대가 하나 더 생기고 화면이
+   * 넘어갑니다. 본문 칸에는 굴릴 것이 없어야 합니다.
+   */
+  const extra = await page.evaluate(() => {
+    const main = document.querySelector('.main')
+    return main.scrollHeight - main.clientHeight
+  })
+  expect('본문 칸에 굴릴 것이 없음(굴림대가 둘이 아님)', extra === 0, String(extra))
   expect('번호도 함께 굴러감', Math.abs(scrolled.gutter - scrolled.editor) <= 1, JSON.stringify(scrolled))
   expect('틀이 글상자보다 길어지지 않음', scrolled.frameH <= scrolled.bodyH + 1, JSON.stringify(scrolled))
   await page.mouse.wheel(0, -5000)
