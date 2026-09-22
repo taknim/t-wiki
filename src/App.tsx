@@ -5,6 +5,7 @@ import { Preview } from './components/Preview'
 import { AssetView } from './components/AssetView'
 import { FolderView } from './components/FolderView'
 import { InfoBar, type SelectionInfo } from './components/InfoBar'
+import { caretAt, jumpInEditor, offsetOf, parseLineColumn } from './lib/editorJump'
 import { SearchPanel } from './components/SearchPanel'
 import { Favorites } from './components/Favorites'
 import { SyncCountdown } from './components/SyncCountdown'
@@ -85,7 +86,7 @@ export default function App() {
   // 'last' 는 지난번에 보던 자리로. 갈 곳이 정해진 부름(동기화 설정이 덜 됐을 때)만 묶음을 짚습니다.
   const [settingsTab, setSettingsTab] = useState<'general' | 'appearance' | 'sync' | 'last' | null>(null)
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
-  /** 편집기 낫표가 선 행·열. 편집기가 없으면 null. 아래 표시줄에 적습니다. */
+  /** 편집기 커서가 있는 행·열. 편집기가 없으면 null. 아래 표시줄에 적습니다. */
   const [caret, setCaret] = useState<{ line: number; column: number } | null>(null)
   const { settings: look } = useTheme()
   /** 옮길 폴더를 고르는 창에 올라와 있는 것. 없으면 닫힘. */
@@ -863,6 +864,31 @@ export default function App() {
     setDraft(draft.slice(0, draft.length - body.length) + next)
     setDirty(true)
   }
+
+  /*
+   * 행·열 표시를 누르면 갈 자리를 묻습니다. "12" 만 적으면 그 줄 첫 칸, "12:5" 면 그 줄 다섯째 칸.
+   * 편집기는 목차와 같은 길로 찾습니다. 편집기가 없는(미리보기만 보는) 때는 표시 자체가 없습니다.
+   */
+  const handleGoTo = useCallback(async () => {
+    const answer = await dialogs.prompt({
+      title: '자리로 가기',
+      label: '행, 또는 행:열 (예: 120 또는 120:8)',
+      defaultValue: caret ? `${caret.line}:${caret.column}` : '',
+      confirmText: '가기',
+    })
+    if (answer === null) return
+    const target = parseLineColumn(answer)
+    if (!target) { flash('행과 열은 숫자로 적어 주세요.'); return }
+    const editor = document.querySelector<HTMLTextAreaElement>('.main > .doc-body > .editor-frame > .editor')
+    if (!editor) return
+    /*
+     * 한 박자 뒤에 옮깁니다. 물음 창은 Enter 의 keydown 에서 닫히는데, 그 자리에서 곧장
+     * 편집기에 초점을 주면 같은 Enter 의 keypress 가 편집기로 들어가 줄바꿈이 하나 끼었습니다.
+     */
+    await new Promise((settle) => window.setTimeout(settle, 0))
+    jumpInEditor(editor, offsetOf(editor.value, target.line, target.column))
+    setCaret(caretAt(editor.value, editor.selectionStart))
+  }, [caret, dialogs, flash])
 
   const handleNewDoc = useCallback(
     async (dirPath: string) => {
@@ -1816,6 +1842,7 @@ export default function App() {
               vaultName={vault.vaultName}
               onNotice={flash}
               caret={look.caretPosition ? caret : null}
+              onGoTo={() => void handleGoTo()}
             />
           )}
         </main>

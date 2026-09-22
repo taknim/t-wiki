@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { applyFormat, type FormatId } from '../lib/markdownFormat'
 import { selectionBox, type SelectionBox } from '../lib/textareaCaret'
+import { caretAt } from '../lib/editorJump'
 import { FormatToolbar } from './FormatToolbar'
 
 interface EditorProps {
@@ -10,16 +11,10 @@ interface EditorProps {
   onSave: () => void
   /** 왼쪽에 줄 번호를 세울지. */
   lineNumbers?: boolean
-  /** 낫표가 선 자리(1부터 세는 행·열)가 바뀔 때. 아래 표시줄에 적습니다. */
+  /** 커서가 있는 자리(1부터 세는 행·열)가 바뀔 때. 아래 표시줄에 적습니다. */
   onCaret?: (at: { line: number; column: number } | null) => void
 }
 
-/** 낫표 자리. 줄은 줄바꿈으로, 열은 그 줄 안의 글자 수로 셉니다(둘 다 1부터). */
-function caretAt(text: string, offset: number): { line: number; column: number } {
-  const before = text.slice(0, offset)
-  const lastBreak = before.lastIndexOf('\n')
-  return { line: (before.match(/\n/g)?.length ?? 0) + 1, column: offset - lastBreak }
-}
 
 /*
  * 편집기 안내 문구. 마크다운만 다루는 것이 아니므로 종류에 맞춰 다르게 말합니다.

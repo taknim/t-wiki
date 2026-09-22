@@ -20,7 +20,7 @@ export interface ThemeSettings {
   imageWidth: ImageWidthId
   /** 편집기 왼쪽에 줄 번호를 세울지. */
   lineNumbers: boolean
-  /** 아래 표시줄에 낫표가 선 행·열을 적을지. */
+  /** 아래 표시줄에 커서가 있는 행·열을 적을지. */
   caretPosition: boolean
 }
 

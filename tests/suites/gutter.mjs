@@ -62,16 +62,16 @@ try {
   await page.click('.mode-switch button[aria-label="편집"]')
   await page.waitForTimeout(300)
 
-  step('1. 기본으로는 줄 번호도 낫표 자리도 없다')
+  step('1. 기본으로는 줄 번호도 커서 위치도 없다')
   expect('줄 번호 없음', (await gutter()).shown === false)
   await page.click('.main .editor')
   await page.waitForTimeout(200)
-  expect('낫표 자리 없음', (await caret()) === null)
+  expect('커서 위치 없음', (await caret()) === null)
 
   step('2. 설정에서 켜면 줄 번호가 서고, 접힌 긴 줄에도 번호는 한 번만 선다')
   await openSettings('편집기')
   await page.click('.checkbox:has-text("줄 번호") input')
-  await page.click('.checkbox:has-text("낫표 자리") input')
+  await page.click('.checkbox:has-text("커서 위치") input')
   await page.keyboard.press('Escape')
   await page.waitForTimeout(500)
   const numbered = await gutter()
@@ -138,7 +138,7 @@ try {
   await page.keyboard.press('Escape')
   await page.waitForTimeout(500)
 
-  step('4. 낫표 자리가 오른쪽 아래에 행·열로 적힌다')
+  step('4. 커서 위치가 오른쪽 아래에 행·열로 적힌다')
   await page.click('.main .editor')
   // 스크립트로 옮긴 자리는 글쇠를 한 번 오가야 화면에 실립니다(사람은 늘 글쇠나 마우스로 옮깁니다).
   await page.evaluate(() => {
@@ -159,7 +159,47 @@ try {
   const order = await page.evaluate(() => [...document.querySelectorAll('.info-bar .info-meta')].map((one) => one.className.includes('info-caret') ? 'caret' : 'meta'))
   expect('크기 앞에 섬', order[0] === 'caret', JSON.stringify(order))
 
-  step('5. 미리보기만 볼 때는 낫표 자리가 사라지고, 끄면 줄 번호도 사라진다')
+  /*
+   * 긴 문서에서 몇백 번째 줄을 굴려 찾는 것은 더딥니다. 행·열 표시를 누르면 자리를 물어
+   * 그리로 데려다 줍니다. 열은 줄 길이를 넘으면 줄 끝으로, 행은 줄 수를 넘으면 마지막 줄로.
+   */
+  step('5. 행·열 표시를 누르면 자리를 물어 그리로 뛰어간다')
+  await page.click('.info-caret')
+  await page.waitForSelector('.dialog input', { timeout: 3000 })
+  const offered = await page.inputValue('.dialog input')
+  expect('지금 자리가 미리 적혀 있음', offered === '4:4', offered)
+  await page.fill('.dialog input', '40:3')
+  await page.keyboard.press('Enter')
+  await page.waitForTimeout(400)
+  const landed = await page.evaluate(() => {
+    const editor = document.querySelector('.main .editor')
+    const before = editor.value.slice(0, editor.selectionStart)
+    return { line: before.split('\n').length, column: editor.selectionStart - before.lastIndexOf('\n'),
+      focused: document.activeElement === editor, scrolled: editor.scrollTop > 0,
+      pill: document.querySelector('.pill')?.textContent }
+  })
+  console.log('  ' + JSON.stringify(landed))
+  expect('40행 3열에 커서가 섬', landed.line === 40 && landed.column === 3, JSON.stringify(landed))
+  expect('편집기에 초점이 있고 그 줄까지 굴러감', landed.focused && landed.scrolled, JSON.stringify(landed))
+  // 물음 창을 닫은 Enter 가 편집기로 새어 들어 줄바꿈을 끼워 넣은 적이 있습니다.
+  expect('글은 손대지 않음', landed.pill === '저장됨', String(landed.pill))
+  expect('표시도 따라 바뀜', (await caret()) === '행 40 열 3', String(await caret()))
+  // 행만 적으면 그 줄 첫 칸. 줄 수를 넘으면 마지막 줄.
+  await page.click('.info-caret')
+  await page.waitForSelector('.dialog input', { timeout: 3000 })
+  await page.fill('.dialog input', '999')
+  await page.keyboard.press('Enter')
+  await page.waitForTimeout(300)
+  expect('넘치는 행은 마지막 줄 첫 칸', (await caret()) === '행 65 열 1', String(await caret()))
+  // 취소하면 자리는 그대로.
+  await page.click('.info-caret')
+  await page.waitForSelector('.dialog input', { timeout: 3000 })
+  await page.fill('.dialog input', '2')
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(300)
+  expect('취소하면 그대로', (await caret()) === '행 65 열 1', String(await caret()))
+
+  step('6. 미리보기만 볼 때는 커서 위치가 사라지고, 끄면 줄 번호도 사라진다')
   await page.click('.mode-switch button[aria-label="미리보기"]')
   await page.waitForTimeout(300)
   expect('편집기가 없으면 자리도 없음', (await caret()) === null, String(await caret()))

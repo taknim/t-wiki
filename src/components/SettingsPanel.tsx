@@ -1194,9 +1194,9 @@ export function SettingsPanel({
                 checked={settings.caretPosition}
                 onChange={(event) => update({ caretPosition: event.target.checked })}
               />
-              아래 표시줄에 낫표 자리(행·열) 보이기
+              아래 표시줄에 커서 위치(행·열) 보이기
               <span className="hint">
-                편집기에서 낫표가 선 곳을 <code>12행 5열</code> 처럼 오른쪽 아래에 적습니다. 미리보기만 볼 때는 나오지 않습니다.
+                편집기에서 커서가 있는 곳을 <code>행 12 열 5</code> 처럼 오른쪽 아래에 적습니다. 미리보기만 볼 때는 나오지 않습니다.
               </span>
             </label>
           </section>

@@ -1841,6 +1841,20 @@ a.btn { text-decoration: none; color: inherit; display: inline-block; }
 .info-path:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
 .info-sep { flex: 1; min-width: 8px; }
 .info-meta { flex-shrink: 0; }
+/* 행·열은 단추입니다. 글씨는 다른 값과 같게 두고 손을 얹었을 때만 밑줄로 눌린다는 것을 알립니다. */
+button.info-caret {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+  text-decoration-color: transparent;
+}
+button.info-caret:hover { text-decoration-color: currentcolor; }
+button.info-caret:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
 /*
  * 값 사이의 가운데 점. 빈칸만으로는 "파일 2개 159 B" 가 한 덩어리로 읽힙니다.
  * 앞에 선 값이 있을 때만 붙이므로, 시각이 없는 폴더에서도 점이 남지 않습니다.

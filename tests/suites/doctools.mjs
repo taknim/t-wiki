@@ -277,7 +277,7 @@ try {
   expect('편집기가 굴러감', jumped.top > 0, JSON.stringify(jumped))
   expect('그 줄이 화면 안에 듦',
     jumped.line >= jumped.top - 40 && jumped.line <= jumped.top + 400, JSON.stringify(jumped))
-  expect('낫표도 그 줄에 섬', jumped.caret === jumped.at, JSON.stringify(jumped))
+  expect('커서도 그 줄에 섬', jumped.caret === jumped.at, JSON.stringify(jumped))
   // 자리를 재느라 값을 잠깐 갈아 끼웁니다. 고쳐졌다고 잡히면 안 됩니다.
   expect('글은 고쳐지지 않음', jumped.dirty === '저장됨', String(jumped.dirty))
 

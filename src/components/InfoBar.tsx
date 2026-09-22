@@ -30,8 +30,10 @@ interface InfoBarProps {
   vaultName: string
   /** 알림 한 줄. 경로를 베낀 뒤 알려 줍니다. */
   onNotice: (message: string) => void
-  /** 편집기 낫표가 선 행·열. 설정을 켰고 편집기가 있을 때만 옵니다. */
+  /** 편집기 커서가 있는 행·열. 설정을 켰고 편집기가 있을 때만 옵니다. */
   caret?: { line: number; column: number } | null
+  /** 행·열 표시를 눌렀을 때. 행·열을 물어 그 자리로 데려다 줍니다. */
+  onGoTo?: () => void
 }
 
 const KIND_LABEL: Record<SelectionKind, string> = {
@@ -44,7 +46,7 @@ const KIND_LABEL: Record<SelectionKind, string> = {
 type Panel = 'toc' | 'backlinks' | null
 
 export function InfoBar({
-  info, headings, index, onOpen, vaultName, onNotice, caret = null,
+  info, headings, index, onOpen, vaultName, onNotice, caret = null, onGoTo,
 }: InfoBarProps) {
   const [panel, setPanel] = useState<Panel>(null)
 
@@ -148,10 +150,16 @@ export function InfoBar({
           폴더도 파일과 같은 차례(크기 · 시각)로 늘어놓고, 그 앞에 항목 수만 더 답니다.
           고른 것에 따라 자리가 바뀌면 눈이 매번 다시 훑어야 합니다.
         */}
+        {/* 눌러서 다른 행·열로 뛰어갑니다. 긴 문서에서 몇백 번째 줄을 굴려 찾는 것은 더딥니다. */}
         {caret && (
-          <span className="info-meta info-caret" data-tip="편집기에서 낫표가 선 행과 열">
+          <button
+            type="button"
+            className="info-meta info-caret"
+            data-tip="편집기에서 커서가 있는 행과 열. 눌러서 다른 자리로"
+            onClick={onGoTo}
+          >
             행 {caret.line} 열 {caret.column}
-          </span>
+          </button>
         )}
 
         {info.kind === 'dir' && (
