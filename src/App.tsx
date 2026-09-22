@@ -88,7 +88,7 @@ export default function App() {
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
   /** 편집기 커서가 있는 행·열. 편집기가 없으면 null. 아래 표시줄에 적습니다. */
   const [caret, setCaret] = useState<{ line: number; column: number } | null>(null)
-  const { settings: look } = useTheme()
+  const { settings: look, update: updateLook } = useTheme()
   /** 옮길 폴더를 고르는 창에 올라와 있는 것. 없으면 닫힘. */
   const [moving, setMoving] = useState<string | null>(null)
   const [reportOpen, setReportOpen] = useState(false)
@@ -870,6 +870,9 @@ export default function App() {
    * 편집기는 목차와 같은 길로 찾습니다. 편집기가 없는(미리보기만 보는) 때는 표시 자체가 없습니다.
    */
   const handleGoTo = useCallback(async () => {
+    const editor = document.querySelector<HTMLTextAreaElement>('.main > .doc-body > .editor-frame > .editor')
+    // 단추는 편집기가 있을 때만 보이지만, 단축키는 미리보기만 보는 중에도 눌립니다.
+    if (!editor) { flash('편집 화면에서만 갈 수 있습니다.'); return }
     const answer = await dialogs.numbers({
       title: '자리로 가기',
       label: '갈 행과 열. 줄 수를 넘으면 마지막 줄로, 줄 길이를 넘으면 줄 끝으로 갑니다.',
@@ -880,8 +883,6 @@ export default function App() {
       confirmText: '가기',
     })
     if (!answer) return
-    const editor = document.querySelector<HTMLTextAreaElement>('.main > .doc-body > .editor-frame > .editor')
-    if (!editor) return
     /*
      * 한 박자 뒤에 옮깁니다. 물음 창은 Enter 의 keydown 에서 닫히는데, 그 자리에서 곧장
      * 편집기에 초점을 주면 같은 Enter 의 keypress 가 편집기로 들어가 줄바꿈이 하나 끼었습니다.
@@ -889,7 +890,7 @@ export default function App() {
     await new Promise((settle) => window.setTimeout(settle, 0))
     jumpInEditor(editor, offsetOf(editor.value, answer.line, answer.column))
     setCaret(caretAt(editor.value, editor.selectionStart))
-  }, [caret, dialogs])
+  }, [caret, dialogs, flash])
 
   const handleNewDoc = useCallback(
     async (dirPath: string) => {
@@ -963,10 +964,10 @@ export default function App() {
   useEffect(() => {
     sidebarOpenRef.current = sidebarOpen
   }, [sidebarOpen])
-  const shortcutRefs = useRef({ handleNewDoc, currentDir, textPreview, startSync, hasDoc: false })
+  const shortcutRefs = useRef({ handleNewDoc, currentDir, textPreview, startSync, handleGoTo, look, hasDoc: false })
   useEffect(() => {
     shortcutRefs.current = {
-      handleNewDoc, currentDir, textPreview, startSync,
+      handleNewDoc, currentDir, textPreview, startSync, handleGoTo, look,
       hasDoc: selectedPath !== null && (isMarkdown(selectedPath) || textPreview !== null),
     }
   })
@@ -979,7 +980,7 @@ export default function App() {
       if (!id) return
       event.preventDefault()
 
-      const { handleNewDoc: newDoc, currentDir: dir, hasDoc, startSync: runSync } = shortcutRefs.current
+      const { handleNewDoc: newDoc, currentDir: dir, hasDoc, startSync: runSync, handleGoTo: goTo, look: shown } = shortcutRefs.current
       switch (id) {
         case 'search':
           if (!vault.tree) return
@@ -1013,6 +1014,21 @@ export default function App() {
           // 단추와 같은 길입니다. 설정이 덜 됐으면 실행 대신 설정 창을 엽니다.
           if (vault.tree) runSync()
           return
+        case 'goto':
+          if (hasDoc) void goTo()
+          return
+        /*
+         * 켜고 끄는 것은 설정과 같은 값입니다. 미리보기만 보는 중에는 눈에 띄는 변화가 없으니
+         * 무엇이 어떻게 됐는지 알림으로 말해 줍니다.
+         */
+        case 'line-numbers':
+          updateLook({ lineNumbers: !shown.lineNumbers })
+          flash(shown.lineNumbers ? '줄 번호를 껐습니다.' : '줄 번호를 켰습니다.')
+          return
+        case 'caret-position':
+          updateLook({ caretPosition: !shown.caretPosition })
+          flash(shown.caretPosition ? '커서 위치를 감췄습니다.' : '커서 위치를 보입니다.')
+          return
         case 'settings':
           setSettingsTab((open) => open ?? 'last')
           return
@@ -1023,7 +1039,7 @@ export default function App() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [applySidebarOpen, applySidebarTab, listEntry, vault.tree])
+  }, [applySidebarOpen, applySidebarTab, flash, listEntry, updateLook, vault.tree])
 
   const handleNewFolder = useCallback(
     async (dirPath: string) => {

@@ -38,6 +38,14 @@ export const SHORTCUTS: Shortcut[] = [
   { id: 'tab-favorites', label: '옆줄을 즐겨찾기로', keys: { key: '2', mod: true, shift: true }, scope: '앱 어디서나' },
   { id: 'sidebar', label: '옆줄(폴더 트리) 접기 / 펴기', keys: { key: 'b', mod: true, shift: true }, scope: '앱 어디서나' },
   { id: 'sync', label: 'GitHub 동기화 실행 (설정이 덜 됐으면 설정을 엶)', keys: { key: 'g', mod: true, shift: true }, scope: '앱 어디서나' },
+  /*
+   * 편집기 관련 셋. 글자에 큰 뜻은 없고, 브라우저가 가져가지 않는 글쇠 가운데 골랐습니다.
+   * (⌘⇧J·⌘⇧C·⌘⇧I 는 개발자 도구, ⌘⇧N 은 시크릿 창, ⌘⇧O 는 북마크, ⌘⇧R 은 새로 고침.)
+   * ⌘G 는 크롬이 "다음 찾기"로 가져가므로 L(line) 을 씁니다.
+   */
+  { id: 'goto', label: '편집기에서 행·열로 가기', keys: { key: 'l', mod: true, shift: true }, scope: '앱 어디서나' },
+  { id: 'line-numbers', label: '편집기 줄 번호 켜기 / 끄기', keys: { key: 'k', mod: true, shift: true }, scope: '앱 어디서나' },
+  { id: 'caret-position', label: '아래 표시줄에 커서 위치 보이기 / 감추기', keys: { key: 'y', mod: true, shift: true }, scope: '앱 어디서나' },
   { id: 'settings', label: '설정 열기', keys: { key: ',', mod: true }, scope: '앱 어디서나' },
   { id: 'help', label: '이 단축키 목록', keys: { key: '/', mod: true }, scope: '앱 어디서나' },
 
