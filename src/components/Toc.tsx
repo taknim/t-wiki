@@ -47,7 +47,7 @@ export function Toc({ headings }: TocProps) {
     const main = document.querySelector<HTMLElement>('.main')
     if (main?.querySelector(`:scope > .doc-body > .preview #${CSS.escape(heading.id)}`)) return
 
-    const editor = main?.querySelector<HTMLTextAreaElement>(':scope > .doc-body > .editor') ?? null
+    const editor = main?.querySelector<HTMLTextAreaElement>(':scope > .doc-body > .editor-frame > .editor') ?? null
     if (!editor) return
 
     event.preventDefault()

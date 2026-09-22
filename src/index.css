@@ -695,7 +695,14 @@ mark { background: var(--mark); color: inherit; border-radius: 2px; }
   .split-resizer::after { transition: none; }
 }
 
+/*
+ * 편집기 틀. 글상자 하나만 있을 때는 그 자리를 그대로 채우고,
+ * 줄 번호를 켜면 왼쪽에 번호 칸이 서고 글상자는 남은 폭을 씁니다.
+ */
+.editor-frame { position: relative; display: flex; min-width: 0; min-height: 0; background: var(--bg); }
 .editor {
+  flex: 1;
+  min-width: 0;
   border: 0;
   resize: none;
   padding: 16px 20px;
@@ -707,6 +714,42 @@ mark { background: var(--mark); color: inherit; border-radius: 2px; }
   tab-size: 2;
 }
 .editor:focus { outline: none; }
+.editor-gutter {
+  flex: none;
+  width: 3.2em;
+  overflow: hidden;
+  padding-inline-end: 8px;
+  border-inline-end: 1px solid var(--border);
+  background: var(--bg-sunken);
+  color: var(--text-muted);
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: var(--doc-leading, 1.7);
+  text-align: end;
+  user-select: none;
+}
+.editor-gutter-pad { height: 16px; }
+.editor-gutter-line { box-sizing: border-box; }
+/*
+ * 거울은 글상자와 같은 자리에 같은 폭으로 놓되 보이지 않습니다.
+ * 글상자의 왼쪽 여백(20px)과 오른쪽 여백을 똑같이 두어 접히는 자리가 같게 합니다.
+ */
+.editor-mirror {
+  position: absolute;
+  inset-block-start: 0;
+  /* 왼쪽 자리와 폭은 글상자를 재서 스크립트가 맞춥니다. */
+  visibility: hidden;
+  pointer-events: none;
+  box-sizing: border-box;
+  padding: 0 20px;
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: var(--doc-leading, 1.7);
+  tab-size: 2;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+
 
 .preview {
   padding: 16px 20px;

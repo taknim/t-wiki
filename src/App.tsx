@@ -33,6 +33,7 @@ import { TrashView } from './components/TrashView'
 import { KeyboardIcon, TrashIcon } from './components/icons'
 import { ShortcutsPopover } from './components/ShortcutsPopover'
 import { SyncProgress } from './components/SyncProgress'
+import { useTheme } from './components/themeContext'
 import { MoveSheet } from './components/MoveSheet'
 import { matches, SHORTCUTS } from './lib/shortcuts'
 import { readTrashPolicy } from './lib/saveOptions'
@@ -84,6 +85,9 @@ export default function App() {
   // 'last' 는 지난번에 보던 자리로. 갈 곳이 정해진 부름(동기화 설정이 덜 됐을 때)만 묶음을 짚습니다.
   const [settingsTab, setSettingsTab] = useState<'general' | 'appearance' | 'sync' | 'last' | null>(null)
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
+  /** 편집기 낫표가 선 행·열. 편집기가 없으면 null. 아래 표시줄에 적습니다. */
+  const [caret, setCaret] = useState<{ line: number; column: number } | null>(null)
+  const { settings: look } = useTheme()
   /** 옮길 폴더를 고르는 창에 올라와 있는 것. 없으면 닫힘. */
   const [moving, setMoving] = useState<string | null>(null)
   const [reportOpen, setReportOpen] = useState(false)
@@ -1697,6 +1701,8 @@ export default function App() {
                         typedAtRef.current = Date.now()
                       }}
                       onSave={() => void commit()}
+                      lineNumbers={look.lineNumbers}
+                      onCaret={look.caretPosition ? setCaret : undefined}
                     />
                   )}
                   {textPreview && viewMode === 'split' && (
@@ -1761,6 +1767,8 @@ export default function App() {
                       typedAtRef.current = Date.now()
                     }}
                     onSave={() => void commit()}
+                    lineNumbers={look.lineNumbers}
+                    onCaret={look.caretPosition ? setCaret : undefined}
                   />
                 )}
                 {viewMode === 'split' && (
@@ -1807,6 +1815,7 @@ export default function App() {
               onOpen={(path) => void openDoc(path)}
               vaultName={vault.vaultName}
               onNotice={flash}
+              caret={look.caretPosition ? caret : null}
             />
           )}
         </main>

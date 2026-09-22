@@ -24,7 +24,7 @@ interface DocToolsProps {
 const PANES = [
   ':scope > .doc-body > .preview',
   ':scope > .asset-view > .preview',
-  ':scope > .doc-body > .editor',
+  ':scope > .doc-body > .editor-frame > .editor',
   ':scope > .asset-view',
 ]
 

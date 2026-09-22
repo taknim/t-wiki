@@ -30,6 +30,8 @@ interface InfoBarProps {
   vaultName: string
   /** 알림 한 줄. 경로를 베낀 뒤 알려 줍니다. */
   onNotice: (message: string) => void
+  /** 편집기 낫표가 선 행·열. 설정을 켰고 편집기가 있을 때만 옵니다. */
+  caret?: { line: number; column: number } | null
 }
 
 const KIND_LABEL: Record<SelectionKind, string> = {
@@ -42,7 +44,7 @@ const KIND_LABEL: Record<SelectionKind, string> = {
 type Panel = 'toc' | 'backlinks' | null
 
 export function InfoBar({
-  info, headings, index, onOpen, vaultName, onNotice,
+  info, headings, index, onOpen, vaultName, onNotice, caret = null,
 }: InfoBarProps) {
   const [panel, setPanel] = useState<Panel>(null)
 
@@ -155,6 +157,12 @@ export function InfoBar({
         <span className="info-meta" data-tip={info.kind === 'dir' ? '폴더 크기' : '파일 크기'}>
           {formatBytes(info.size)}
         </span>
+
+        {caret && (
+          <span className="info-meta info-caret" data-tip="편집기에서 낫표가 선 행과 열">
+            {caret.line}행 {caret.column}열
+          </span>
+        )}
 
         {info.lastModified !== null && (
           <span

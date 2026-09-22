@@ -151,6 +151,8 @@ export function parseBundle(raw: string): SettingsBundle | null {
       width: pick(appearance.width, WIDTHS, DEFAULT_SETTINGS.width),
       imageAlign: pick(appearance.imageAlign, IMAGE_ALIGNS, DEFAULT_SETTINGS.imageAlign),
       imageWidth: pick(appearance.imageWidth, IMAGE_WIDTHS, DEFAULT_SETTINGS.imageWidth),
+      lineNumbers: bool(appearance.lineNumbers, DEFAULT_SETTINGS.lineNumbers),
+      caretPosition: bool(appearance.caretPosition, DEFAULT_SETTINGS.caretPosition),
     },
     general: {
       rememberSession: bool(general.rememberSession, true),

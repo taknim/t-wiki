@@ -8,6 +8,17 @@ interface EditorProps {
   path: string
   onChange: (next: string) => void
   onSave: () => void
+  /** 왼쪽에 줄 번호를 세울지. */
+  lineNumbers?: boolean
+  /** 낫표가 선 자리(1부터 세는 행·열)가 바뀔 때. 아래 표시줄에 적습니다. */
+  onCaret?: (at: { line: number; column: number } | null) => void
+}
+
+/** 낫표 자리. 줄은 줄바꿈으로, 열은 그 줄 안의 글자 수로 셉니다(둘 다 1부터). */
+function caretAt(text: string, offset: number): { line: number; column: number } {
+  const before = text.slice(0, offset)
+  const lastBreak = before.lastIndexOf('\n')
+  return { line: (before.match(/\n/g)?.length ?? 0) + 1, column: offset - lastBreak }
 }
 
 /*
@@ -39,9 +50,46 @@ const SHORTCUTS: Record<string, FormatId> = {
   k: 'link',
 }
 
-export function Editor({ value, path, onChange, onSave }: EditorProps) {
+export function Editor({ value, path, onChange, onSave, lineNumbers = false, onCaret }: EditorProps) {
   const ref = useRef<HTMLTextAreaElement>(null)
   const [box, setBox] = useState<SelectionBox | null>(null)
+
+  /*
+   * 줄 번호.
+   *
+   * 글상자는 줄 번호를 세워 주지 않고, 긴 줄은 접혀 두세 줄로 그려집니다. 그래서 번호 하나가
+   * 몇 픽셀을 차지하는지 미리 알 수 없습니다. 글상자와 같은 글꼴·폭·접기로 그린 거울에
+   * 줄마다 한 덩이씩 놓고 그 높이를 재서, 번호를 같은 높이로 세웁니다.
+   * 긴 줄을 접지 않는(옆으로 굴리는) 길도 있지만 산문에는 맞지 않습니다.
+   */
+  const mirror = useRef<HTMLDivElement>(null)
+  const gutter = useRef<HTMLDivElement>(null)
+  const [heights, setHeights] = useState<number[]>([])
+  useLayoutEffect(() => {
+    if (!lineNumbers) return
+    const measure = () => {
+      const glass = mirror.current
+      const textarea = ref.current
+      if (!glass || !textarea) return
+      // 거울을 글상자의 글 자리에 정확히 포갭니다. 굴림대가 서면 그만큼 좁아지는 것까지.
+      glass.style.left = `${textarea.offsetLeft}px`
+      glass.style.width = `${textarea.clientWidth}px`
+      setHeights([...glass.children].map((row) => (row as HTMLElement).getBoundingClientRect().height))
+    }
+    measure()
+    // 폭이 바뀌면 접히는 자리가 바뀝니다. 창을 늘이고 줄일 때 다시 잽니다.
+    const watcher = new ResizeObserver(measure)
+    if (ref.current) watcher.observe(ref.current)
+    return () => watcher.disconnect()
+  }, [lineNumbers, value])
+
+  const reportCaret = useCallback(() => {
+    const textarea = ref.current
+    if (!textarea || !onCaret) return
+    onCaret(caretAt(textarea.value, textarea.selectionStart))
+  }, [onCaret])
+  // 문서를 떠나면 자리도 지웁니다.
+  useEffect(() => () => onCaret?.(null), [onCaret])
   // 서식을 적용하면 본문이 부모 상태로 올라갔다 내려오므로,
   // 새 값이 반영된 뒤에 선택을 복원해야 합니다.
   const pendingSelection = useRef<[number, number] | null>(null)
@@ -49,7 +97,8 @@ export function Editor({ value, path, onChange, onSave }: EditorProps) {
   const syncToolbar = useCallback(() => {
     const textarea = ref.current
     setBox(textarea ? selectionBox(textarea) : null)
-  }, [])
+    reportCaret()
+  }, [reportCaret])
 
   // 다른 문서로 옮겨가면 도구 막대를 닫습니다.
   // effect 로 미루면 이전 문서 기준 위치가 한 프레임 남으므로 렌더 중에 정리합니다.
@@ -136,8 +185,27 @@ export function Editor({ value, path, onChange, onSave }: EditorProps) {
     }
   }
 
+  const lines = lineNumbers ? value.split('\n') : []
+
   return (
-    <>
+    <div className={lineNumbers ? 'editor-frame has-gutter' : 'editor-frame'}>
+      {lineNumbers && (
+        <>
+          <div ref={gutter} className="editor-gutter" aria-hidden="true">
+            {/* 글상자의 위 여백만큼 띄워 첫 줄과 나란히 섭니다. */}
+            <div className="editor-gutter-pad" />
+            {lines.map((_, at) => (
+              <div key={at} className="editor-gutter-line" style={{ height: heights[at] }}>{at + 1}</div>
+            ))}
+          </div>
+          {/* 거울. 보이지 않지만 글상자와 같은 폭·글꼴·접기로 줄마다 한 덩이씩 놓습니다. */}
+          <div ref={mirror} className="editor-mirror" aria-hidden="true">
+            {lines.map((line, at) => (
+              <div key={at}>{line === '' ? '\u200b' : line}</div>
+            ))}
+          </div>
+        </>
+      )}
       <textarea
         ref={ref}
         className="editor"
@@ -145,8 +213,14 @@ export function Editor({ value, path, onChange, onSave }: EditorProps) {
         spellCheck={false}
         onChange={(event) => onChange(event.target.value)}
         onKeyDown={handleKeyDown}
+        onKeyUp={reportCaret}
+        onClick={reportCaret}
         onSelect={syncToolbar}
-        onScroll={syncToolbar}
+        onScroll={(event) => {
+          syncToolbar()
+          // 번호도 함께 굴립니다. 글상자만 굴러가면 번호가 엉뚱한 줄 옆에 섭니다.
+          if (gutter.current) gutter.current.scrollTop = event.currentTarget.scrollTop
+        }}
         onBlur={(event) => {
           // 도구 막대를 누른 경우에는 닫지 않습니다.
           if (event.relatedTarget instanceof Element && event.relatedTarget.closest('.format-toolbar')) return
@@ -155,6 +229,6 @@ export function Editor({ value, path, onChange, onSave }: EditorProps) {
         placeholder={placeholderFor(path)}
       />
       {box && <FormatToolbar box={box} onApply={runFormat} />}
-    </>
+    </div>
   )
 }

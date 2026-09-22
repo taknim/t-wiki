@@ -18,6 +18,10 @@ export interface ThemeSettings {
   width: WidthId
   imageAlign: ImageAlignId
   imageWidth: ImageWidthId
+  /** 편집기 왼쪽에 줄 번호를 세울지. */
+  lineNumbers: boolean
+  /** 아래 표시줄에 낫표가 선 행·열을 적을지. */
+  caretPosition: boolean
 }
 
 export const DEFAULT_SETTINGS: ThemeSettings = {
@@ -29,6 +33,8 @@ export const DEFAULT_SETTINGS: ThemeSettings = {
   width: 'medium',
   imageAlign: 'start',
   imageWidth: 'full',
+  lineNumbers: false,
+  caretPosition: false,
 }
 
 /** CSS 변수로 내보낼 색 한 벌. */
@@ -597,6 +603,8 @@ export function loadSettings(): ThemeSettings {
       imageWidth: IMAGE_WIDTHS.some((w) => w.id === parsed.imageWidth)
         ? parsed.imageWidth!
         : DEFAULT_SETTINGS.imageWidth,
+      lineNumbers: typeof parsed.lineNumbers === 'boolean' ? parsed.lineNumbers : DEFAULT_SETTINGS.lineNumbers,
+      caretPosition: typeof parsed.caretPosition === 'boolean' ? parsed.caretPosition : DEFAULT_SETTINGS.caretPosition,
     }
   } catch {
     return DEFAULT_SETTINGS

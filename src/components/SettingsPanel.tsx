@@ -99,6 +99,7 @@ const TABS: { id: TabId; name: string; hint: string; items: { id: string; name: 
       { id: 'set-theme', name: '테마' },
       { id: 'set-font', name: '본문' },
       { id: 'set-image-align', name: '이미지' },
+      { id: 'set-editor', name: '편집기' },
     ],
   },
   {
@@ -1171,6 +1172,34 @@ export function SettingsPanel({
             </p>
           </section>
 
+          </div>
+
+          <div className="field-group" id="set-editor">
+            <h4 className="field-group-title">편집기</h4>
+          <section className="field">
+            <label className="checkbox">
+              <input
+                type="checkbox"
+                checked={settings.lineNumbers}
+                onChange={(event) => update({ lineNumbers: event.target.checked })}
+              />
+              왼쪽에 줄 번호 보이기
+              <span className="hint">
+                편집 화면 왼쪽에 줄 번호가 섭니다. 긴 줄이 접혀 두세 줄로 그려져도 번호는 그 줄 옆에 한 번만 섭니다.
+              </span>
+            </label>
+            <label className="checkbox">
+              <input
+                type="checkbox"
+                checked={settings.caretPosition}
+                onChange={(event) => update({ caretPosition: event.target.checked })}
+              />
+              아래 표시줄에 낫표 자리(행·열) 보이기
+              <span className="hint">
+                편집기에서 낫표가 선 곳을 <code>12행 5열</code> 처럼 오른쪽 아래에 적습니다. 미리보기만 볼 때는 나오지 않습니다.
+              </span>
+            </label>
+          </section>
           </div>
 
           <section className="field">
