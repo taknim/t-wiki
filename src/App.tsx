@@ -335,9 +335,44 @@ export default function App() {
     flash(sync.status.message)
   }, [sync.status, flash])
 
+  /*
+   * 보던 문서에서 떠나도 되는지 묻습니다.
+   *
+   * 자동 저장이 켜져 있으면 예전처럼 조용히 쓰고 갑니다. 꺼 두었을 때 말없이 쓰면
+   * "내가 누를 때만 쓴다"는 약속을 깨는 것이고, 말없이 버리면 고친 것을 잃습니다.
+   * 그래서 그때만 묻습니다. 물러서면(취소·Esc) 아무 데도 가지 않으므로 저장 단추를
+   * 누를 기회가 그대로 남습니다.
+   */
+  const leaveDoc = useCallback(async (): Promise<boolean> => {
+    if (autoSave.on) {
+      await commit(true)
+      return true
+    }
+    const path = selectedRef.current
+    if (!dirtyRef.current || path === null) return true
+    const go = await dialogs.confirm({
+      title: '저장하지 않은 변경이 있습니다',
+      label: `"${displayPath(path)}" 을(를) 고친 뒤 아직 저장하지 않았습니다.\n`
+        + '저장하지 않고 옮겨 가면 고친 내용이 사라집니다.\n'
+        + '저장이 필요하면 취소를 누르고 저장 단추(또는 ⌘S)로 저장한 뒤 옮겨 가세요.',
+      confirmText: '저장하지 않고 이동',
+      danger: true,
+    })
+    // 버리고 가기로 했으면 고친 자국도 함께 지웁니다. 남겨 두면 다음 자리에서 또 묻습니다.
+    if (go) setDirty(false)
+    return go
+  }, [autoSave.on, commit, dialogs])
+
+  /** 폴더를 고릅니다. 문서에서 떠나는 길이라 저장을 한 번 챙깁니다. */
+  const selectDir = useCallback(async (path: string) => {
+    if (!(await leaveDoc())) return
+    setSelectedDir(path)
+    setSelectedPath(null)
+  }, [leaveDoc])
+
   const closeVault = useCallback(async () => {
-    // 자동 저장이 아직 안 돌았을 수 있으므로 먼저 씁니다.
-    await commit(true)
+    // 자동 저장이 아직 안 돌았을 수 있으므로 먼저 챙깁니다. 꺼 두었으면 어떻게 할지 묻습니다.
+    if (!(await leaveDoc())) return
 
     // 닫기 전에 지금 화면 상태를 남겨 둡니다. 다음에 같은 폴더를 열면 이대로 복원됩니다.
     if (vault.root) {
@@ -355,7 +390,7 @@ export default function App() {
     setDraft('')
     setDirty(false)
     setViewMode(DEFAULT_VIEW_MODE)
-  }, [commit, vault, expanded, selectedPath, selectedDir, viewMode])
+  }, [leaveDoc, vault, expanded, selectedPath, selectedDir, viewMode])
 
   const startSync = useCallback(() => {
     // 설정이 덜 됐으면 실행 대신 설정 창을 열어 줍니다.
@@ -371,7 +406,7 @@ export default function App() {
       // 이미 보고 있는 파일을 다시 고르면 아무것도 하지 않습니다.
       // 그러지 않으면 누를 때마다 정돈이 걸려, 열기만 해도 파일이 바뀝니다.
       if (path === selectedRef.current) return
-      await commit(true)
+      if (!(await leaveDoc())) return
 
       // 글자로 된 첨부는 편집기에서 바로 고칠 수 있게 내용을 읽어 둡니다.
       // 화면을 먼저 바꾸고 나중에 채우면, 그 틈에 친 글자가 덮여 사라집니다.
@@ -389,7 +424,7 @@ export default function App() {
       setDraft(content)
       setDirty(false)
     },
-    [commit, report, vault.root],
+    [leaveDoc, report, vault.root],
   )
 
   /*
@@ -425,7 +460,7 @@ export default function App() {
   const openDoc = useCallback(
     async (path: string) => {
       if (path === selectedRef.current) return
-      await commit(true)
+      if (!(await leaveDoc())) return
       const entry = vault.index.get(path)
       setSelectedDir(null)
       setSelectedPath(path)
@@ -441,7 +476,7 @@ export default function App() {
         return next
       })
     },
-    [commit, vault.index],
+    [leaveDoc, vault.index],
   )
 
   /*
@@ -477,8 +512,7 @@ export default function App() {
       return
     }
     closeSheets()
-    setSelectedDir(path)
-    setSelectedPath(null)
+    void selectDir(path)
     setExpanded((previous) => {
       const next = new Set(previous)
       const segments = path.split('/')
@@ -487,7 +521,7 @@ export default function App() {
       }
       return next
     })
-  }, [closeSheets, flash, vault.tree])
+  }, [closeSheets, flash, selectDir, vault.tree])
 
   // 볼트를 다시 스캔한 뒤에도 열려 있던 문서의 내용을 최신으로 맞춥니다.
   useEffect(() => {
@@ -1585,10 +1619,7 @@ export default function App() {
                 query={favoriteQuery}
                 root={vault.tree}
                 onOpen={(path) => void (isMarkdown(path) ? openDoc(path) : openAsset(path))}
-                onOpenDir={(path) => {
-                  setSelectedDir(path)
-                  setSelectedPath(null)
-                }}
+                onOpenDir={(path) => void selectDir(path)}
                 onRemove={toggleFavorite}
                 onReorder={(from, to, place) =>
                   applyFavorites(reorderFavorites(favorites, from, to, place))}
@@ -1601,10 +1632,7 @@ export default function App() {
                 source={searchSource}
                 loading={textsLoading}
                 onOpen={(path) => void (isMarkdown(path) ? openDoc(path) : openAsset(path))}
-                onOpenDir={(path) => {
-                  setSelectedDir(path)
-                  setSelectedPath(null)
-                }}
+                onOpenDir={(path) => void selectDir(path)}
                 onLeaveTop={() => {
                   const box = searchInput.current
                   if (!box) return
@@ -1639,10 +1667,7 @@ export default function App() {
                   expanded={expanded}
                   onToggle={toggleFolder}
                   onSelect={(path) => void (isMarkdown(path) ? openDoc(path) : openAsset(path))}
-                  onSelectDir={(path: string) => {
-                    setSelectedDir(path)
-                    setSelectedPath(null)
-                  }}
+                  onSelectDir={(path: string) => void selectDir(path)}
                   onNewDoc={(dir) => void handleNewDoc(dir)}
                   onNewFolder={(dir) => void handleNewFolder(dir)}
                   onRename={(path) => void handleRename(path)}
@@ -1670,10 +1695,7 @@ export default function App() {
                 className={selectedDir === TRASH_DIR ? 'trash-row is-selected' : 'trash-row'}
                 data-tip="지운 것을 보고 되돌리거나 완전히 없앱니다"
                 aria-pressed={selectedDir === TRASH_DIR}
-                onClick={() => {
-                  setSelectedDir(TRASH_DIR)
-                  setSelectedPath(null)
-                }}
+                onClick={() => void selectDir(TRASH_DIR)}
               >
                 <TrashIcon />
                 <span>휴지통</span>

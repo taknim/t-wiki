@@ -128,17 +128,48 @@ try {
   expect('⌘S 로는 저장됨', (await page.evaluate(() => window.__vaultText('회고/2026-08.md'))).includes('여섯')
     && (await label()) === '저장됨', String(await label()))
 
-  step('6. 꺼 두어도 문서를 떠날 때는 저장한다')
+  /*
+   * 꺼 두었는데 말없이 쓰면 "내가 누를 때만 쓴다"는 약속을 깨는 것이고, 말없이 버리면
+   * 고친 것을 잃습니다. 그래서 떠나기 전에 묻고, 고르는 쪽으로만 갑니다.
+   */
+  step('6. 꺼 두었을 때 다른 문서로 옮기려 하면 묻는다')
   await page.click('.main .editor')
   await page.keyboard.press('End')
   await page.keyboard.type(' 일곱')
   await page.waitForTimeout(300)
   await page.click(`.tree-row:has-text("${DOC}") .tree-name`)
+  await page.waitForSelector('.dialog', { timeout: 5000 })
+  const asked = (await page.textContent('.dialog')).replace(/\s+/g, ' ')
+  console.log('  ' + asked.slice(0, 110))
+  expect('저장하지 않았다고 알림', asked.includes('저장하지 않은 변경이 있습니다'), asked.slice(0, 60))
+  expect('취소하고 저장하라고 일러 줌', asked.includes('취소를 누르고 저장'), asked.slice(0, 120))
+  // 물러서면 아무 데도 가지 않습니다. 저장 단추를 누를 기회가 그대로 남습니다.
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(400)
+  expect('취소하면 그 문서에 머무름', (await page.textContent('.doc-head h1')) === '2026-08.md',
+    await page.textContent('.doc-head h1'))
+  expect('고친 것도 그대로', (await label()) === '변경됨', String(await label()))
+  await saveButton().click()
+  await page.waitForTimeout(400)
+  await page.click(`.tree-row:has-text("${DOC}") .tree-name`)
   await page.waitForSelector(`.doc-head h1:has-text("${DOC}")`, { timeout: 5000 })
-  await page.waitForTimeout(500)
-  expect('떠나면서 저장됨', (await page.evaluate(() => window.__vaultText('회고/2026-08.md'))).includes('일곱'))
+  expect('저장한 뒤에는 묻지 않고 옮겨 감', (await page.locator('.dialog').count()) === 0
+    && (await page.evaluate(() => window.__vaultText('회고/2026-08.md'))).includes('일곱'))
 
-  step('7. 새로고침해도 설정이 남는다')
+  step('7. 저장하지 않고 이동을 고르면 고친 것은 사라진다')
+  await page.click('.main .editor')
+  await page.keyboard.press('End')
+  await page.keyboard.type(' 여덟')
+  await page.waitForTimeout(300)
+  await page.click('.tree-row:has-text("회고") .tree-name')
+  await page.waitForSelector('.dialog', { timeout: 5000 })
+  await page.click('.dialog button:has-text("저장하지 않고 이동")')
+  await page.waitForTimeout(500)
+  expect('폴더로 옮겨 감', (await page.textContent('.doc-head h1')) === '회고',
+    await page.textContent('.doc-head h1'))
+  expect('고친 것은 파일에 들어가지 않음', !(await onDisk()).includes('여덟'), (await onDisk()).slice(-30))
+
+  step('8. 새로고침해도 설정이 남는다')
   // 권한이 살아 있으면 새로 고침 뒤에 곧바로 폴더가 다시 열립니다.
   await page.reload({ waitUntil: 'domcontentloaded' })
   await page.waitForSelector('.tree', { timeout: 10000 })
