@@ -8,8 +8,8 @@ import { clearTextIndex } from '../lib/textIndex'
 import * as fs from '../lib/fsAccess'
 import { clearVaultHandle, loadVaultHandle, saveVaultHandle } from '../lib/store'
 import {
-  emptyTrash, moveToTrash, purgeTrashItem, purgeTrashOlderThan, readTrash, restoreFromTrash,
-  type RestoreResult, type TrashItem,
+  emptyTrash, moveToTrash, peekTrashItem, purgeTrashItem, purgeTrashOlderThan, readTrash, restoreFromTrash,
+  type RestoreResult, type TrashItem, type TrashPeek,
 } from '../lib/trash'
 
 export type VaultStatus = 'unsupported' | 'empty' | 'needs-permission' | 'loading' | 'ready' | 'error'
@@ -48,6 +48,8 @@ export interface Vault {
   /** 원래 자리로. 그 자리에 다른 것이 있으면 ok: false 로 알리고, overwrite 를 켜면 덮습니다. */
   restoreTrash: (item: TrashItem, overwrite?: boolean) => Promise<RestoreResult>
   purgeTrash: (item: TrashItem) => Promise<void>
+  /** 지운 것의 앞부분만 엿봅니다. 되돌릴지 없앨지 정하는 데에 씁니다. */
+  peekTrash: (item: TrashItem) => Promise<TrashPeek>
   emptyTrash: () => Promise<number>
   /** 옮긴 지 이만큼(ms)이 지난 것을 비웁니다. 비운 개수를 돌려줍니다. */
   purgeTrashOlderThan: (ms: number) => Promise<number>
@@ -401,6 +403,11 @@ export function useVault(): Vault {
     [rereadTrash, requireRoot],
   )
 
+  const peekTrash = useCallback(
+    (item: TrashItem) => peekTrashItem(requireRoot(), item),
+    [requireRoot],
+  )
+
   const emptyAll = useCallback(async () => {
     const root = requireRoot()
     const count = await emptyTrash(root)
@@ -466,6 +473,7 @@ export function useVault(): Vault {
     trashPath,
     restoreTrash,
     purgeTrash,
+    peekTrash,
     emptyTrash: emptyAll,
     purgeTrashOlderThan: purgeOlder,
     createDoc,

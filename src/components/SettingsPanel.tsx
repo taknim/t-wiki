@@ -9,9 +9,9 @@ import { ChevronIcon } from './icons'
 import { clearSessions, isRememberEnabled, setRememberEnabled } from '../lib/session'
 import { isLocked, lock, unlock, type Locked } from '../lib/secret'
 import {
-  clampTrashDays, readIncludeToken, readSaveOptions, readSettingsSpot, readTrashPolicy,
+  clampAutoSaveSeconds, clampTrashDays, readIncludeToken, readSaveOptions, readSettingsSpot, readTrashPolicy,
   writeIncludeToken, writeSaveOptions, writeSettingsSpot, writeTrashPolicy,
-  type SaveOptions, type TrashPolicy,
+  type AutoSavePolicy, type SaveOptions, type TrashPolicy,
 } from '../lib/saveOptions'
 import { removeEntry } from '../lib/fsAccess'
 import { buildBundle, bundleFileName, parseBundle } from '../lib/settingsFile'
@@ -60,6 +60,9 @@ interface SettingsPanelProps {
   /** 워드·엑셀을 그려 볼지. */
   officePreview: boolean
   onOfficePreview: (on: boolean) => void
+  /** 자동 저장. 제목 옆의 셈이 곧바로 따라오도록 값은 App 이 들고 있습니다. */
+  autoSave: AutoSavePolicy
+  onAutoSave: (next: AutoSavePolicy) => void
 }
 
 type TabId = 'general' | 'appearance' | 'sync'
@@ -86,6 +89,7 @@ const TABS: { id: TabId; name: string; hint: string; items: { id: string; name: 
     items: [
       { id: 'set-session', name: '마지막 화면 상태' },
       { id: 'set-image-preview', name: '미리보기' },
+      { id: 'set-autosave', name: '자동 저장' },
       { id: 'set-tidy', name: '저장할 때 정돈' },
       { id: 'set-trash', name: '휴지통' },
       { id: 'set-transfer', name: '설정 주고받기' },
@@ -121,6 +125,7 @@ export function SettingsPanel({
   splitRatio, onSplitRatio,
   imagePreview, onImagePreview, imageBackdrop, onImageBackdrop,
   officePreview, onOfficePreview,
+  autoSave, onAutoSave,
   initialTab = 'last',
 }: SettingsPanelProps) {
   const { settings, isDark, update } = useTheme()
@@ -188,6 +193,7 @@ export function SettingsPanel({
       imageBackdrop,
       officePreview,
       saveOptions,
+      autoSave,
       trashPolicy,
       github: sync.isConfigured || sync.config.token ? sync.config : null,
       includeToken,
@@ -399,6 +405,7 @@ export function SettingsPanel({
     onImagePreview(bundle.general.imagePreview)
     onImageBackdrop(bundle.general.imageBackdrop)
     onOfficePreview(bundle.general.officePreview)
+    onAutoSave({ on: bundle.general.autoSave, seconds: bundle.general.autoSaveSeconds })
     const trashNext = { autoPurge: bundle.general.trashAutoPurge, days: bundle.general.trashPurgeDays }
     setTrashPolicy(trashNext)
     writeTrashPolicy(trashNext)
@@ -827,6 +834,45 @@ export function SettingsPanel({
               </label>
             </section>
 
+            </div>
+
+            <div className="field-group" id="set-autosave">
+              <h4 className="field-group-title">자동 저장</h4>
+            <section className="field">
+              <p className="hint" style={{ marginTop: 0 }}>
+                손을 멈추면 정한 시간 뒤에 저절로 파일에 씁니다. 기다리는 동안 제목 옆에
+                남은 시간이 적히고, <strong>저장</strong> 단추로 기다리지 않고 바로 쓸 수도 있습니다.
+                꺼 두면 저장은 그 단추나 <code>⌘S</code>, 그리고 문서를 떠날 때만 일어납니다.
+                어느 쪽이든 다른 문서로 옮겨 가거나 동기화가 돌기 전에는 반드시 한 번 저장합니다.
+              </p>
+
+              <label className="checkbox">
+                <input
+                  type="checkbox"
+                  checked={autoSave.on}
+                  onChange={(event) => onAutoSave({ ...autoSave, on: event.target.checked })}
+                />
+                손을 멈추면 저절로 저장하기
+              </label>
+
+              <div className="row" style={{ alignItems: 'center', gap: 8 }}>
+                <label htmlFor="autosave-seconds">몇 초 뒤에</label>
+                {/* 휴지통 날수와 같은 칸. 0.1 초 눈금으로 오르내립니다. */}
+                <input
+                  id="autosave-seconds"
+                  className="dialog-input interval-input"
+                  type="number"
+                  inputMode="decimal"
+                  min={0.1}
+                  max={60}
+                  step={0.1}
+                  value={autoSave.seconds}
+                  disabled={!autoSave.on}
+                  onChange={(event) => onAutoSave({ ...autoSave, seconds: clampAutoSaveSeconds(Number(event.target.value)) })}
+                />
+                <span className="hint" style={{ margin: 0 }}>초 (0.1 ~ 60, 기본 0.8)</span>
+              </div>
+            </section>
             </div>
 
             <div className="field-group" id="set-tidy">

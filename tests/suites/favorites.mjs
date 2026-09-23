@@ -484,7 +484,7 @@ try {
   }, keep)
   await page.fill('.main .editor', JSON.stringify(onlyOne, null, 2) + '\n')
   await page.waitForTimeout(1500)
-  expect('저장됨', (await page.evaluate(() => document.querySelector('.pill')?.textContent)) === '저장됨')
+  expect('저장됨', (await page.evaluate(() => document.querySelector('.doc-head .pill:not(.pill-save)')?.textContent)) === '저장됨')
   await page.fill('.search-input', '')
   const after20 = await listed()
   console.log('  ' + JSON.stringify(before20) + ' → ' + JSON.stringify(after20))

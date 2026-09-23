@@ -52,6 +52,25 @@ const gutter = () => page.evaluate(() => {
   }
 })
 const caret = () => page.evaluate(() => document.querySelector('.info-caret')?.textContent ?? null)
+/*
+ * 행·열 창을 열고 값을 적어 보냅니다.
+ *
+ * 그냥 fill 두 번으로는 이따금 앞 칸의 값이 도로 씻겨 나갔습니다(줄 번호를 켜면 글을 그릴
+ * 때마다 거울을 재느라 다시 그리는 일이 잦아, 채워 넣은 값이 다음 그림에 밀립니다).
+ * 사람이라면 칸에 적힌 값을 눈으로 보고 누르므로, 여기서도 적힌 대로인지 보고 나서 보냅니다.
+ */
+const goTo = async (line, column) => {
+  await page.click('.info-caret')
+  await page.waitForSelector('.dialog-field input', { timeout: 3000 })
+  for (let tries = 0; tries < 5; tries += 1) {
+    await page.fill('.dialog-field:has-text("행") input', line)
+    await page.fill('.dialog-field:has-text("열") input', column)
+    const inBox = await page.evaluate(() => [...document.querySelectorAll('.dialog-field input')].map((one) => one.value))
+    if (inBox[0] === line && inBox[1] === column) break
+  }
+  await page.keyboard.press('Enter')
+  await page.waitForTimeout(400)
+}
 
 try {
   await page.goto(process.env.APP_URL ?? 'http://localhost:5173', { waitUntil: 'domcontentloaded' })
@@ -168,17 +187,16 @@ try {
   await page.waitForSelector('.dialog-field input', { timeout: 3000 })
   const offered = await page.evaluate(() => [...document.querySelectorAll('.dialog-field input')].map((one) => one.value))
   expect('행·열 칸이 따로 있고 지금 자리가 미리 적혀 있음', offered.join(':') === '4:4', JSON.stringify(offered))
-  await page.fill('.dialog-field:has-text("행") input', '40')
-  await page.fill('.dialog-field:has-text("열") input', '3')
-  await page.keyboard.press('Enter')
-  await page.waitForTimeout(400)
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(200)
+  await goTo('40', '3')
   const where = () => page.evaluate(() => {
     const editor = document.querySelector('.main .editor')
     const before = editor.value.slice(0, editor.selectionStart)
     const top = editor.scrollTop
     return { line: before.split('\n').length, column: editor.selectionStart - before.lastIndexOf('\n'),
       focused: document.activeElement === editor, scrollTop: Math.round(top),
-      pill: document.querySelector('.pill')?.textContent,
+      pill: document.querySelector('.doc-head .pill:not(.pill-save)')?.textContent,
       // 커서 줄이 화면 안에 있는지. 줄 높이는 번호 칸에서 가져옵니다.
       visible: (() => {
         const rows = [...document.querySelectorAll('.editor-gutter-line')]
@@ -198,23 +216,13 @@ try {
    * 앞쪽 줄로 되돌아갈 때. 그 자리까지의 글만 담아 scrollHeight 를 재던 때는 내용이 칸보다
    * 짧으면 칸 높이로 눌려, 3행으로 가자는데 아래로 굴러가 커서가 화면 밖에 남았습니다.
    */
-  await page.click('.info-caret')
-  await page.waitForSelector('.dialog-field input', { timeout: 3000 })
-  await page.fill('.dialog-field:has-text("행") input', '3')
-  await page.fill('.dialog-field:has-text("열") input', '1')
-  await page.keyboard.press('Enter')
-  await page.waitForTimeout(400)
+  await goTo('3', '1')
   const back = await where()
   console.log('  ' + JSON.stringify(back))
   // 둘째 줄이 접혀 높으므로 0 까지는 아니지만, 위로 돌아와 커서 줄이 보여야 합니다.
   expect('3행으로 되돌아오면 위로 굴러 그 줄이 보임', back.line === 3 && back.scrollTop < landed.scrollTop && back.visible, JSON.stringify(back))
   // 행만 적고 열을 비우면 그 줄 첫 칸. 줄 수를 넘으면 마지막 줄.
-  await page.click('.info-caret')
-  await page.waitForSelector('.dialog-field input', { timeout: 3000 })
-  await page.fill('.dialog-field:has-text("행") input', '999')
-  await page.fill('.dialog-field:has-text("열") input', '')
-  await page.keyboard.press('Enter')
-  await page.waitForTimeout(300)
+  await goTo('999', '')
   expect('넘치는 행은 마지막 줄, 빈 열은 첫 칸', (await caret()) === '행 65 열 1', String(await caret()))
   // 취소하면 자리는 그대로.
   await page.click('.info-caret')

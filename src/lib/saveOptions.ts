@@ -355,6 +355,53 @@ export function writeTrashPolicy(policy: TrashPolicy): void {
 }
 
 /**
+ * 자동 저장. 손을 멈추고 얼마 뒤에 쓸지.
+ *
+ * 끄면 저장은 사람이 누를 때(또는 ⌘S, 문서를 떠날 때)만 일어납니다.
+ * 기다리는 시간은 초 단위로 0.1 ~ 60 초. 기본 0.8 초는 "손을 멈추면 곧" 에 해당합니다.
+ * 이것도 폴더가 아니라 이 브라우저의 취향이라 localStorage 에 둡니다.
+ */
+export interface AutoSavePolicy {
+  on: boolean
+  /** 손을 멈춘 뒤 기다리는 초. */
+  seconds: number
+}
+
+const AUTOSAVE = 'mdwiki:autosave'
+const AUTOSAVE_SECONDS = 'mdwiki:autosave-seconds'
+
+export const DEFAULT_AUTO_SAVE: AutoSavePolicy = { on: true, seconds: 0.8 }
+
+/** 0.1 초 아래로는 치는 도중에 쓰게 되고, 1 분을 넘기면 자동이라 부를 수 없습니다. */
+export function clampAutoSaveSeconds(seconds: number): number {
+  if (!Number.isFinite(seconds)) return DEFAULT_AUTO_SAVE.seconds
+  // 0.1 초 자리까지만 씁니다. 그보다 잘게 나눌 까닭이 없습니다.
+  return Math.min(Math.max(Math.round(seconds * 10) / 10, 0.1), 60)
+}
+
+export function readAutoSave(): AutoSavePolicy {
+  try {
+    const raw = localStorage.getItem(AUTOSAVE_SECONDS)
+    return {
+      // 이 값을 모르던 판에서는 늘 자동 저장이었습니다. 적힌 것이 없으면 그쪽입니다.
+      on: localStorage.getItem(AUTOSAVE) !== 'off',
+      seconds: raw === null ? DEFAULT_AUTO_SAVE.seconds : clampAutoSaveSeconds(Number(raw)),
+    }
+  } catch {
+    return DEFAULT_AUTO_SAVE
+  }
+}
+
+export function writeAutoSave(policy: AutoSavePolicy): void {
+  try {
+    localStorage.setItem(AUTOSAVE, policy.on ? 'on' : 'off')
+    localStorage.setItem(AUTOSAVE_SECONDS, String(clampAutoSaveSeconds(policy.seconds)))
+  } catch {
+    // 저장이 막혀 있어도 이번에는 그대로 적용됩니다.
+  }
+}
+
+/**
  * 좁은 화면인지. 옆줄을 본문 옆이 아니라 위에 서랍처럼 띄우는 문턱입니다.
  * CSS 의 @media (max-width: 720px) 와 같은 값이어야 합니다.
  */

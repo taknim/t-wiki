@@ -5,6 +5,7 @@ import { Preview } from './components/Preview'
 import { AssetView } from './components/AssetView'
 import { FolderView } from './components/FolderView'
 import { InfoBar, type SelectionInfo } from './components/InfoBar'
+import { SaveState } from './components/SaveState'
 import { caretAt, jumpInEditor, offsetOf } from './lib/editorJump'
 import { SearchPanel } from './components/SearchPanel'
 import { Favorites } from './components/Favorites'
@@ -45,9 +46,10 @@ import { formatTidyFor, textPreviewKind, trimWhitespace } from './lib/textPrevie
 import {
   clampSidebarWidth, DEFAULT_SIDEBAR_WIDTH, maxSidebarWidth, MIN_SIDEBAR_WIDTH,
   isNarrow, NARROW_QUERY,
-  readImageBackdrop, readImagePreview, readOfficePreview, readSaveOptions, readSidebarOpen,
+  readAutoSave, readImageBackdrop, readImagePreview, readOfficePreview, readSaveOptions, readSidebarOpen,
   readSidebarTab, readSidebarWidth, readSplitRatio, writeImageBackdrop, writeImagePreview,
   writeOfficePreview, writeSidebarOpen, writeSidebarTab, writeSidebarWidth, writeSplitRatio,
+  writeAutoSave, type AutoSavePolicy,
 } from './lib/saveOptions'
 import { displayPath, FAVORITES_FILE, fileNameOf, isAppFile, TRASH_DIR } from './lib/paths'
 import { loadFavorites } from './lib/store'
@@ -57,7 +59,6 @@ import type { CSSProperties } from 'react'
 import type { ImageBackdrop, SidebarTab, ViewMode, VaultNode } from './types'
 
 
-const AUTOSAVE_DELAY = 800
 
 /** 옆줄의 두 탭. 접힌 옆줄의 단추도 같은 목록으로 그립니다. */
 /*
@@ -78,6 +79,12 @@ export default function App() {
   const [selectedDir, setSelectedDir] = useState<string | null>(null)
   const [draft, setDraft] = useState('')
   const [dirty, setDirty] = useState(false)
+  /*
+   * 마지막으로 글에 손댄 때. 자동 저장까지 남은 시간을 여기서부터 셉니다.
+   * ref 가 아니라 state 인 것은 제목 옆의 셈이 이 값을 보고 다시 그려져야 하기 때문입니다.
+   */
+  const [editedAt, setEditedAt] = useState(0)
+  const [autoSave, setAutoSave] = useState<AutoSavePolicy>(readAutoSave)
   const [viewMode, setViewMode] = useState<ViewMode>(DEFAULT_VIEW_MODE)
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set())
   const [query, setQuery] = useState('')
@@ -385,15 +392,35 @@ export default function App() {
     [commit, report, vault.root],
   )
 
-  // 편집이 멈추면 잠시 뒤 자동 저장합니다.
+  /*
+   * 편집이 멈추면 정한 시간 뒤에 자동 저장합니다.
+   *
+   * 고른 문서(selectedPath)까지 보는 것은 문서를 옮길 때 셈을 처음부터 다시 잡기
+   * 위해서입니다. 떠나는 길에 앞 문서는 이미 저장되므로(openDoc), 새 문서에서는
+   * 남은 시간이 아니라 온전한 시간이 주어져야 합니다.
+   */
   useEffect(() => {
-    if (!dirty) return
+    if (!dirty || !autoSave.on) return
     if (saveTimer.current) window.clearTimeout(saveTimer.current)
-    saveTimer.current = window.setTimeout(() => void commit(), AUTOSAVE_DELAY)
+    saveTimer.current = window.setTimeout(() => void commit(), autoSave.seconds * 1000)
     return () => {
       if (saveTimer.current) window.clearTimeout(saveTimer.current)
     }
-  }, [draft, dirty, commit])
+  }, [draft, dirty, commit, autoSave, selectedPath])
+
+  /** 글에 손댔다고 적어 둡니다. 자동 저장까지 남은 시간은 이때부터 셉니다. */
+  const markEdited = useCallback(() => {
+    setDirty(true)
+    setEditedAt(Date.now())
+  }, [])
+
+  const applyAutoSave = useCallback((next: AutoSavePolicy) => {
+    setAutoSave(next)
+    writeAutoSave(next)
+  }, [])
+
+  // 자동 저장이 예정된 때. 꺼져 있거나 쓸 것이 없으면 적을 것도 없습니다.
+  const saveDueAt = dirty && autoSave.on ? editedAt + autoSave.seconds * 1000 : null
 
   const openDoc = useCallback(
     async (path: string) => {
@@ -862,7 +889,7 @@ export default function App() {
     const next = toggleTask(body, at)
     if (next === null) return
     setDraft(draft.slice(0, draft.length - body.length) + next)
-    setDirty(true)
+    markEdited()
   }
 
   /*
@@ -1700,6 +1727,7 @@ export default function App() {
                 onRestore={(item) => void handleRestore(item)}
                 onPurge={(item) => void handlePurge(item)}
                 onEmpty={() => void handleEmptyTrash()}
+                onPeek={vault.peekTrash}
               />
             </>
           ) : selection && selection.kind !== 'markdown' ? (
@@ -1707,7 +1735,7 @@ export default function App() {
               <div className="doc-head">
                 <h1>{selection.name}</h1>
                 {editableText && (
-                  <span className={dirty ? 'pill' : 'pill pill-ok'}>{dirty ? '저장 중…' : '저장됨'}</span>
+                  <SaveState dirty={dirty} dueAt={saveDueAt} seconds={autoSave.seconds} onSave={() => void commit()} />
                 )}
                 {selection.kind !== 'dir' && !editableText && <span className="pill">읽기 전용</span>}
                 {/*
@@ -1740,7 +1768,7 @@ export default function App() {
                       value={draft}
                       onChange={(next) => {
                         setDraft(next)
-                        setDirty(true)
+                        markEdited()
                         typedAtRef.current = Date.now()
                       }}
                       onSave={() => void commit()}
@@ -1775,7 +1803,7 @@ export default function App() {
             <>
               <div className="doc-head">
                 <h1>{fileNameOf(selectedPath)}</h1>
-                <span className={dirty ? 'pill' : 'pill pill-ok'}>{dirty ? '저장 중…' : '저장됨'}</span>
+                <SaveState dirty={dirty} dueAt={saveDueAt} seconds={autoSave.seconds} onSave={() => void commit()} />
                 <ViewModeSwitch mode={viewMode} onChange={setViewMode} />
               </div>
 
@@ -1806,7 +1834,7 @@ export default function App() {
                     value={draft}
                     onChange={(next) => {
                       setDraft(next)
-                      setDirty(true)
+                      markEdited()
                       typedAtRef.current = Date.now()
                     }}
                     onSave={() => void commit()}
@@ -1887,6 +1915,8 @@ export default function App() {
           onImageBackdrop={applyImageBackdrop}
           officePreview={officePreview}
           onOfficePreview={applyOfficePreview}
+          autoSave={autoSave}
+          onAutoSave={applyAutoSave}
           onShowHistory={() => setHistoryOpen(true)}
           onClose={() => setSettingsTab(null)}
         />

@@ -3,9 +3,10 @@ import {
   type ThemeSettings,
 } from './theme'
 import {
-  clampSidebarWidth, clampSplitRatio, clampTrashDays, DEFAULT_IMAGE_BACKDROP, DEFAULT_SAVE_OPTIONS,
+  clampAutoSaveSeconds, clampSidebarWidth, clampSplitRatio, clampTrashDays, DEFAULT_AUTO_SAVE,
+  DEFAULT_IMAGE_BACKDROP, DEFAULT_SAVE_OPTIONS,
   DEFAULT_SIDEBAR_TAB, DEFAULT_SIDEBAR_WIDTH, DEFAULT_SPLIT_RATIO, DEFAULT_TRASH_POLICY,
-  isImageBackdrop, type SaveOptions, type TrashPolicy,
+  isImageBackdrop, type AutoSavePolicy, type SaveOptions, type TrashPolicy,
 } from './saveOptions'
 import { DEFAULT_GITHUB_CONFIG } from '../hooks/useGitHubSync'
 import { isLocked, type Locked } from './secret'
@@ -40,6 +41,8 @@ export interface SettingsBundle {
     includeToken: boolean
     trashAutoPurge: boolean
     trashPurgeDays: number
+    autoSave: boolean
+    autoSaveSeconds: number
   } & SaveOptions
   github: BundleGitHub | null
 }
@@ -65,6 +68,7 @@ export interface ExportInput {
   imageBackdrop: ImageBackdrop
   officePreview: boolean
   saveOptions: SaveOptions
+  autoSave: AutoSavePolicy
   trashPolicy: TrashPolicy
   github: GitHubConfig | null
   /** 액세스 토큰까지 담을지. 담더라도 암호로 잠근 꼴로만 적힙니다. */
@@ -92,6 +96,8 @@ export function buildBundle(input: ExportInput): SettingsBundle {
       includeToken: input.includeToken,
       trashAutoPurge: input.trashPolicy.autoPurge,
       trashPurgeDays: input.trashPolicy.days,
+      autoSave: input.autoSave.on,
+      autoSaveSeconds: input.autoSave.seconds,
       ...input.saveOptions,
     },
     github: input.github
@@ -180,6 +186,11 @@ export function parseBundle(raw: string): SettingsBundle | null {
       trashPurgeDays: typeof general.trashPurgeDays === 'number'
         ? clampTrashDays(general.trashPurgeDays)
         : DEFAULT_TRASH_POLICY.days,
+      // 이 값을 모르던 판에서 온 파일이면 늘 자동 저장이었습니다.
+      autoSave: bool(general.autoSave, DEFAULT_AUTO_SAVE.on),
+      autoSaveSeconds: typeof general.autoSaveSeconds === 'number'
+        ? clampAutoSaveSeconds(general.autoSaveSeconds)
+        : DEFAULT_AUTO_SAVE.seconds,
       trimWhitespace: bool(general.trimWhitespace, DEFAULT_SAVE_OPTIONS.trimWhitespace),
       tidyFormat: bool(general.tidyFormat, DEFAULT_SAVE_OPTIONS.tidyFormat),
     },

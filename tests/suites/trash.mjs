@@ -100,7 +100,25 @@ try {
   await page.screenshot({ path: join(HERE, '..', 'shots', 'trash', '01-view.png'),
     clip: { x: 0, y: 40, width: 1300, height: 420 } })
 
-  step('3. 복원하면 원래 자리로 돌아간다')
+  /*
+   * 되돌릴지 없앨지 정하려면 이름과 자리만으로는 모자랄 때가 있습니다(README.md 가 여럿).
+   * 고치지는 못하고 앞부분만 읽습니다.
+   */
+  step('3. 미리보기로 무엇이었는지 앞부분만 본다')
+  await page.click('.trash-item button:has-text("미리보기")')
+  await page.waitForSelector('.trash-peek-text', { timeout: 5000 })
+  const peeked = await page.textContent('.trash-peek-text')
+  console.log('  ' + peeked.replace(/\s+/g, ' ').slice(0, 60))
+  expect('글 앞부분이 보임', peeked.includes('온보딩'), peeked.slice(0, 60))
+  expect('고치는 칸은 없음', (await page.locator('.trash-view .editor').count()) === 0)
+  await page.screenshot({ path: join(HERE, '..', 'shots', 'trash', '02-peek.png'),
+    clip: { x: 0, y: 40, width: 1300, height: 420 } })
+  // 다시 누르면 접힙니다. 한 번에 한 줄만 펴 둡니다.
+  await page.click('.trash-item button:has-text("미리보기")')
+  await page.waitForTimeout(300)
+  expect('다시 누르면 접힘', (await page.locator('.trash-peek').count()) === 0)
+
+  step('4. 복원하면 원래 자리로 돌아간다')
   await page.click('.trash-item button:has-text("복원")')
   await page.waitForTimeout(800)
   expect('원래 자리에 돌아옴', (await names('회사')).includes('온보딩.md'), JSON.stringify(await names('회사')))
@@ -109,7 +127,7 @@ try {
     JSON.stringify(await names('_t-wiki.trash')))
   expect('트리에도 돌아옴', (await rows()).includes('온보딩.md'), JSON.stringify(await rows()))
 
-  step('4. 폴더도 통째로 갔다 돌아온다')
+  step('5. 폴더도 통째로 갔다 돌아온다')
   await remove('회고', '휴지통으로 이동')
   expect('폴더가 트리에서 사라짐', !(await rows()).includes('회고'), JSON.stringify(await rows()))
   const folderItem = (await manifest())[0]
@@ -118,11 +136,20 @@ try {
   expect('안엣것까지 함께 감', inside !== null && inside.includes('2026-08.md'), JSON.stringify(inside))
   await page.click('.trash-row')
   await page.waitForSelector('.trash-view')
+  // 폴더는 안에 무엇이 들었는지를 대신 늘어놓습니다.
+  await page.click('.trash-item button:has-text("미리보기")')
+  await page.waitForSelector('.trash-peek-entries', { timeout: 5000 })
+  const insideShown = await page.evaluate(() =>
+    [...document.querySelectorAll('.trash-peek-entries li')].map((one) => one.textContent))
+  console.log('  ' + JSON.stringify(insideShown))
+  expect('폴더 안엣것이 보임', insideShown.includes('2026-08.md'), JSON.stringify(insideShown))
+  await page.click('.trash-item button:has-text("미리보기")')
+  await page.waitForTimeout(200)
   await page.click('.trash-item button:has-text("복원")')
   await page.waitForTimeout(800)
   expect('폴더가 돌아옴', (await names('회고'))?.includes('2026-08.md') ?? false, JSON.stringify(await names('회고')))
 
-  step('5. 복원할 자리에 다른 것이 있으면 묻는다')
+  step('6. 복원할 자리에 다른 것이 있으면 묻는다')
   await remove('휴가 정책', '휴지통으로 이동')
   // 같은 이름의 새 문서를 그 자리에 만들어 둡니다.
   await page.evaluate(() => {
@@ -149,7 +176,7 @@ try {
   expect('덮어쓰면 휴지통의 것이 돌아옴', restoredText.includes('연차'), restoredText)
   expect('휴지통이 비었음', (await trashCount()) === 0)
 
-  step('6. 완전 삭제와 휴지통 비우기는 확인을 받고 없앤다')
+  step('7. 완전 삭제와 휴지통 비우기는 확인을 받고 없앤다')
   await remove('개발 환경', '휴지통으로 이동')
   await remove('휴가 정책', '휴지통으로 이동')
   await remove('온보딩', '완전 삭제')
@@ -177,7 +204,7 @@ try {
   expect('칸도 다 치워짐', JSON.stringify(await names('_t-wiki.trash')) === '["_index.json"]',
     JSON.stringify(await names('_t-wiki.trash')))
 
-  step('7. 폴더를 다시 열어도 휴지통이 남아 있다')
+  step('8. 폴더를 다시 열어도 휴지통이 남아 있다')
   // 앞에서 없앤 파일을 다시 심어 둡니다.
   await seed('회사/휴가 정책.md', '# 휴가 정책\n\n연차는 15일입니다.\n')
   await seed('개발 환경.md', '# 개발 환경\n\nNode 20 을 씁니다.\n')
@@ -191,7 +218,7 @@ try {
   expect('휴지통이 트리에 폴더로 나오지 않음', !(await rows()).some((one) => one.includes('_t-wiki')),
     JSON.stringify(await rows()))
 
-  step('8. 휴지통은 동기화되지 않고, 설정을 켜면 오래된 것만 비운다')
+  step('9. 휴지통은 동기화되지 않고, 설정을 켜면 오래된 것만 비운다')
   // 하나는 31일 전에 옮긴 것으로 꾸밉니다.
   await remove('개발 환경', '휴지통으로 이동')
   await page.evaluate(async () => {

@@ -1,4 +1,5 @@
 import * as fs from './fsAccess'
+import { attachmentKind, isEditableText, isMarkdown, withMime } from './attachments'
 import { fileNameOf, TRASH_DIR, TRASH_INDEX } from './paths'
 
 /** 휴지통에 든 것 하나. 파일이든 폴더든 지운 단위로 한 줄입니다. */
@@ -20,6 +21,50 @@ export interface TrashItem {
  */
 export const trashLocation = (item: TrashItem): string =>
   `${TRASH_DIR}/${item.id}/${fileNameOf(item.path)}`
+
+/**
+ * 지운 것이 무엇이었는지 엿보기.
+ *
+ * 되돌릴지 없앨지 정하려면 이름과 자리만으로는 모자랄 때가 있습니다(README.md 가 여럿,
+ * 무슨 메모였는지 가물가물). 그렇다고 휴지통에서 편집까지 열어 주면 지운 것을 되살려
+ * 쓰는 길이 되어, 되돌리기와 뜻이 겹칩니다. 그래서 **읽기만, 그것도 앞부분만** 보여 줍니다.
+ */
+export type TrashPeek =
+  | { kind: 'text'; text: string; truncated: boolean; bytes: number }
+  | { kind: 'image'; url: string; bytes: number }
+  | { kind: 'dir'; entries: { name: string; kind: 'file' | 'dir' }[]; more: number }
+  | { kind: 'none'; bytes: number }
+
+/** 글은 이만큼만 읽습니다. 무엇이었는지 알아보는 데에는 넉넉하고, 큰 파일을 통째로 들지 않습니다. */
+export const PEEK_BYTES = 4 * 1024
+/** 폴더는 이만큼만 늘어놓습니다. 나머지는 몇 개 더 있다고만 적습니다. */
+export const PEEK_ENTRIES = 12
+
+export async function peekTrashItem(
+  root: FileSystemDirectoryHandle,
+  item: TrashItem,
+): Promise<TrashPeek> {
+  const where = trashLocation(item)
+
+  if (item.kind === 'dir') {
+    const all = await fs.dirEntries(root, where)
+    all.sort((a, b) => (a.kind === b.kind ? a.name.localeCompare(b.name, 'ko') : a.kind === 'dir' ? -1 : 1))
+    return { kind: 'dir', entries: all.slice(0, PEEK_ENTRIES), more: Math.max(0, all.length - PEEK_ENTRIES) }
+  }
+
+  const blob = await fs.readBinaryFile(root, where)
+  const name = fileNameOf(item.path)
+
+  if (isMarkdown(name) || isEditableText(name)) {
+    // 글자 한가운데서 자르면 깨지므로 넉넉히 잘라 읽고 글자 수로 다시 줄입니다.
+    const head = await blob.slice(0, PEEK_BYTES).text()
+    return { kind: 'text', text: head, truncated: blob.size > PEEK_BYTES, bytes: blob.size }
+  }
+  if (attachmentKind(name) === 'image') {
+    return { kind: 'image', url: URL.createObjectURL(withMime(blob, name)), bytes: blob.size }
+  }
+  return { kind: 'none', bytes: blob.size }
+}
 
 /** 목록을 읽습니다. 칸이 사라진 줄은 지웁니다 — 밖에서 손댄 뒤에도 목록이 맞아야 합니다. */
 export async function readTrash(root: FileSystemDirectoryHandle): Promise<TrashItem[]> {

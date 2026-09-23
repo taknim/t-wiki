@@ -79,7 +79,7 @@ try {
   // 앞머리를 뗀 만큼 자리를 밀지 않으면 앞머리 쪽 글자가 망가집니다.
   expect('앞머리는 그대로', first.startsWith('---\ntitle: 할 일\n---\n'), first)
   expect('저장까지 됨', (await page.evaluate(() =>
-    document.querySelector('.pill')?.textContent ?? '')) === '저장됨')
+    document.querySelector('.doc-head .pill:not(.pill-save)')?.textContent ?? '')) === '저장됨')
 
   step('3. 켜진 것을 다시 누르면 꺼진다')
   await page.click('.preview input.task-check >> nth=1')

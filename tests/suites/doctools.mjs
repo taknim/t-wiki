@@ -31,6 +31,8 @@ await page.addInitScript(({ xlsx, docx }) => {
   make('긴 문서.md', ['# 긴 문서', '', ...Array.from({ length: 40 },
     (_, at) => `## 제목 ${at + 1}\n\n본문 줄입니다.\n`)].join('\n'))
   make('짧은 문서.md', '# 짧은 문서\n\n한 줄뿐입니다.\n')
+  // 목차가 서되 몇 줄 안 되는 글. 이쪽은 제 내용만큼만 서야 합니다.
+  make('짧은 목차.md', ['# 짧은 목차', '', '## 하나', '내용', '', '## 둘', '내용', ''].join('\n'))
   /*
    * 앞머리가 달린 글. 제목은 앞머리를 뗀 본문에서 뽑으므로, 뗀 만큼 자리를 밀어
    * 주지 않으면 편집기에서 엉뚱한 줄로 뛰어갑니다.
@@ -270,7 +272,7 @@ try {
       line: Math.round(upTo),
       caret: editor.selectionStart,
       at,
-      dirty: document.querySelector('.pill')?.textContent ?? null,
+      dirty: document.querySelector('.doc-head .pill:not(.pill-save)')?.textContent ?? null,
     }
   })
   console.log('  ' + JSON.stringify(jumped))
@@ -329,7 +331,37 @@ try {
    * 백링크 셈은 목록과 같은 자리에서 나와야 합니다. 예전에는 셈만 따로 세면서
    * 파일명만 맞춰 보아, 다른 폴더의 같은 이름 문서를 가리키는 링크까지 세었습니다.
    */
-  step('11. 백링크 셈이 펼친 목록과 맞고, 어느 폴더의 것인지 밝힌다')
+  /*
+   * 목차가 글 위에 얹히므로 키를 묶어 둡니다. 40% 로 두었더니 제목이 서른 개만 넘어도
+   * 화면의 절반 가까이가 덮여 정작 글이 몇 줄 안 보였습니다.
+   */
+  step('11. 목차는 화면의 30% 를 넘지 않고, 짧으면 그 내용만큼만 선다')
+  await page.click('.tree-row:has-text("긴 문서") .tree-name')
+  await page.waitForSelector('.doc-head h1:has-text("긴 문서")', { timeout: 5000 })
+  await page.click('.doc-tools button:has-text("목차")')
+  await page.waitForSelector('.info-panel .toc', { timeout: 3000 })
+  const tall = await page.evaluate(() => {
+    const panel = document.querySelector('.info-panel')
+    return { height: Math.round(panel.getBoundingClientRect().height), cap: Math.round(window.innerHeight * 0.3),
+      scrollable: panel.scrollHeight > panel.clientHeight + 1 }
+  })
+  console.log('  긴 목차: ' + JSON.stringify(tall))
+  expect('긴 목차는 화면의 30% 에서 멈춤', tall.height <= tall.cap + 1, JSON.stringify(tall))
+  expect('잘린 만큼은 굴려서 봄', tall.scrollable, JSON.stringify(tall))
+  await page.click('.tree-row:has-text("짧은 목차") .tree-name')
+  await page.waitForSelector('.doc-head h1:has-text("짧은 목차")', { timeout: 5000 })
+  // 문서를 옮겨도 펼쳐 둔 칸은 그대로입니다. 접혀 있을 때만 다시 폅니다.
+  if ((await page.locator('.info-panel .toc').count()) === 0) await page.click('.doc-tools button:has-text("목차")')
+  await page.waitForSelector('.info-panel .toc', { timeout: 3000 })
+  const smallToc = await page.evaluate(() => {
+    const panel = document.querySelector('.info-panel')
+    return { height: Math.round(panel.getBoundingClientRect().height), cap: Math.round(window.innerHeight * 0.3),
+      rows: panel.querySelectorAll('.toc li').length }
+  })
+  console.log('  짧은 목차: ' + JSON.stringify(smallToc))
+  expect('짧은 목차는 제 내용만큼만 섬', smallToc.rows === 3 && smallToc.height < smallToc.cap, JSON.stringify(smallToc))
+
+  step('12. 백링크 셈이 펼친 목록과 맞고, 어느 폴더의 것인지 밝힌다')
   await page.click('.tree-row:has-text("자료") .tree-caret')
   await page.waitForTimeout(300)
   await page.click('.tree-row:has-text("깊은") .tree-caret')

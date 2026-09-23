@@ -109,6 +109,18 @@ button, input, select, textarea { font: inherit; color: inherit; }
   color: var(--text-muted);
 }
 .pill-ok { color: var(--ok); border-color: currentColor; }
+/*
+ * 제목 옆의 저장 단추. 같은 알약 모양이되 누를 수 있다는 것이 보여야 하므로
+ * 글씨를 또렷하게 두고 손을 얹으면 강조색으로 물듭니다.
+ */
+.pill-save {
+  font-family: inherit;
+  color: var(--text);
+  background: none;
+  cursor: pointer;
+}
+.pill-save:hover { color: var(--accent); border-color: currentColor; }
+.pill-save:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 .hint { margin: 4px 0 0; font-size: 12px; color: var(--text-muted); line-height: 1.5; }
 
@@ -1924,8 +1936,15 @@ button.info-caret:focus-visible { outline: 2px solid var(--accent); outline-offs
 .info-toggle:hover { color: var(--text); }
 .info-toggle.is-open { background: var(--accent); border-color: var(--accent); color: #fff; }
 
+/*
+ * 목차·백링크는 글 위에 얹히므로 키를 묶어 둡니다. 40% 로 두었더니 제목이 서른 개만
+ * 넘어도 화면의 절반 가까이가 목차로 덮여 정작 글이 몇 줄 안 보였습니다.
+ * 짧은 목록은 제 내용만큼만 서고(흐름에 두어 저절로 그렇습니다), 긴 것만 여기서 잘립니다.
+ * dvh 를 쓰는 것은 손전화에서 주소줄이 접히고 펴지는 만큼을 따라가기 위해서입니다 —
+ * vh 는 늘 주소줄이 접힌 큰 키라, 펴져 있는 동안에는 30% 보다 많이 덮습니다.
+ */
 .info-panel {
-  max-height: 40vh;
+  max-height: 30dvh;
   overflow: auto;
   padding: 12px 16px;
   border-top: 1px solid var(--border);
@@ -2171,6 +2190,8 @@ button.info-caret:focus-visible { outline: 2px solid var(--accent); outline-offs
   display: flex;
   align-items: center;
   gap: 10px;
+  /* 엿보기 칸은 그 줄 아래에 통째로 눕습니다. 그래서 줄을 감쌌습니다. */
+  flex-wrap: wrap;
   padding: 8px 12px;
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -2181,6 +2202,50 @@ button.info-caret:focus-visible { outline: 2px solid var(--accent); outline-offs
 .trash-name { font-weight: 600; overflow-wrap: anywhere; }
 .trash-meta { font-size: 12px; color: var(--text-muted); overflow-wrap: anywhere; }
 .trash-tools { display: flex; gap: 6px; flex-shrink: 0; }
+/*
+ * 엿보기 칸. 되돌릴지 없앨지 정하려고 잠깐 들여다보는 자리라, 글은 앞부분만 싣고
+ * 키도 묶어 둡니다. 길면 이 안에서만 굴립니다 — 목록 전체가 길어지면 다른 줄을 잃습니다.
+ */
+.trash-peek {
+  flex-basis: 100%;
+  margin-block-start: 8px;
+  padding-block-start: 8px;
+  border-block-start: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.trash-peek.is-empty { margin: 8px 0 0; font-size: 12px; color: var(--text-muted); }
+.trash-peek-text {
+  margin: 0;
+  max-height: 220px;
+  overflow: auto;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--bg-sunken);
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+/* 그림은 줄 안에 들어올 만큼만. 큰 그림이 목록을 밀어내면 무엇을 고르는 중인지 잃습니다. */
+.trash-peek-image {
+  max-width: 100%;
+  max-height: 220px;
+  width: auto;
+  border-radius: 6px;
+  background: var(--bg-sunken);
+}
+.trash-peek-entries {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 220px;
+  overflow: auto;
+  font-size: 13px;
+}
+.trash-peek-entries li { display: flex; align-items: center; gap: 6px; padding: 2px 0; }
 
 /* ---------- 단축키 목록 ---------- */
 

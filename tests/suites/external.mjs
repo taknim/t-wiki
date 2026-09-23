@@ -21,7 +21,7 @@ await page.addInitScript(() => window.__installMockFs())
 const DOC = '개발 환경.md'
 const onDisk = () => page.evaluate((path) => window.__vaultText(path), DOC)
 const inEditor = () => page.evaluate(() => document.querySelector('.main .editor').value)
-const pill = () => page.evaluate(() => document.querySelector('.pill')?.textContent ?? null)
+const pill = () => page.evaluate(() => document.querySelector('.doc-head .pill:not(.pill-save)')?.textContent ?? null)
 /*
  * 앱 밖에서 파일을 고친 것처럼 꾸밉니다. 내용과 함께 시각도 앞으로 밀어야 합니다.
  * 같은 밀리초 안에 쓴 것과 구별되지 않으면 바뀐 줄 모릅니다.
@@ -96,7 +96,8 @@ try {
   await page.waitForTimeout(1500)
   expect('파일은 밖의 글 그대로', (await onDisk()) === '# 세 번째 밖의 글\n', await onDisk())
   expect('편집기 글은 남아 있음', (await inEditor()).includes('넷'), await inEditor())
-  expect('저장 중 표시', (await pill()) === '저장 중…', String(await pill()))
+  // 아직 쓰지 않았으므로 자동 저장을 기다리는 중이라고 적힙니다.
+  expect('아직 저장 전이라고 적힘', (await pill())?.includes('자동 저장') ?? false, String(await pill()))
   // 자동 저장이 계속 돌아도 같은 글로는 다시 묻지 않습니다.
   expect('되풀이해 묻지 않음', (await dialog()) === null, String(await dialog()))
   // 더 치면 새 글이므로 다시 묻습니다.

@@ -224,6 +224,19 @@ export async function entryKind(
   }
 }
 
+/** 그 폴더 안의 것들. 휴지통을 엿볼 때 씁니다 — 볼트 트리에는 들지 않는 자리라 따로 읽습니다. */
+export async function dirEntries(
+  root: FileSystemDirectoryHandle,
+  path: string,
+): Promise<{ name: string; kind: 'file' | 'dir' }[]> {
+  const dir = await resolveDir(root, path.split('/').filter(Boolean))
+  const found: { name: string; kind: 'file' | 'dir' }[] = []
+  for await (const [name, handle] of dir.entries()) {
+    found.push({ name, kind: handle.kind === 'directory' ? 'dir' : 'file' })
+  }
+  return found
+}
+
 export async function removeEntry(root: FileSystemDirectoryHandle, path: string): Promise<void> {
   const { segments, name } = splitPath(path)
   const dir = await resolveDir(root, segments)
