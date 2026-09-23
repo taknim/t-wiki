@@ -80,6 +80,16 @@ export default function App() {
   const [draft, setDraft] = useState('')
   const [dirty, setDirty] = useState(false)
   /*
+   * 지금 파일에 쓰고 있는지. 쓰는 동안에는 편집기를 잠급니다.
+   * 겹쳐 부르는 일이 있어(덮어쓰기로 저장을 다시 부릅니다) 셈으로 셉니다.
+   */
+  const [saving, setSaving] = useState(false)
+  const savingRef = useRef(0)
+  const markSaving = useCallback((delta: number) => {
+    savingRef.current = Math.max(0, savingRef.current + delta)
+    setSaving(savingRef.current > 0)
+  }, [])
+  /*
    * 마지막으로 글에 손댄 때. 자동 저장까지 남은 시간을 여기서부터 셉니다.
    * ref 가 아니라 state 인 것은 제목 옆의 셈이 이 값을 보고 다시 그려져야 하기 때문입니다.
    */
@@ -190,6 +200,7 @@ export default function App() {
       ? undefined
       : (isMarkdown(path) ? vault.index.get(path) : vault.assets.get(path))?.lastModified
 
+    markSaving(1)
     try {
       // 마크다운은 문서 색인까지 갱신하고, 그 밖의 텍스트는 파일만 씁니다.
       if (isMarkdown(path)) await vault.save(path, snapshot, known)
@@ -257,8 +268,10 @@ export default function App() {
         return
       }
       heldRef.current = original
+    } finally {
+      markSaving(-1)
     }
-  }, [dialogs, dirty, report, vault])
+  }, [dialogs, dirty, markSaving, report, vault])
 
   // 저장 안에서 저장을 다시 부를 때 씁니다(덮어쓰기). 제 이름을 안에서 부를 수 없습니다.
   const commitRef = useRef(commit)
@@ -920,6 +933,8 @@ export default function App() {
    * 저장은 늘 하던 대로 자동 저장이 이어받습니다.
    */
   const toggleTaskAt = (at: number) => {
+    // 쓰는 중에 네모를 누르면 방금 담은 글과 어긋납니다. 편집기를 잠그는 것과 같은 까닭입니다.
+    if (saving) return
     const next = toggleTask(body, at)
     if (next === null) return
     setDraft(draft.slice(0, draft.length - body.length) + next)
@@ -1757,7 +1772,7 @@ export default function App() {
               <div className="doc-head">
                 <h1>{selection.name}</h1>
                 {editableText && (
-                  <SaveState dirty={dirty} dueAt={saveDueAt} seconds={autoSave.seconds} onSave={() => void commit()} />
+                  <SaveState dirty={dirty} saving={saving} dueAt={saveDueAt} seconds={autoSave.seconds} onSave={() => void commit()} />
                 )}
                 {selection.kind !== 'dir' && !editableText && <span className="pill">읽기 전용</span>}
                 {/*
@@ -1795,6 +1810,7 @@ export default function App() {
                       }}
                       onSave={() => void commit()}
                       lineNumbers={look.lineNumbers}
+                      busy={saving}
                       onCaret={look.caretPosition ? setCaret : undefined}
                     />
                   )}
@@ -1825,7 +1841,7 @@ export default function App() {
             <>
               <div className="doc-head">
                 <h1>{fileNameOf(selectedPath)}</h1>
-                <SaveState dirty={dirty} dueAt={saveDueAt} seconds={autoSave.seconds} onSave={() => void commit()} />
+                <SaveState dirty={dirty} saving={saving} dueAt={saveDueAt} seconds={autoSave.seconds} onSave={() => void commit()} />
                 <ViewModeSwitch mode={viewMode} onChange={setViewMode} />
               </div>
 
@@ -1861,6 +1877,7 @@ export default function App() {
                     }}
                     onSave={() => void commit()}
                     lineNumbers={look.lineNumbers}
+                    busy={saving}
                     onCaret={look.caretPosition ? setCaret : undefined}
                   />
                 )}

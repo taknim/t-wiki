@@ -4,6 +4,8 @@ import { SaveIcon } from './icons'
 interface SaveStateProps {
   /** 아직 파일에 쓰지 않은 것이 있는지. */
   dirty: boolean
+  /** 지금 파일에 쓰고 있는지. 그동안 편집기는 잠깁니다. */
+  saving: boolean
   /**
    * 자동 저장이 예정된 시각(ms). 자동 저장이 꺼져 있거나 쓸 것이 없으면 null.
    * 남은 시간은 여기서 헤아립니다 — 저장을 거는 쪽과 적는 쪽이 같은 값을 봐야 어긋나지 않습니다.
@@ -23,7 +25,7 @@ interface SaveStateProps {
  * 꺼져 있다는 것을) 적습니다. 단추는 자동 저장이 켜져 있어도 나옵니다. 기다리지 않고
  * 지금 쓰고 싶을 때가 있기 때문입니다.
  */
-export function SaveState({ dirty, dueAt, seconds, onSave }: SaveStateProps) {
+export function SaveState({ dirty, saving, dueAt, seconds, onSave }: SaveStateProps) {
   const [now, setNow] = useState(() => Date.now())
 
   useEffect(() => {
@@ -32,6 +34,9 @@ export function SaveState({ dirty, dueAt, seconds, onSave }: SaveStateProps) {
     const timer = window.setInterval(() => setNow(Date.now()), 200)
     return () => window.clearInterval(timer)
   }, [dueAt])
+
+  // 쓰는 동안에는 그렇다고만 적습니다. 이때 편집기도 잠겨 있어 무엇을 눌러도 듣지 않습니다.
+  if (saving) return <span className="pill pill-dirty">저장 중…</span>
 
   if (!dirty) return <span className="pill pill-ok">저장됨</span>
 

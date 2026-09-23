@@ -194,7 +194,46 @@ try {
     await page.textContent('.doc-head h1'))
   expect('고친 것은 파일에 들어가지 않음', !(await onDisk()).includes('여덟'), (await onDisk()).slice(-30))
 
-  step('8. 새로고침해도 설정이 남는다')
+  /*
+   * 쓰는 사이에 친 글자는 방금 파일에 담은 것과 어긋나고, 곧이어 돌아오는 저장 결과에
+   * 덮여 소리 없이 사라집니다. 그동안은 아예 손대지 못하게 막습니다.
+   */
+  step('8. 쓰는 동안에는 편집기가 잠긴다')
+  await page.click(`.tree-row:has-text("${DOC}") .tree-name`)
+  await page.waitForSelector(`.doc-head h1:has-text("${DOC}")`, { timeout: 5000 })
+  await page.evaluate(() => { window.__slowWrite = 1500 })
+  await page.click('.main .editor')
+  await page.keyboard.press('End')
+  await page.keyboard.type(' 여덟')
+  await page.waitForTimeout(200)
+  const before = await page.evaluate(() => document.querySelector('.main .editor').value)
+  await saveButton().click()
+  await page.waitForTimeout(400)
+  const locked = await page.evaluate(() => ({
+    readOnly: document.querySelector('.main .editor').readOnly,
+    label: document.querySelector('.doc-head .pill:not(.doc-save)')?.textContent,
+    button: document.querySelector('.doc-head .doc-save') !== null,
+  }))
+  console.log('  ' + JSON.stringify(locked))
+  expect('편집기가 잠김', locked.readOnly, JSON.stringify(locked))
+  expect('쓰는 중이라고 적힘', locked.label === '저장 중…', String(locked.label))
+  // 잠긴 동안 친 글자는 들어가지 않습니다.
+  await page.keyboard.type(' 끼어들기')
+  await page.waitForTimeout(100)
+  expect('그 사이에 친 글자는 들어가지 않음',
+    (await page.evaluate(() => document.querySelector('.main .editor').value)) === before)
+  // 다 쓰고 나면 다시 풀립니다.
+  await page.waitForFunction(() => !document.querySelector('.main .editor').readOnly, undefined, { timeout: 5000 })
+  await page.evaluate(() => { window.__slowWrite = 0 })
+  expect('다 쓰면 풀림', (await label()) === '저장됨', String(await label()))
+  await page.keyboard.type(' 아홉')
+  await page.waitForTimeout(200)
+  expect('풀린 뒤에는 다시 쳐짐',
+    (await page.evaluate(() => document.querySelector('.main .editor').value)).includes('아홉'))
+  await saveButton().click()
+  await page.waitForTimeout(500)
+
+  step('9. 새로고침해도 설정이 남는다')
   // 권한이 살아 있으면 새로 고침 뒤에 곧바로 폴더가 다시 열립니다.
   await page.reload({ waitUntil: 'domcontentloaded' })
   await page.waitForSelector('.tree', { timeout: 10000 })

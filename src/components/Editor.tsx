@@ -11,6 +11,8 @@ interface EditorProps {
   onSave: () => void
   /** 왼쪽에 줄 번호를 세울지. */
   lineNumbers?: boolean
+  /** 파일에 쓰는 중이라 잠시 손댈 수 없는지. */
+  busy?: boolean
   /** 커서가 있는 자리(1부터 세는 행·열)가 바뀔 때. 아래 표시줄에 적습니다. */
   onCaret?: (at: { line: number; column: number } | null) => void
 }
@@ -45,7 +47,7 @@ const SHORTCUTS: Record<string, FormatId> = {
   k: 'link',
 }
 
-export function Editor({ value, path, onChange, onSave, lineNumbers = false, onCaret }: EditorProps) {
+export function Editor({ value, path, onChange, onSave, lineNumbers = false, busy = false, onCaret }: EditorProps) {
   const ref = useRef<HTMLTextAreaElement>(null)
   const [box, setBox] = useState<SelectionBox | null>(null)
 
@@ -216,6 +218,13 @@ export function Editor({ value, path, onChange, onSave, lineNumbers = false, onC
         ref={ref}
         className="editor"
         value={value}
+        /*
+         * 쓰는 동안에는 잠급니다. 그 사이에 친 글자는 방금 파일에 담은 것과 어긋나고,
+         * 곧이어 돌아오는 저장 결과에 덮여 소리 없이 사라집니다.
+         * disabled 가 아니라 readOnly 인 것은 자리(커서·선택·굴린 자리)를 잃지 않기 위해서입니다.
+         */
+        readOnly={busy}
+        aria-busy={busy}
         spellCheck={false}
         onChange={(event) => onChange(event.target.value)}
         onKeyDown={handleKeyDown}

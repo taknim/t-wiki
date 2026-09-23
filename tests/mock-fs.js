@@ -20,7 +20,16 @@ window.__installMockFs = function installMockFs() {
       const parts = []
       return {
         write: async (chunk) => { parts.push(chunk) },
-        close: async () => { self._data = new Blob(parts); self._lastModified = now() },
+        close: async () => {
+          /*
+           * 실제 디스크는 큰 파일이나 느린 기기에서 한참 걸립니다. 그 사이에 무엇이
+           * 되고 안 되는지를 보려면 쓰는 일을 붙잡아 둘 수 있어야 합니다.
+           * `window.__slowWrite` 에 밀리초를 넣으면 그만큼 늦게 끝납니다.
+           */
+          if (window.__slowWrite) await new Promise((done) => setTimeout(done, window.__slowWrite))
+          self._data = new Blob(parts)
+          self._lastModified = now()
+        },
       }
     }
     async queryPermission() { return 'granted' }
