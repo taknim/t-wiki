@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { SaveIcon } from './icons'
 
 interface SaveStateProps {
   /** 아직 파일에 쓰지 않은 것이 있는지. */
@@ -43,16 +44,13 @@ export function SaveState({ dirty, dueAt, seconds, onSave }: SaveStateProps) {
     ? null
     : Math.max(0, Math.min(Math.ceil(seconds), Math.ceil((dueAt - now) / 1000)))
 
+  /*
+   * 말이 먼저, 단추가 뒤입니다. 무슨 일이 있었는지(변경됨) 읽고 나서 무엇을 할지(저장)
+   * 고르는 차례가 자연스럽습니다. 단추는 알약이 아니라 단추 모양으로 두어 곁의 말과
+   * 헷갈리지 않게 하고, 색은 눈에 걸리라고 경고와 같은 붉은 계열을 씁니다.
+   */
   return (
     <>
-      <button
-        type="button"
-        className="pill pill-save"
-        data-tip="지금 파일에 씁니다 (⌘S)"
-        onClick={onSave}
-      >
-        저장
-      </button>
       <span
         className="pill"
         data-tip={dueAt === null
@@ -63,6 +61,15 @@ export function SaveState({ dirty, dueAt, seconds, onSave }: SaveStateProps) {
       >
         {left === null ? '변경됨' : left > 0 ? `${left}초 뒤 자동 저장` : '자동 저장하는 중…'}
       </span>
+      <button
+        type="button"
+        className="btn btn-danger btn-small doc-save"
+        data-tip="지금 파일에 씁니다 (⌘S)"
+        onClick={onSave}
+      >
+        <SaveIcon />
+        저장
+      </button>
     </>
   )
 }

@@ -27,7 +27,7 @@ const onDisk = () => page.evaluate((path) => window.__vaultText(path), DOC)
 /** 제목 옆의 상태말. 저장 단추는 빼고 봅니다. */
 const label = () => page.evaluate(() =>
   document.querySelector('.doc-head .pill:not(.pill-save)')?.textContent ?? null)
-const saveButton = () => page.locator('.doc-head .pill-save')
+const saveButton = () => page.locator('.doc-head .doc-save')
 const openSettings = async (item) => {
   await page.click('button[aria-label="설정"]')
   await page.waitForSelector('.settings-nav')
@@ -52,6 +52,11 @@ try {
   await page.keyboard.type(' 하나')
   // 아직 0.8초가 되기 전. 단추가 서고 언제 저장되는지 적힙니다.
   expect('저장 단추가 섬', (await saveButton().count()) === 1)
+  // 말이 먼저, 단추가 뒤입니다. 무슨 일이 있었는지 읽고 나서 무엇을 할지 고릅니다.
+  const order = await page.evaluate(() => [...document.querySelectorAll('.doc-head > *')]
+    .map((one) => (one.classList.contains('doc-save') ? '저장' : one.classList.contains('pill') ? '말' : one.tagName)))
+  expect('말 뒤에 단추가 섬', order.join(',').includes('말,저장'), JSON.stringify(order))
+  expect('단추에 아이콘이 있음', (await page.locator('.doc-save .icon').count()) === 1)
   expect('언제 저장되는지 적힘', (await label())?.includes('자동 저장') ?? false, String(await label()))
   await page.waitForTimeout(1200)
   expect('0.8초 뒤 저절로 저장됨', (await onDisk()).includes('하나') && (await label()) === '저장됨',

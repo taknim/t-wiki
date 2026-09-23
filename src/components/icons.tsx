@@ -224,6 +224,17 @@ export function ImageIcon(props: IconProps) {
   )
 }
 
+/** 저장. 옛 플로피 디스크 모양이 아직 가장 빨리 읽힙니다. */
+export function SaveIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M2.8 2.8h8l2.4 2.4v8a.4.4 0 0 1-.4.4H2.8a.4.4 0 0 1-.4-.4V3.2a.4.4 0 0 1 .4-.4z" />
+      <path d="M5.2 2.8v3.6h5.2V2.8" />
+      <path d="M5.2 13.6V9.6h5.6v4" />
+    </Svg>
+  )
+}
+
 export function TrashIcon(props: IconProps) {
   return (
     <Svg {...props}>

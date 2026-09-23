@@ -113,17 +113,19 @@ button, input, select, textarea { font: inherit; color: inherit; }
  * 제목 옆의 저장 단추. 같은 알약 모양이되 누를 수 있다는 것이 보여야 하므로
  * 글씨를 또렷하게 두고 손을 얹으면 강조색으로 물듭니다.
  */
-.pill-save {
-  font-family: inherit;
-  /* 강조색을 채워 둡니다. 다른 알약과 같은 흐린 글씨로는 누를 수 있는 것인지 눈에 띄지 않습니다. */
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
+/*
+ * 제목 옆의 저장 단추. 곁에 선 알약(변경됨·N초 뒤 자동 저장)과 헷갈리지 않도록
+ * 둥근 알약이 아니라 단추 모양 그대로 두고, 아이콘을 앞에 세웁니다.
+ * 제목 줄은 글줄을 맞춰 세우므로(baseline) 단추만 따로 가운데로 맞춥니다.
+ */
+.doc-save {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+  align-self: center;
   font-weight: 600;
-  cursor: pointer;
 }
-.pill-save:hover { filter: brightness(1.08); }
-.pill-save:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 .hint { margin: 4px 0 0; font-size: 12px; color: var(--text-muted); line-height: 1.5; }
 
