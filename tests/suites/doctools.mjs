@@ -333,21 +333,35 @@ try {
    */
   /*
    * 목차가 글 위에 얹히므로 키를 묶어 둡니다. 40% 로 두었더니 제목이 서른 개만 넘어도
-   * 화면의 절반 가까이가 덮여 정작 글이 몇 줄 안 보였습니다.
+   * 화면의 절반 가까이가 덮여 정작 글이 몇 줄 안 보였습니다. 큰 화면에서는 25% 도
+   * 한참이라 400px 에서 한 번 더 묶습니다.
    */
-  step('11. 목차는 화면의 30% 를 넘지 않고, 짧으면 그 내용만큼만 선다')
+  step('11. 목차는 화면의 25%(많아야 400px) 를 넘지 않고, 짧으면 그 내용만큼만 선다')
   await page.click('.tree-row:has-text("긴 문서") .tree-name')
   await page.waitForSelector('.doc-head h1:has-text("긴 문서")', { timeout: 5000 })
   await page.click('.doc-tools button:has-text("목차")')
   await page.waitForSelector('.info-panel .toc', { timeout: 3000 })
   const tall = await page.evaluate(() => {
     const panel = document.querySelector('.info-panel')
-    return { height: Math.round(panel.getBoundingClientRect().height), cap: Math.round(window.innerHeight * 0.3),
+    return { height: Math.round(panel.getBoundingClientRect().height),
+      cap: Math.min(Math.round(window.innerHeight * 0.25), 400),
       scrollable: panel.scrollHeight > panel.clientHeight + 1 }
   })
   console.log('  긴 목차: ' + JSON.stringify(tall))
-  expect('긴 목차는 화면의 30% 에서 멈춤', tall.height <= tall.cap + 1, JSON.stringify(tall))
+  expect('긴 목차는 화면의 25%(많아야 400px) 에서 멈춤', tall.height <= tall.cap + 1, JSON.stringify(tall))
   expect('잘린 만큼은 굴려서 봄', tall.scrollable, JSON.stringify(tall))
+  /*
+   * 아주 높은 화면에서는 25% 도 한참입니다. 목차가 화면 반쪽만큼 길어질 까닭이 없어
+   * 400px 에서 한 번 더 묶습니다.
+   */
+  const was = page.viewportSize()
+  await page.setViewportSize({ width: was.width, height: 1800 })
+  await page.waitForTimeout(400)
+  const onTall = await page.evaluate(() => Math.round(document.querySelector('.info-panel').getBoundingClientRect().height))
+  console.log('  높은 화면에서: ' + onTall)
+  expect('높은 화면에서도 400px 을 넘지 않음', onTall <= 400 && onTall > 300, String(onTall))
+  await page.setViewportSize(was)
+  await page.waitForTimeout(400)
   await page.click('.tree-row:has-text("짧은 목차") .tree-name')
   await page.waitForSelector('.doc-head h1:has-text("짧은 목차")', { timeout: 5000 })
   // 문서를 옮겨도 펼쳐 둔 칸은 그대로입니다. 접혀 있을 때만 다시 폅니다.
@@ -355,7 +369,8 @@ try {
   await page.waitForSelector('.info-panel .toc', { timeout: 3000 })
   const smallToc = await page.evaluate(() => {
     const panel = document.querySelector('.info-panel')
-    return { height: Math.round(panel.getBoundingClientRect().height), cap: Math.round(window.innerHeight * 0.3),
+    return { height: Math.round(panel.getBoundingClientRect().height),
+      cap: Math.min(Math.round(window.innerHeight * 0.25), 400),
       rows: panel.querySelectorAll('.toc li').length }
   })
   console.log('  짧은 목차: ' + JSON.stringify(smallToc))

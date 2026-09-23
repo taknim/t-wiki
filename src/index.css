@@ -110,6 +110,11 @@ button, input, select, textarea { font: inherit; color: inherit; }
 }
 .pill-ok { color: var(--ok); border-color: currentColor; }
 /*
+ * 아직 파일에 안 들어간 것이 있을 때의 말. 흐린 글씨로 두었더니 "저장됨"에서
+ * "변경됨"으로 바뀐 것이 눈에 띄지 않았습니다. 테두리까지 같은 색으로 물들입니다.
+ */
+.pill-dirty { color: var(--warn); border-color: currentColor; font-weight: 600; }
+/*
  * 제목 옆의 저장 단추. 같은 알약 모양이되 누를 수 있다는 것이 보여야 하므로
  * 글씨를 또렷하게 두고 손을 얹으면 강조색으로 물듭니다.
  */
@@ -121,10 +126,9 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .doc-save {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
   flex-shrink: 0;
+  /* 제목 줄은 글줄을 맞춰 세우므로(baseline) 단추만 따로 가운데로 맞춥니다. */
   align-self: center;
-  font-weight: 600;
 }
 
 .hint { margin: 4px 0 0; font-size: 12px; color: var(--text-muted); line-height: 1.5; }
@@ -1946,10 +1950,11 @@ button.info-caret:focus-visible { outline: 2px solid var(--accent); outline-offs
  * 넘어도 화면의 절반 가까이가 목차로 덮여 정작 글이 몇 줄 안 보였습니다.
  * 짧은 목록은 제 내용만큼만 서고(흐름에 두어 저절로 그렇습니다), 긴 것만 여기서 잘립니다.
  * dvh 를 쓰는 것은 손전화에서 주소줄이 접히고 펴지는 만큼을 따라가기 위해서입니다 —
- * vh 는 늘 주소줄이 접힌 큰 키라, 펴져 있는 동안에는 30% 보다 많이 덮습니다.
+ * vh 는 늘 주소줄이 접힌 큰 키라, 펴져 있는 동안에는 몫보다 많이 덮습니다.
+ * 큰 화면에서는 25% 만으로도 한참이라 400px 에서 한 번 더 묶습니다.
  */
 .info-panel {
-  max-height: 30dvh;
+  max-height: min(25dvh, 400px);
   overflow: auto;
   padding: 12px 16px;
   border-top: 1px solid var(--border);
@@ -2212,6 +2217,8 @@ button.info-caret:focus-visible { outline: 2px solid var(--accent); outline-offs
  * 키도 묶어 둡니다. 길면 이 안에서만 굴립니다 — 목록 전체가 길어지면 다른 줄을 잃습니다.
  */
 .trash-peek {
+  /* 엿보는 칸의 키. 글이든 그림이든 폴더든 같은 키라 줄마다 들쭉날쭉하지 않습니다. */
+  --peek-height: 220px;
   flex-basis: 100%;
   margin-block-start: 8px;
   padding-block-start: 8px;
@@ -2223,7 +2230,7 @@ button.info-caret:focus-visible { outline: 2px solid var(--accent); outline-offs
 .trash-peek.is-empty { margin: 8px 0 0; font-size: 12px; color: var(--text-muted); }
 .trash-peek-text {
   margin: 0;
-  max-height: 220px;
+  height: var(--peek-height);
   overflow: auto;
   padding: 8px 10px;
   border-radius: 6px;
@@ -2234,19 +2241,33 @@ button.info-caret:focus-visible { outline: 2px solid var(--accent); outline-offs
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
-/* 그림은 줄 안에 들어올 만큼만. 큰 그림이 목록을 밀어내면 무엇을 고르는 중인지 잃습니다. */
-.trash-peek-image {
-  max-width: 100%;
-  max-height: 220px;
-  width: auto;
+/*
+ * 그림 칸. 키는 글·목록과 같게 묶어 두고 그림은 그 안에서 제 비율대로 줄어듭니다.
+ * 예전에는 그림에 곧바로 키만 물렸는데, 이 칸이 세로로 쌓는 칸(flex column)이라
+ * 그림이 가로로 늘어나 비율이 찌그러졌습니다. 작은 그림은 늘리지 않고 그대로 둡니다.
+ */
+.trash-peek-figure {
+  height: var(--peek-height);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  box-sizing: border-box;
   border-radius: 6px;
   background: var(--bg-sunken);
+}
+.trash-peek-image {
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+  object-fit: contain;
 }
 .trash-peek-entries {
   list-style: none;
   margin: 0;
   padding: 0;
-  max-height: 220px;
+  height: var(--peek-height);
   overflow: auto;
   font-size: 13px;
 }

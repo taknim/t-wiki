@@ -47,16 +47,36 @@ try {
   step('1. 기본은 0.8초 자동 저장이고, 쓸 것이 없으면 저장됨만 적힌다')
   expect('저장됨', (await label()) === '저장됨', String(await label()))
   expect('저장 단추는 없음', (await saveButton().count()) === 0)
+  const okColor = await page.evaluate(() => getComputedStyle(document.querySelector('.doc-head .pill')).color)
   await page.click('.main .editor')
   await page.keyboard.press('End')
   await page.keyboard.type(' 하나')
   // 아직 0.8초가 되기 전. 단추가 서고 언제 저장되는지 적힙니다.
   expect('저장 단추가 섬', (await saveButton().count()) === 1)
-  // 말이 먼저, 단추가 뒤입니다. 무슨 일이 있었는지 읽고 나서 무엇을 할지 고릅니다.
+  // 단추가 먼저, 말이 뒤입니다. 단추 자리가 고정되어 있어야 손이 헤매지 않습니다.
   const order = await page.evaluate(() => [...document.querySelectorAll('.doc-head > *')]
     .map((one) => (one.classList.contains('doc-save') ? '저장' : one.classList.contains('pill') ? '말' : one.tagName)))
-  expect('말 뒤에 단추가 섬', order.join(',').includes('말,저장'), JSON.stringify(order))
-  expect('단추에 아이콘이 있음', (await page.locator('.doc-save .icon').count()) === 1)
+  expect('단추 뒤에 말이 섬', order.join(',').includes('저장,말'), JSON.stringify(order))
+  // 단추에는 아이콘만. 곁의 말이 이미 글자라 거기에 글자를 더하면 어느 쪽이 눌리는지 헷갈립니다.
+  expect('아이콘만 있고 글자는 없음', (await page.locator('.doc-save .icon').count()) === 1
+    && (await page.textContent('.doc-save')).trim() === '', JSON.stringify(await page.textContent('.doc-save')))
+  /*
+   * 저장됨에서 변경됨으로 바뀐 것이 눈에 띄어야 합니다. 흐린 글씨로 두었더니 티가 나지
+   * 않았습니다. 둘은 서로 다른 색이어야 합니다.
+   */
+  const colors = await page.evaluate(() => {
+    // 알림색을 그대로 견주려고 같은 값을 입힌 조각을 잠깐 세워 재 봅니다.
+    const probe = document.createElement('span')
+    probe.style.color = 'var(--warn)'
+    document.body.append(probe)
+    const warn = getComputedStyle(probe).color
+    probe.remove()
+    const muted = getComputedStyle(document.querySelector('.info-meta')).color
+    return { now: getComputedStyle(document.querySelector('.doc-head .pill')).color, warn, muted }
+  })
+  console.log('  ' + JSON.stringify(colors))
+  expect('저장됨과도, 흐린 글씨와도 다른 알림색', colors.now === colors.warn && colors.now !== okColor
+    && colors.now !== colors.muted, `${okColor} / ${colors.muted} → ${colors.now}`)
   expect('언제 저장되는지 적힘', (await label())?.includes('자동 저장') ?? false, String(await label()))
   await page.waitForTimeout(1200)
   expect('0.8초 뒤 저절로 저장됨', (await onDisk()).includes('하나') && (await label()) === '저장됨',

@@ -62,7 +62,10 @@ function TrashPeekView({ item, onPeek }: { item: TrashItem; onPeek: (item: Trash
   if (peek.kind === 'image') {
     return (
       <div className="trash-peek">
-        <img className="trash-peek-image" src={peek.url} alt={`${fileNameOf(item.path)} 미리보기`} />
+        {/* 그림은 칸 안에 가운데로 앉힙니다. 칸 키는 글·목록과 같아 줄마다 들쭉날쭉하지 않습니다. */}
+        <div className="trash-peek-figure">
+          <img className="trash-peek-image" src={peek.url} alt={`${fileNameOf(item.path)} 미리보기`} />
+        </div>
         <p className="hint" style={{ margin: 0 }}>{formatBytes(peek.bytes)}</p>
       </div>
     )

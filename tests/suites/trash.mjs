@@ -35,6 +35,10 @@ const listed = () => page.evaluate(() =>
     name: one.querySelector('.trash-name').textContent,
     meta: one.querySelector('.trash-meta').textContent,
   })))
+/** 가로로 긴 그림. 미리보기 칸에서 비율이 찌그러지지 않아야 합니다. */
+const WIDE_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="600">'
+  + '<rect width="120" height="600" fill="#4a7"/></svg>'
+
 const manifest = async () => JSON.parse(await page.evaluate(() => window.__vaultText('_t-wiki.trash/_index.json')))
 /** 시험 도중 없앤 파일을 다시 심고 트리를 새로 읽습니다. */
 const seed = async (path, text) => {
@@ -110,6 +114,10 @@ try {
   const peeked = await page.textContent('.trash-peek-text')
   console.log('  ' + peeked.replace(/\s+/g, ' ').slice(0, 60))
   expect('글 앞부분이 보임', peeked.includes('온보딩'), peeked.slice(0, 60))
+  // 짧은 글이어도 칸 키는 그대로입니다. 줄마다 키가 달라지면 목록이 들썩입니다.
+  const textPeekHeight = await page.evaluate(() =>
+    Math.round(document.querySelector('.trash-peek-text').getBoundingClientRect().height))
+  console.log('  글 칸 키: ' + textPeekHeight)
   expect('고치는 칸은 없음', (await page.locator('.trash-view .editor').count()) === 0)
   await page.screenshot({ path: join(HERE, '..', 'shots', 'trash', '02-peek.png'),
     clip: { x: 0, y: 40, width: 1300, height: 420 } })
@@ -118,7 +126,41 @@ try {
   await page.waitForTimeout(300)
   expect('다시 누르면 접힘', (await page.locator('.trash-peek').count()) === 0)
 
-  step('4. 복원하면 원래 자리로 돌아간다')
+  /*
+   * 엿보는 칸은 글이든 그림이든 폴더든 같은 키입니다. 그림은 그 안에서 제 비율대로 줄어듭니다.
+   * 예전에는 그림에 곧바로 키만 물려, 세로로 쌓는 칸에서 가로로 늘어나 찌그러졌습니다.
+   */
+  step('4. 그림은 비율을 지킨 채 같은 키의 칸 안에 앉는다')
+  await seed('넓은 그림.svg', WIDE_SVG)
+  await remove('넓은 그림', '휴지통으로 이동')
+  await page.click('.trash-row')
+  await page.waitForSelector('.trash-view')
+  await page.click('.trash-item:has-text("넓은 그림") button:has-text("미리보기")')
+  await page.waitForSelector('.trash-peek-figure img', { timeout: 5000 })
+  await page.waitForTimeout(400)
+  const shot = await page.evaluate(() => {
+    const img = document.querySelector('.trash-peek-image')
+    const box = img.getBoundingClientRect()
+    return {
+      칸: Math.round((document.querySelector('.trash-peek-figure') ?? img).getBoundingClientRect().height),
+      비율: Math.round((box.width / box.height) * 100) / 100,
+      원본비율: Math.round((img.naturalWidth / img.naturalHeight) * 100) / 100,
+      키: Math.round(box.height),
+    }
+  })
+  console.log('  ' + JSON.stringify(shot))
+  expect('그림이 제 비율 그대로', Math.abs(shot.비율 - shot.원본비율) < 0.05, JSON.stringify(shot))
+  expect('칸을 넘지 않음', shot.키 <= shot.칸, JSON.stringify(shot))
+  // 글이든 그림이든 같은 키입니다.
+  expect('글 칸과 같은 키', shot.칸 === textPeekHeight, `${textPeekHeight} vs ${shot.칸}`)
+  await page.click('.trash-item:has-text("넓은 그림") button:has-text("미리보기")')
+  await page.waitForTimeout(200)
+  await page.click('.trash-item:has-text("넓은 그림") button:has-text("완전 삭제")')
+  await page.waitForSelector('.dialog', { timeout: 3000 })
+  await page.click('.dialog button:has-text("완전 삭제")')
+  await page.waitForTimeout(500)
+
+  step('5. 복원하면 원래 자리로 돌아간다')
   await page.click('.trash-item button:has-text("복원")')
   await page.waitForTimeout(800)
   expect('원래 자리에 돌아옴', (await names('회사')).includes('온보딩.md'), JSON.stringify(await names('회사')))
@@ -127,7 +169,7 @@ try {
     JSON.stringify(await names('_t-wiki.trash')))
   expect('트리에도 돌아옴', (await rows()).includes('온보딩.md'), JSON.stringify(await rows()))
 
-  step('5. 폴더도 통째로 갔다 돌아온다')
+  step('6. 폴더도 통째로 갔다 돌아온다')
   await remove('회고', '휴지통으로 이동')
   expect('폴더가 트리에서 사라짐', !(await rows()).includes('회고'), JSON.stringify(await rows()))
   const folderItem = (await manifest())[0]
@@ -149,7 +191,7 @@ try {
   await page.waitForTimeout(800)
   expect('폴더가 돌아옴', (await names('회고'))?.includes('2026-08.md') ?? false, JSON.stringify(await names('회고')))
 
-  step('6. 복원할 자리에 다른 것이 있으면 묻는다')
+  step('7. 복원할 자리에 다른 것이 있으면 묻는다')
   await remove('휴가 정책', '휴지통으로 이동')
   // 같은 이름의 새 문서를 그 자리에 만들어 둡니다.
   await page.evaluate(() => {
@@ -176,7 +218,7 @@ try {
   expect('덮어쓰면 휴지통의 것이 돌아옴', restoredText.includes('연차'), restoredText)
   expect('휴지통이 비었음', (await trashCount()) === 0)
 
-  step('7. 완전 삭제와 휴지통 비우기는 확인을 받고 없앤다')
+  step('8. 완전 삭제와 휴지통 비우기는 확인을 받고 없앤다')
   await remove('개발 환경', '휴지통으로 이동')
   await remove('휴가 정책', '휴지통으로 이동')
   await remove('온보딩', '완전 삭제')
@@ -204,7 +246,7 @@ try {
   expect('칸도 다 치워짐', JSON.stringify(await names('_t-wiki.trash')) === '["_index.json"]',
     JSON.stringify(await names('_t-wiki.trash')))
 
-  step('8. 폴더를 다시 열어도 휴지통이 남아 있다')
+  step('9. 폴더를 다시 열어도 휴지통이 남아 있다')
   // 앞에서 없앤 파일을 다시 심어 둡니다.
   await seed('회사/휴가 정책.md', '# 휴가 정책\n\n연차는 15일입니다.\n')
   await seed('개발 환경.md', '# 개발 환경\n\nNode 20 을 씁니다.\n')
@@ -218,7 +260,7 @@ try {
   expect('휴지통이 트리에 폴더로 나오지 않음', !(await rows()).some((one) => one.includes('_t-wiki')),
     JSON.stringify(await rows()))
 
-  step('9. 휴지통은 동기화되지 않고, 설정을 켜면 오래된 것만 비운다')
+  step('10. 휴지통은 동기화되지 않고, 설정을 켜면 오래된 것만 비운다')
   // 하나는 31일 전에 옮긴 것으로 꾸밉니다.
   await remove('개발 환경', '휴지통으로 이동')
   await page.evaluate(async () => {

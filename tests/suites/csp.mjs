@@ -88,6 +88,13 @@ await page.addInitScript(({ xlsx, docx }) => {
     '# 모둠\n\n```mermaid\ngraph TD;\n  가-->나;\n```\n\n$$E = mc^2$$\n\n'
     + '![도표](첨부/도표.svg)\n\n<style>.doc-head h1 { letter-spacing: 1px; }</style>\n'))
   root._children.set('쪽.html', make('쪽.html', '<h1>안녕</h1><p id="here">여기</p>'))
+  /*
+   * 수식을 글로 설명하는 문서. 문장 속에 `$$` 를 적어 두기만 해도 거기서 문단이 끊기고
+   * 블록 수식이 뒤의 코드 울타리를 통째로 삼켜, 문서의 나머지가 통째로 어긋났습니다.
+   */
+  root._children.set('수식 설명.md', make('수식 설명.md',
+    '# 수식 설명\n\n문장 안에는 `$E = mc^2$`, 한 문단을 차지하는 식은 `$$` 로 감쌉니다.\n\n'
+    + '```markdown\n$$\na^2 + b^2 = c^2\n$$\n```\n\n## 뒤에 오는 제목\n\n마지막 문단입니다.\n'))
 
   // 막힌 것이 있으면 브라우저가 이 사건을 올립니다. 콘솔만 보면 놓칩니다.
   window.__csp = []
@@ -142,7 +149,27 @@ try {
   expect('앱 화면에 걸리지 않음', drawn.spacing !== '1px', JSON.stringify(drawn))
   await page.screenshot({ path: join(HERE, '..', 'shots', 'csp', '01-doc.png') })
 
-  step('4. HTML 첨부 미리보기도 그려진다')
+  /*
+   * 글 속의 `$$` 가 문단을 끊고 그 뒤를 삼키면, 뒤의 제목과 문단이 통째로 사라집니다.
+   * 블록 수식은 줄 첫머리의 `$$` 에서만 시작해야 합니다.
+   */
+  step('4. 글 속에 적어 둔 `$$` 가 뒤의 문서를 삼키지 않는다')
+  await page.click('.tree-row:has-text("수식 설명")')
+  await page.waitForTimeout(1200)
+  const parsed = await page.evaluate(() => ({
+    heads: [...document.querySelectorAll('.preview h2')].map((one) => one.textContent.replace('#', '')),
+    code: document.querySelectorAll('.preview pre').length,
+    last: document.querySelector('.preview').lastElementChild?.textContent ?? '',
+    math: document.querySelectorAll('.preview .katex').length,
+  }))
+  console.log('  ' + JSON.stringify(parsed))
+  expect('뒤의 제목이 남아 있음', parsed.heads.includes('뒤에 오는 제목'), JSON.stringify(parsed))
+  expect('마지막 문단까지 그려짐', parsed.last.includes('마지막 문단'), JSON.stringify(parsed))
+  expect('예시는 코드 칸 하나로 남음', parsed.code === 1, JSON.stringify(parsed))
+  // 글로 적은 것이라 수식으로 그려지지도 않습니다.
+  expect('글 속의 $$ 는 수식이 아님', parsed.math === 0, JSON.stringify(parsed))
+
+  step('5. HTML 첨부 미리보기도 그려진다')
   await page.click('.tree-row:has-text("쪽.html")')
   await page.waitForTimeout(1200)
   const framed = await page.frameLocator('.html-frame').locator('#here').textContent()
@@ -157,7 +184,7 @@ try {
    * 오피스 미리보기는 큰 벌을 그때그때 내려받습니다. 그 안에서 eval 이나 new Function 을
    * 쓰면 script-src 에 걸려 조용히 죽습니다. 실제로 열어 봐야 압니다.
    */
-  step('5. 오피스 미리보기도 울타리 안에서 돈다')
+  step('6. 오피스 미리보기도 울타리 안에서 돈다')
   await page.click('.tree-row:has-text("판매표")')
   await page.waitForSelector('.data-table', { timeout: 15000 })
   const cells = await page.evaluate(() =>
@@ -169,7 +196,7 @@ try {
     document.querySelector('.text-preview.markdown-body h1')?.textContent ?? null)
   expect('워드가 글로 그려짐', word === '워드 제목', String(word))
 
-  step('6. 저장소와 주고받기도 막히지 않는다')
+  step('7. 저장소와 주고받기도 막히지 않는다')
   await page.click('button[aria-label="설정"]')
   await page.waitForSelector('.settings-nav')
   await page.click('.settings-nav button:has-text("GitHub 동기화")')
@@ -195,7 +222,7 @@ try {
   console.log('  저장소: ' + JSON.stringify(landed))
   expect('저장소에 올라감', landed.length > 0, JSON.stringify(landed))
 
-  step('7. 막힌 것이 하나도 없다')
+  step('8. 막힌 것이 하나도 없다')
   const blocked = await page.evaluate(() => window.__csp)
   console.log('  ' + JSON.stringify(blocked))
   expect('CSP 에 걸린 것이 없음', blocked.length === 0, JSON.stringify(blocked))

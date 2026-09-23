@@ -285,13 +285,16 @@ function findDollar(src: string): number | undefined {
 }
 
 /**
- * 블록 수식은 `$$` 에서만 시작합니다.
- * 여기서 `$` 하나까지 가리키면 marked 가 그 자리에서 문단을 끊어 버려
- * 문장 안 수식이 인라인 확장까지 도달하지 못합니다.
+ * 블록 수식은 **줄 첫머리의** `$$` 에서만 시작합니다.
+ *
+ * `$` 하나까지 가리키면 marked 가 그 자리에서 문단을 끊어 버려 문장 안 수식이 인라인
+ * 확장까지 도달하지 못합니다. 그렇다고 줄 가운데의 `$$` 까지 가리키면, 글 속에 `$$` 를
+ * 적어 두기만 해도(수식 설명처럼 따옴표 안에 적은 것까지) 거기서 문단이 끊기고 블록
+ * 수식이 그 뒤의 코드 울타리를 통째로 삼켜, 문서의 나머지가 통째로 어긋났습니다.
  */
 function findDoubleDollar(src: string): number | undefined {
-  const at = src.search(/(?<!\\)\$\$/)
-  return at === -1 ? undefined : at
+  const match = /(^|\n)(?<!\\)\$\$/.exec(src)
+  return match ? match.index + match[1].length : undefined
 }
 
 /** 문단 하나를 통째로 차지하는 `$$ ... $$`. */

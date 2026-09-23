@@ -45,14 +45,24 @@ export function SaveState({ dirty, dueAt, seconds, onSave }: SaveStateProps) {
     : Math.max(0, Math.min(Math.ceil(seconds), Math.ceil((dueAt - now) / 1000)))
 
   /*
-   * 말이 먼저, 단추가 뒤입니다. 무슨 일이 있었는지(변경됨) 읽고 나서 무엇을 할지(저장)
-   * 고르는 차례가 자연스럽습니다. 단추는 알약이 아니라 단추 모양으로 두어 곁의 말과
-   * 헷갈리지 않게 하고, 색은 눈에 걸리라고 경고와 같은 붉은 계열을 씁니다.
+   * 단추가 먼저, 말이 뒤입니다. 단추 자리가 고정되어 있어야 상태가 바뀌어도 손이 헤매지 않습니다.
+   * 단추에는 아이콘만 둡니다 — 곁의 말이 이미 글자라, 거기에 글자를 더하면 어느 쪽이 눌리는
+   * 것인지 되레 헷갈립니다. 색도 입히지 않습니다. 눈에 걸려야 하는 것은 단추가 아니라
+   * "아직 안 들어갔다"는 말이기 때문입니다.
    */
   return (
     <>
+      <button
+        type="button"
+        className="btn btn-icon doc-save"
+        aria-label="지금 저장"
+        data-tip="지금 파일에 씁니다 (⌘S)"
+        onClick={onSave}
+      >
+        <SaveIcon />
+      </button>
       <span
-        className="pill"
+        className="pill pill-dirty"
         data-tip={dueAt === null
           ? '고친 것이 아직 파일에 들어가지 않았습니다. 저장 단추나 ⌘S 로 씁니다 (설정 → 일반 → 자동 저장)'
           : '손을 멈추면 이만큼 뒤에 저절로 씁니다 (설정 → 일반 → 자동 저장)'}
@@ -61,15 +71,6 @@ export function SaveState({ dirty, dueAt, seconds, onSave }: SaveStateProps) {
       >
         {left === null ? '변경됨' : left > 0 ? `${left}초 뒤 자동 저장` : '자동 저장하는 중…'}
       </span>
-      <button
-        type="button"
-        className="btn btn-danger btn-small doc-save"
-        data-tip="지금 파일에 씁니다 (⌘S)"
-        onClick={onSave}
-      >
-        <SaveIcon />
-        저장
-      </button>
     </>
   )
 }
