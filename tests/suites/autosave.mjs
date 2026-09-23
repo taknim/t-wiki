@@ -121,7 +121,7 @@ try {
   await page.keyboard.type(' 여섯')
   await page.waitForTimeout(2000)
   expect('가만히 두면 쓰지 않음', !(await page.evaluate(() => window.__vaultText('회고/2026-08.md'))).includes('여섯'))
-  expect('저절로 쓰지 않는다고 적힘', (await label()) === '저장 안 함', String(await label()))
+  expect('고친 것이 남아 있다고 적힘', (await label()) === '변경됨', String(await label()))
   expect('저장 단추는 그대로 있음', (await saveButton().count()) === 1)
   await page.keyboard.press(process.platform === 'darwin' ? 'Meta+s' : 'Control+s')
   await page.waitForTimeout(500)

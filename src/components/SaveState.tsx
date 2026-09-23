@@ -56,12 +56,12 @@ export function SaveState({ dirty, dueAt, seconds, onSave }: SaveStateProps) {
       <span
         className="pill"
         data-tip={dueAt === null
-          ? '자동 저장이 꺼져 있습니다. 저장 단추나 ⌘S 로 씁니다 (설정 → 일반 → 자동 저장)'
+          ? '고친 것이 아직 파일에 들어가지 않았습니다. 저장 단추나 ⌘S 로 씁니다 (설정 → 일반 → 자동 저장)'
           : '손을 멈추면 이만큼 뒤에 저절로 씁니다 (설정 → 일반 → 자동 저장)'}
         // 1초마다 바뀌는 값이라, 읽어 주는 도구가 계속 끼어들지 않도록 막습니다.
         aria-live="off"
       >
-        {left === null ? '저장 안 함' : left > 0 ? `${left}초 뒤 자동 저장` : '자동 저장하는 중…'}
+        {left === null ? '변경됨' : left > 0 ? `${left}초 뒤 자동 저장` : '자동 저장하는 중…'}
       </span>
     </>
   )
