@@ -5,6 +5,7 @@ import {
 import { readBinaryFile } from '../lib/fsAccess'
 import { imageFormatName } from '../lib/imageEdit'
 import { ZoomControl } from './ZoomControl'
+import { useSpacePan } from '../hooks/useSpacePan'
 import { SheetPreview, WordPreview } from './OfficePreview'
 import type { ImageBackdrop } from '../types'
 
@@ -50,6 +51,14 @@ export function AssetView({
   const imageRef = useRef<HTMLImageElement>(null)
   const objectUrl = useRef<string | null>(null)
   const kind = attachmentKind(path)
+
+  const canvasRef = useRef<HTMLDivElement>(null)
+  /*
+   * 스페이스를 누른 채 끌어 그림을 옮겨 봅니다. 수정 화면과 같은 손잡이입니다.
+   * 배율을 정해 두었을 때만 켭니다 — 칸에 다 들어오는 그림은 옮길 것이 없고,
+   * 그때까지 스페이스를 가로채면 제 할 일(한 화면 내리기)을 막게 됩니다.
+   */
+  const pan = useSpacePan(() => canvasRef.current, kind === 'image' && zoom !== null)
 
   // 파일이 바뀌면 이전 내용을 렌더 중에 비웁니다.
   // effect 안에서 비우면 옛 이미지가 한 프레임 남습니다.
@@ -161,7 +170,16 @@ export function AssetView({
          * 배율을 정해 두면 그림을 그 크기로 그리고 칸 안에서 굴립니다.
          * 정하지 않았으면 예전처럼 칸에 맞춰 줄입니다.
          */
-        <div className={`asset-canvas is-${backdrop}${zoom === null ? '' : ' is-zoomed'}`}>
+        <div
+          ref={canvasRef}
+          className={`asset-canvas is-${backdrop}${zoom === null ? '' : ' is-zoomed'}${pan.held ? ' is-panning' : ''}`}
+          onPointerDown={(event) => {
+            if (pan.begin(event)) event.currentTarget.setPointerCapture(event.pointerId)
+          }}
+          onPointerMove={(event) => pan.drag(event)}
+          onPointerUp={() => pan.end()}
+          onPointerCancel={() => pan.end()}
+        >
           <img
             ref={imageRef}
             className="asset-image"

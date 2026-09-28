@@ -228,6 +228,46 @@ try {
    * 100% 로 열었더니 큰 그림은 한 귀퉁이만 보여 어디를 고르는지 알 수 없었고, 작은 그림은
    * 너른 칸 한가운데 조그맣게 놓여 픽셀을 집어내기 어려웠습니다.
    */
+  /*
+   * 크게 키워 놓으면 보기 모드에서도 굴림대를 잡아야 했습니다. 수정 화면과 같은 길로
+   * 스페이스를 누른 채 끌어 옮깁니다.
+   */
+  step('2-1-2. 보기 모드에서도 스페이스를 누른 채 끌어 옮긴다')
+  await page.click('.tree-row:has-text("큰 그림") .tree-name')
+  await page.waitForSelector('.asset-image', { timeout: 8000 })
+  await page.waitForTimeout(400)
+  await page.click('.asset-canvas .zoom-control button[aria-label="원본 크기"]')
+  await page.waitForTimeout(300)
+  const canvasAt = () => page.evaluate(() => {
+    const box = document.querySelector('.asset-canvas')
+    return {
+      굴린자리: [Math.round(box.scrollLeft), Math.round(box.scrollTop)],
+      굴릴것: [box.scrollWidth - box.clientWidth, box.scrollHeight - box.clientHeight],
+      손모양: getComputedStyle(box).cursor,
+    }
+  })
+  const seen = await canvasAt()
+  console.log('  보기 모드: ' + JSON.stringify(seen))
+  expect('원본 크기에서는 굴릴 것이 있음', seen.굴릴것[0] > 0, JSON.stringify(seen))
+  await page.keyboard.down('Space')
+  await page.waitForTimeout(200)
+  expect('누르면 손 모양', (await canvasAt()).손모양 === 'grab', JSON.stringify(await canvasAt()))
+  const canvasBox = await page.locator('.asset-canvas').boundingBox()
+  await page.mouse.move(canvasBox.x + canvasBox.width / 2, canvasBox.y + canvasBox.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(canvasBox.x + canvasBox.width / 2 - 80, canvasBox.y + canvasBox.height / 2, { steps: 8 })
+  await page.mouse.up()
+  await page.keyboard.up('Space')
+  await page.waitForTimeout(300)
+  const panned = await canvasAt()
+  console.log('  옮긴 뒤: ' + JSON.stringify(panned))
+  // 손이 간 만큼(80px 남짓) 따라와야 합니다. 몇 픽셀만 움직였다면 옮긴 것이 아닙니다.
+  expect('끌면 손이 간 만큼 옮겨짐', panned.굴린자리[0] >= 70, JSON.stringify({ seen, panned }))
+  expect('떼면 손 모양이 걷힘', panned.손모양 !== 'grab', JSON.stringify(panned))
+  // 화면 맞춤으로 돌려 놓습니다. 옮길 것이 없을 때는 스페이스를 가로채지 않습니다.
+  await page.click('.asset-canvas .zoom-control button[aria-label="화면에 맞추기"]')
+  await page.waitForTimeout(300)
+
   step('2-2. 수정 화면은 칸에 꽉 차는 배율로 열린다')
   await page.click('.tree-row:has-text("큰 그림") .tree-name')
   await page.waitForSelector('.asset-image', { timeout: 8000 })
@@ -509,7 +549,38 @@ try {
   })
   console.log('  옮기기 전: ' + JSON.stringify(beforePan))
   const held = await box()
-  // 손이 그림 위에 있을 때만 스페이스를 가로챕니다. 자판으로 단추에 닿은 사람을 막지 않습니다.
+  /*
+   * 브라우저는 스페이스를 "한 화면 내리기" 로 씁니다. 수정 화면이 열려 있는 동안에는
+   * 그 일이 일어나지 않아야 합니다 — 고르던 자리가 화면 밖으로 밀려납니다.
+   * 손이 그림 위에 있든 없든 가로채는지 보려고, 일부러 손잡이 칸에 손을 둔 채 누릅니다.
+   */
+  const panel = await page.locator('.image-edit-panel').boundingBox()
+  await page.mouse.move(panel.x + panel.width / 2, panel.y + 40)
+  await page.waitForTimeout(150)
+  // 스페이스가 한 화면을 내리는 칸은 손이 놓인 자리에 따라 다릅니다. 굴러갈 만한 곳을 모두 봅니다.
+  const scrolls = () => page.evaluate(() => ['.image-edit-stage', '.image-edit-panel', '.main']
+    .map((one) => Math.round(document.querySelector(one)?.scrollTop ?? 0)))
+  const rolledBefore = await scrolls()
+  /*
+   * 브라우저가 한 화면을 내리기 전에 막았는지는 사건에 적혀 옵니다.
+   * 굴린 자리만 견주면 마침 굴릴 것이 없을 때 막지 않고도 통과합니다.
+   */
+  await page.evaluate(() => {
+    window.__spaceStopped = null
+    window.addEventListener('keydown', (event) => {
+      if (event.code === 'Space') window.__spaceStopped = event.defaultPrevented
+    })
+  })
+  await page.keyboard.down('Space')
+  await page.waitForTimeout(250)
+  const stillThere = await scrolls()
+  expect('스페이스의 기본 동작(한 화면 내리기)을 막음',
+    (await page.evaluate(() => window.__spaceStopped)) === true,
+    String(await page.evaluate(() => window.__spaceStopped)))
+  expect('화면이 내려가지 않음', JSON.stringify(stillThere) === JSON.stringify(rolledBefore),
+    JSON.stringify({ rolledBefore, stillThere }))
+  await page.keyboard.up('Space')
+  await page.waitForTimeout(150)
   const overImage = await page.locator('.image-edit-stage').boundingBox()
   await page.mouse.move(overImage.x + overImage.width / 2, overImage.y + overImage.height / 2)
   await page.waitForTimeout(150)

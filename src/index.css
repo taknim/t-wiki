@@ -1743,6 +1743,11 @@ a.btn { text-decoration: none; color: inherit; display: inline-block; }
   padding: 16px;
 }
 /* 손대지 않은 본디 모습. 이것만 테마를 따릅니다. */
+/* 스페이스를 누르고 있는 동안. 끌어서 그림을 옮기는 자리라고 손 모양으로 알립니다. */
+.asset-canvas.is-panning { cursor: grab; }
+.asset-canvas.is-panning:active { cursor: grabbing; }
+/* 끌어 옮기는 동안 그림이 잡혀 끌리지 않게 막습니다. */
+.asset-canvas.is-panning .asset-image { pointer-events: none; }
 /*
  * 배율을 정해 둔 회차. 그림이 칸보다 커질 수 있으므로 이 안에서 굴립니다.
  *

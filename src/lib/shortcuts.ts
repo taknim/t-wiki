@@ -61,10 +61,11 @@ export const SHORTCUTS: Shortcut[] = [
   { id: 'zoom-set', label: '배율 적어 넣기 (10 ~ 300%)', keys: { key: 'z' }, scope: '그림 볼 때' },
 
   /*
-   * 그림 수정 화면에서만 도는 것. 표에만 적어 두고 다루는 곳은 그 화면입니다 —
+   * 그림을 보거나 고칠 때만 도는 것. 표에만 적어 두고 다루는 곳은 그 화면입니다 —
    * 누르고 있는 동안만 뜻이 있는 글쇠라 전역에서 가로채면 다른 일을 방해합니다.
    */
-  { id: 'pan', label: '누른 채 끌어 그림 옮기기 (굴림대를 잡지 않고)', keys: { key: 'Space' }, scope: '그림 수정할 때' },
+  { id: 'pan', label: '누른 채 끌어 그림 옮기기 (굴림대를 잡지 않고)', keys: { key: 'Space' }, scope: '그림 볼 때',
+    note: '크게 키워 옮길 것이 있을 때만 듣습니다' },
 
   { id: 'save', label: '지금 바로 저장', keys: { key: 's', mod: true }, scope: '편집기 안' },
   { id: 'bold', label: '굵게', keys: { key: 'b', mod: true }, scope: '편집기 안' },
