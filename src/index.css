@@ -2344,6 +2344,11 @@ button.info-caret:focus-visible { outline: 2px solid var(--accent); outline-offs
   cursor: crosshair;
   user-select: none;
 }
+/* 스페이스를 누르고 있는 동안. 고르는 대신 끌어 옮기는 자리라고 손 모양으로 알립니다. */
+.image-edit-frame.is-panning { cursor: grab; }
+.image-edit-frame.is-panning:active { cursor: grabbing; }
+/* 옮기는 중에는 손잡이도 같은 모양이어야 합니다. 꼭지점 위에서만 화살표가 남으면 어리둥절합니다. */
+.image-edit-frame.is-panning .crop-grip { cursor: inherit; }
 .image-edit-frame img { display: block; width: 100%; height: auto; }
 /* 고른 자리. 테두리만으로는 밝은 그림 위에서 안 보여 바깥을 덮어 어둡게 합니다. */
 .image-edit-crop {

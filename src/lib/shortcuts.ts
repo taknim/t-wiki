@@ -20,7 +20,7 @@ export interface Shortcut {
   label: string
   keys: KeySpec
   /** 어디서 도는지. 목록에서 묶어 보여 줍니다. */
-  scope: '앱 어디서나' | '그림 볼 때' | '편집기 안' | '창·목록'
+  scope: '앱 어디서나' | '그림 볼 때' | '그림 수정할 때' | '편집기 안' | '창·목록'
   /** 눌러도 앱까지 오지 않는 자판이 있으면 그 사연. */
   note?: string
 }
@@ -59,6 +59,12 @@ export const SHORTCUTS: Shortcut[] = [
   { id: 'zoom-fit', label: '화면에 맞추기', keys: { key: '0' }, scope: '그림 볼 때' },
   { id: 'zoom-actual', label: '원본 크기로', keys: { key: '1' }, scope: '그림 볼 때' },
   { id: 'zoom-set', label: '배율 적어 넣기 (10 ~ 300%)', keys: { key: 'z' }, scope: '그림 볼 때' },
+
+  /*
+   * 그림 수정 화면에서만 도는 것. 표에만 적어 두고 다루는 곳은 그 화면입니다 —
+   * 누르고 있는 동안만 뜻이 있는 글쇠라 전역에서 가로채면 다른 일을 방해합니다.
+   */
+  { id: 'pan', label: '누른 채 끌어 그림 옮기기 (굴림대를 잡지 않고)', keys: { key: 'Space' }, scope: '그림 수정할 때' },
 
   { id: 'save', label: '지금 바로 저장', keys: { key: 's', mod: true }, scope: '편집기 안' },
   { id: 'bold', label: '굵게', keys: { key: 'b', mod: true }, scope: '편집기 안' },

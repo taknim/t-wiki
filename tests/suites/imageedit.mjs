@@ -431,6 +431,58 @@ try {
   expect('안으로 밀면 줄어듦', narrowed.width < bigger.width && narrowed.height === bigger.height,
     JSON.stringify(narrowed))
   // 지우면 고른 자리가 없어지고 그림 전체 크기로 돌아옵니다.
+  /*
+   * 크게 키워 놓으면 굴림대를 잡아 옮겨야 하는데, 그림 위에서는 끌기가 곧 고르기라
+   * 굴림대까지 손을 옮겨야 했습니다. 스페이스를 누르고 있는 동안에는 끌어 옮깁니다.
+   */
+  const stageAt = () => page.evaluate(() => {
+    const box = document.querySelector('.image-edit-stage')
+    return {
+      굴린자리: [Math.round(box.scrollLeft), Math.round(box.scrollTop)],
+      손모양: getComputedStyle(document.querySelector('.image-edit-frame')).cursor,
+    }
+  })
+  // 칸을 넘칠 만큼 키워 둡니다. 다 들어오는 그림은 옮길 것이 없습니다.
+  for (let at = 0; at < 6; at += 1) {
+    await page.click('.image-edit .zoom-control button[aria-label="확대"]')
+    await page.waitForTimeout(150)
+  }
+  const beforePan = await page.evaluate(() => {
+    const box = document.querySelector('.image-edit-stage')
+    return {
+      굴린자리: [Math.round(box.scrollLeft), Math.round(box.scrollTop)],
+      굴릴것: [box.scrollWidth - box.clientWidth, box.scrollHeight - box.clientHeight],
+      손모양: getComputedStyle(document.querySelector('.image-edit-frame')).cursor,
+    }
+  })
+  console.log('  옮기기 전: ' + JSON.stringify(beforePan))
+  const held = await box()
+  // 손이 그림 위에 있을 때만 스페이스를 가로챕니다. 자판으로 단추에 닿은 사람을 막지 않습니다.
+  const overImage = await page.locator('.image-edit-stage').boundingBox()
+  await page.mouse.move(overImage.x + overImage.width / 2, overImage.y + overImage.height / 2)
+  await page.waitForTimeout(150)
+  await page.keyboard.down('Space')
+  await page.waitForTimeout(200)
+  const holding = await stageAt()
+  console.log('  스페이스: ' + JSON.stringify(holding))
+  expect('누르면 손 모양으로 바뀜', holding.손모양 === 'grab', JSON.stringify(holding))
+  const stageBox2 = await page.locator('.image-edit-stage').boundingBox()
+  await page.mouse.move(stageBox2.x + stageBox2.width / 2, stageBox2.y + stageBox2.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(stageBox2.x + stageBox2.width / 2 - 90, stageBox2.y + stageBox2.height / 2 - 60, { steps: 8 })
+  await page.mouse.up()
+  await page.keyboard.up('Space')
+  await page.waitForTimeout(300)
+  const moved = await stageAt()
+  console.log('  옮긴 뒤: ' + JSON.stringify(moved))
+  // 세로로는 다 들어와 굴릴 것이 없을 수 있습니다. 굴릴 것이 있는 축만 봅니다.
+  expect('끌면 그림이 옮겨짐', moved.굴린자리[0] > beforePan.굴린자리[0],
+    JSON.stringify({ beforePan, moved }))
+  expect('떼면 다시 고르는 손 모양', moved.손모양 === 'crosshair', JSON.stringify(moved))
+  // 옮기는 동안 고른 자리는 건드리지 않습니다.
+  expect('고른 자리는 그대로', JSON.stringify(await box()) === JSON.stringify(held),
+    JSON.stringify([held, await box()]))
+
   await page.click('.image-edit button:has-text("선택 영역 해제")')
   await page.waitForTimeout(300)
   const cleared = await box()

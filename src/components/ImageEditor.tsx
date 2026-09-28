@@ -58,6 +58,12 @@ export function ImageEditor({ root, path, onSave, onCancel }: ImageEditorProps) 
   const [quality, setQuality] = useState(90)
   const [name, setName] = useState(() => outputName(path, 'png'))
   const [zoom, setZoom] = useState(1)
+  /** 스페이스를 누르고 있는 동안. 이때는 고르는 대신 그림을 끌어 옮깁니다. */
+  const [panning, setPanning] = useState(false)
+  /** 옮기는 중인 손의 자리와 그때의 굴린 자리. */
+  const panFrom = useRef<{ x: number; y: number; left: number; top: number } | null>(null)
+  /** 손이 그림 칸 위에 있는지. 스페이스를 가로챌지 가리는 잣대입니다. */
+  const overStage = useRef(false)
 
   const stage = useRef<HTMLDivElement>(null)
   const shown = useRef<HTMLImageElement>(null)
@@ -95,6 +101,52 @@ export function ImageEditor({ root, path, onSave, onCancel }: ImageEditorProps) 
       if (made) URL.revokeObjectURL(made)
     }
   }, [root, path])
+
+  /*
+   * 스페이스를 누르고 있는 동안에는 그림을 끌어 옮깁니다.
+   *
+   * 크게 키워 놓으면 굴림대를 잡아 옮겨야 하는데, 그림 위에서는 끌기가 곧 고르기라
+   * 굴림대까지 손을 옮겨야 했습니다. 그림 다루는 프로그램들이 오래 써 온 길을 그대로 씁니다.
+   *
+   * **손이 그림 칸 위에 있을 때만** 가로챕니다. 어디서나 가로채면 자판으로 단추에 가 닿은
+   * 사람이 스페이스로 누를 수 없게 됩니다. 손이 그림 위에 있다면 스페이스는 옮기라는 뜻이
+   * 분명하고, 그때 단추를 누르려던 사람은 없습니다.
+   */
+  useEffect(() => {
+    /*
+     * 글을 치는 자리에서는 가로채지 않습니다. 스페이스는 거기서 빈칸입니다.
+     * 단추는 가리지 않습니다 — 자리가 단추에 있어도 손이 그림 위에 있으면 옮기라는 뜻이고,
+     * 단추를 누르려던 사람은 손도 그 단추 위에 있습니다.
+     */
+    const typing = (target: EventTarget | null) => target instanceof HTMLElement
+      && target.closest('input, textarea, [contenteditable]') !== null
+
+    const down = (event: KeyboardEvent) => {
+      if (event.code !== 'Space' || event.repeat || typing(event.target) || !overStage.current) return
+      // 누르고 있는 동안 화면이 한 쪽씩 내려가지 않게 합니다.
+      event.preventDefault()
+      setPanning(true)
+    }
+    const up = (event: KeyboardEvent) => {
+      if (event.code !== 'Space') return
+      setPanning(false)
+      panFrom.current = null
+    }
+    // 창을 떠나면 글쇠를 뗀 것을 못 받습니다. 손 모양이 그대로 남지 않게 함께 거둡니다.
+    const leave = () => {
+      setPanning(false)
+      panFrom.current = null
+    }
+
+    window.addEventListener('keydown', down)
+    window.addEventListener('keyup', up)
+    window.addEventListener('blur', leave)
+    return () => {
+      window.removeEventListener('keydown', down)
+      window.removeEventListener('keyup', up)
+      window.removeEventListener('blur', leave)
+    }
+  }, [])
 
   /** 잘라 낸 자리(없으면 통째로). 여기서부터 내놓을 크기를 셉니다. */
   const base = crop ?? (natural ? { x: 0, y: 0, ...natural } : null)
@@ -247,6 +299,13 @@ export function ImageEditor({ root, path, onSave, onCancel }: ImageEditorProps) 
 
   const onDown = (event: React.PointerEvent) => {
     if (!natural || !isPicking(event)) return
+    if (panning) {
+      const box = stage.current
+      if (!box) return
+      panFrom.current = { x: event.clientX, y: event.clientY, left: box.scrollLeft, top: box.scrollTop }
+      event.currentTarget.setPointerCapture(event.pointerId)
+      return
+    }
     const at = pointAt(event)
     if (!at) return
     // 새로 고르는 길. 누른 곳이 붙박이가 되고 두 축이 모두 움직입니다.
@@ -267,6 +326,12 @@ export function ImageEditor({ root, path, onSave, onCancel }: ImageEditorProps) 
    */
   const onGrip = (grip: Grip) => (event: React.PointerEvent) => {
     if (!crop || !natural || !isPicking(event)) return
+    /*
+     * 옮기는 중에는 손잡이도 옮기는 자리입니다. 여기서 사건을 붙들지 않고 흘려보내면
+     * 아래 칸(그림 틀)이 받아 옮기기로 다룹니다. 붙들면 손잡이 위에서만 옮기기가
+     * 되지 않아, 크게 키워 놓았을 때 옮길 수 있는 자리가 드문드문해집니다.
+     */
+    if (panning) return
     // 손잡이를 잡은 것이 칸을 새로 고르는 일로 읽히면 안 됩니다.
     event.stopPropagation()
     dragBase.current = crop
@@ -283,9 +348,23 @@ export function ImageEditor({ root, path, onSave, onCancel }: ImageEditorProps) 
     if (!rolling.current) rolling.current = requestAnimationFrame(rollNearEdge)
   }
   const onMove = (event: React.PointerEvent) => {
+    const from = panFrom.current
+    if (from) {
+      const box = stage.current
+      if (!box) return
+      // 손이 간 만큼 그림이 따라오도록 반대로 굴립니다.
+      box.scrollLeft = from.left - (event.clientX - from.x)
+      box.scrollTop = from.top - (event.clientY - from.y)
+      return
+    }
     if (dragFrom.current) {
       dragAt.current = { x: event.clientX, y: event.clientY }
       dragTo(event)
+      return
+    }
+    // 옮기는 중에는 쪽지를 띄우지 않습니다. 고르는 일이 아니므로 자리를 적을 까닭이 없습니다.
+    if (panning) {
+      setReadout(null)
       return
     }
     // 아직 고르기 전. 그림에서 어디를 짚고 있는지 적습니다.
@@ -296,6 +375,7 @@ export function ImageEditor({ root, path, onSave, onCancel }: ImageEditorProps) 
     dragFrom.current = null
     dragBase.current = null
     dragAt.current = null
+    panFrom.current = null
     stopRolling()
   }
   const onLeave = () => {
@@ -332,11 +412,16 @@ export function ImageEditor({ root, path, onSave, onCancel }: ImageEditorProps) 
 
   return (
     <div className="image-edit">
-      <div className="image-edit-stage" ref={stage}>
+      <div
+        className="image-edit-stage"
+        ref={stage}
+        onPointerEnter={() => { overStage.current = true }}
+        onPointerLeave={() => { overStage.current = false }}
+      >
         <div className="image-edit-canvas" style={natural ? { width: natural.width * zoom } : undefined}>
           {url && (
             <div
-              className="image-edit-frame"
+              className={panning ? 'image-edit-frame is-panning' : 'image-edit-frame'}
               onPointerDown={onDown}
               onPointerMove={onMove}
               onPointerUp={onUp}
