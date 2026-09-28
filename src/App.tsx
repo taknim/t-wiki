@@ -40,7 +40,7 @@ import { SyncProgress } from './components/SyncProgress'
 import { useTheme } from './components/themeContext'
 import { MoveSheet } from './components/MoveSheet'
 import { matches, SHORTCUTS } from './lib/shortcuts'
-import { stepZoom } from './lib/zoom'
+import { askZoomPercent, stepZoom } from './lib/zoom'
 import { readTrashPolicy } from './lib/saveOptions'
 import type { TrashItem } from './lib/trash'
 import { entryKind, readFile } from './lib/fsAccess'
@@ -1134,7 +1134,10 @@ export default function App() {
           : 1
         if (zoomHit.id === 'zoom-fit') setImageZoom(null)
         else if (zoomHit.id === 'zoom-actual') setImageZoom(1)
-        else setImageZoom(stepZoom(scale, zoomHit.id === 'zoom-in' ? 1 : -1))
+        else if (zoomHit.id === 'zoom-set') {
+          // 창을 띄우는 길은 손잡이와 한 자리를 씁니다. 묻는 말과 값의 끝이 어긋나지 않습니다.
+          void askZoomPercent(dialogs.numbers, scale).then((next) => next !== null && setImageZoom(next))
+        } else setImageZoom(stepZoom(scale, zoomHit.id === 'zoom-in' ? 1 : -1))
         return
       }
 
@@ -1215,7 +1218,7 @@ export default function App() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [applySidebarOpen, applySidebarTab, flash, listEntry, updateLook, vault.tree])
+  }, [applySidebarOpen, applySidebarTab, dialogs, flash, listEntry, updateLook, vault.tree])
 
   const handleNewFolder = useCallback(
     async (dirPath: string) => {

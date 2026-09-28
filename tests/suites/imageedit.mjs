@@ -168,6 +168,40 @@ try {
   await page.keyboard.press('Digit0')
   await page.waitForTimeout(300)
   expect('0 은 화면 맞춤', (await zoomed()).잰 === fit.잰, JSON.stringify(await zoomed()))
+  /*
+   * 단계로는 닿지 않는 값(110% 같은)을 쓰려면 적어 넣습니다. 손잡이의 배율을 눌러도,
+   * Z 를 눌러도 같은 창이 뜹니다.
+   */
+  await page.keyboard.press('KeyZ')
+  await page.waitForSelector('.dialog-field input', { timeout: 4000 })
+  expect('지금 배율이 미리 적혀 있음', (await page.inputValue('.dialog-field input')) === String(fit.잰),
+    await page.inputValue('.dialog-field input'))
+  await page.fill('.dialog-field input', '110')
+  await page.keyboard.press('Enter')
+  await page.waitForTimeout(400)
+  expect('적어 넣은 배율로 감', (await zoomed()).잰 === 110, JSON.stringify(await zoomed()))
+  // 끝을 넘겨 적으면 가까운 끝으로 맞춥니다.
+  await page.click('.asset-canvas .zoom-now')
+  await page.waitForSelector('.dialog-field input', { timeout: 4000 })
+  await page.fill('.dialog-field input', '900')
+  await page.keyboard.press('Enter')
+  await page.waitForTimeout(400)
+  expect('300% 를 넘지 않음', (await zoomed()).잰 === 300, JSON.stringify(await zoomed()))
+  await page.click('.asset-canvas .zoom-now')
+  await page.waitForSelector('.dialog-field input', { timeout: 4000 })
+  await page.fill('.dialog-field input', '1')
+  await page.keyboard.press('Enter')
+  await page.waitForTimeout(400)
+  expect('10% 아래로는 안 감', (await zoomed()).잰 === 10, JSON.stringify(await zoomed()))
+  // 물러서면 보던 그대로.
+  await page.click('.asset-canvas .zoom-now')
+  await page.waitForSelector('.dialog-field input', { timeout: 4000 })
+  await page.fill('.dialog-field input', '200')
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(400)
+  expect('물러서면 그대로', (await zoomed()).잰 === 10, JSON.stringify(await zoomed()))
+  await page.keyboard.press('Digit0')
+  await page.waitForTimeout(300)
   // 글을 치는 자리에서는 가로채지 않습니다. 검색 칸에 0 을 친다고 그림이 줄면 안 됩니다.
   await page.click('.search-input')
   await page.keyboard.type('0')

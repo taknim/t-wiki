@@ -16,7 +16,7 @@ export interface DialogApi {
   numbers: (options: {
     title: string
     label: string
-    fields: { id: string; label: string; value: number; min: number }[]
+    fields: { id: string; label: string; value: number; min: number; max?: number }[]
     confirmText?: string
   }) => Promise<Record<string, number> | null>
   confirm: (options: {

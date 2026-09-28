@@ -58,6 +58,7 @@ export const SHORTCUTS: Shortcut[] = [
   { id: 'zoom-out', label: '작게 보기', keys: { key: '-' }, scope: '그림 볼 때' },
   { id: 'zoom-fit', label: '화면에 맞추기', keys: { key: '0' }, scope: '그림 볼 때' },
   { id: 'zoom-actual', label: '원본 크기로', keys: { key: '1' }, scope: '그림 볼 때' },
+  { id: 'zoom-set', label: '배율 적어 넣기 (10 ~ 300%)', keys: { key: 'z' }, scope: '그림 볼 때' },
 
   { id: 'save', label: '지금 바로 저장', keys: { key: 's', mod: true }, scope: '편집기 안' },
   { id: 'bold', label: '굵게', keys: { key: 'b', mod: true }, scope: '편집기 안' },

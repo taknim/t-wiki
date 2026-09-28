@@ -15,7 +15,7 @@ interface NumbersRequest {
   kind: 'numbers'
   title: string
   label: string
-  fields: { id: string; label: string; value: number; min: number }[]
+  fields: { id: string; label: string; value: number; min: number; max?: number }[]
   confirmText: string
 }
 
@@ -131,7 +131,8 @@ export function DialogProvider({ children }: { children: ReactNode }) {
       const answer: Record<string, number> = {}
       for (const field of request.fields) {
         const parsed = Number.parseInt(values[field.id] ?? '', 10)
-        answer[field.id] = Number.isNaN(parsed) ? field.min : Math.max(field.min, parsed)
+        const floored = Number.isNaN(parsed) ? field.min : Math.max(field.min, parsed)
+        answer[field.id] = field.max === undefined ? floored : Math.min(floored, field.max)
       }
       close(answer)
     } else if (request.kind === 'confirm') {
@@ -180,6 +181,7 @@ export function DialogProvider({ children }: { children: ReactNode }) {
                       type="number"
                       inputMode="numeric"
                       min={field.min}
+                      max={field.max}
                       value={values[field.id] ?? ''}
                       autoFocus={at === 0}
                       onChange={(event) => setValues((current) => ({ ...current, [field.id]: event.target.value }))}

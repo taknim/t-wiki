@@ -1,5 +1,5 @@
 import { clampCrop, clampSide, keepRatio, MAX_SIDE, outputName } from '../../src/lib/imageEdit'
-import { stepZoom, ZOOMS } from '../../src/lib/zoom'
+import { clampPercent, MAX_PERCENT, MIN_PERCENT, stepZoom, ZOOMS } from '../../src/lib/zoom'
 
 /*
  * 그림을 고칠 때 쓰는 셈만 따로 잽니다.
@@ -52,23 +52,34 @@ same('확장자가 없어도', outputName('사진', 'png'), '사진_modified.png
 same('점이 여럿이어도 마지막만', outputName('a.b.c.png', 'png'), 'a.b.c_modified.png')
 expect('원본 이름과 같지 않음', outputName('사진.png', 'png') !== '사진.png')
 
-console.log('\n>>> 5. 보기 배율은 지금 값에서 25% 씩 오르내린다')
-same('눈금 위에서 한 걸음 위로', stepZoom(1, 1), 1.25)
-same('눈금 위에서 한 걸음 아래로', stepZoom(1, -1), 0.75)
-// 아주 큰 그림은 25% 로도 한 화면에 들지 않습니다. 맨 아래만 10% 를 따로 둡니다.
-same('맨 아래는 10%', stepZoom(0.25, -1), 0.1)
-same('10% 에서 올라가면 25%', stepZoom(0.1, 1), 0.25)
-expect('400% 까지 커짐', ZOOMS[ZOOMS.length - 1] === 4, String(ZOOMS[ZOOMS.length - 1]))
+console.log('\n>>> 5. 보기 배율은 지금 값에서 한 걸음씩, 큰 쪽일수록 성글게 옮긴다')
+// 작을 때는 20% 씩, 100% 를 넘으면 25% 씩, 200% 를 넘으면 50% 씩.
+same('100% 아래는 20% 씩', stepZoom(0.8, -1), 0.6)
+same('100% 에서 위로는 25%', stepZoom(1, 1), 1.25)
+same('100% 에서 아래로는 20%', stepZoom(1, -1), 0.8)
+same('200% 를 넘으면 50% 씩', stepZoom(2, 1), 2.5)
+// 아주 큰 그림은 20% 로도 한 화면에 들지 않습니다. 맨 아래만 10% 를 따로 둡니다.
+same('맨 아래는 10%', stepZoom(0.2, -1), 0.1)
+same('10% 에서 올라가면 20%', stepZoom(0.1, 1), 0.2)
+expect('300% 에서 멈춤', ZOOMS[ZOOMS.length - 1] === 3, String(ZOOMS[ZOOMS.length - 1]))
 /*
  * 화면 맞춤은 칸에 따라 37% 처럼 어중간한 값이 됩니다. 표에서 자리를 못 찾아 100% 부터
  * 세었더니, 크게 보기를 눌렀는데 오히려 150% 로 건너뛰었습니다.
  */
-same('어중간한 값에서 위로는 바로 위 눈금', stepZoom(0.37, 1), 0.5)
-same('어중간한 값에서 아래로는 바로 아래 눈금', stepZoom(0.37, -1), 0.25)
-same('맨 위에서 더 눌러도 그대로', stepZoom(4, 1), ZOOMS[ZOOMS.length - 1])
+same('어중간한 값에서 위로는 바로 위 눈금', stepZoom(0.37, 1), 0.4)
+same('어중간한 값에서 아래로는 바로 아래 눈금', stepZoom(0.37, -1), 0.2)
+same('맨 위에서 더 눌러도 그대로', stepZoom(3, 1), ZOOMS[ZOOMS.length - 1])
 same('맨 아래에서 더 눌러도 그대로', stepZoom(0.1, -1), ZOOMS[0])
 // 재서 나온 값은 소수점 아래가 지저분합니다. 100.2% 는 100% 로 봐야 150% 로 갑니다.
 same('재다 생긴 티끌은 같은 값으로', stepZoom(1.002, 1), 1.25)
+
+console.log('\n>>> 6. 손으로 적어 넣은 배율은 쓸 수 있는 자리로 눌러 둔다')
+same('그 사이는 그대로', clampPercent(137), 137)
+same('아래로 넘치면 맨 아래', clampPercent(3), MIN_PERCENT)
+same('위로 넘치면 맨 위', clampPercent(1000), MAX_PERCENT)
+same('소수는 반올림', clampPercent(42.6), 43)
+// 숫자가 아니면 본디 크기로 둡니다. 빈 칸을 100% 로 읽는 것이 가장 덜 놀랍습니다.
+same('숫자가 아니면 100', clampPercent(Number.NaN), 100)
 
 console.log('\n' + (problems ? `FAIL ${problems}건` : '모두 통과'))
 if (problems) process.exitCode = 1

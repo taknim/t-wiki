@@ -1,5 +1,6 @@
 import { ActualSizeIcon, FitIcon, MinusIcon, PlusIcon } from './icons'
-import { stepZoom } from '../lib/zoom'
+import { askZoomPercent, stepZoom } from '../lib/zoom'
+import { useDialogs } from './dialogContext'
 
 interface ZoomControlProps {
   /** 지금 화면에 그려진 배율. 화면 맞춤일 때는 줄어든 그 값입니다. */
@@ -25,7 +26,14 @@ interface ZoomControlProps {
  * 100% 에서부터 세면, 키우려고 눌렀는데 오히려 더 작아지는 일이 생깁니다.
  */
 export function ZoomControl({ scale, fitted, onZoom, canFit = true }: ZoomControlProps) {
+  const dialogs = useDialogs()
   const percent = Math.round(scale * 100)
+
+  // 적어 넣은 배율로 곧장 갑니다. 물러서면 보던 그대로 둡니다.
+  const askPercent = async () => {
+    const next = await askZoomPercent(dialogs.numbers, scale)
+    if (next !== null) onZoom(next)
+  }
 
   return (
     <div className="zoom-control" role="group" aria-label="보기 배율">
@@ -60,8 +68,16 @@ export function ZoomControl({ scale, fitted, onZoom, canFit = true }: ZoomContro
       >
         <PlusIcon />
       </button>
-      {/* 지금 몇 할인지. 단추가 아니라 읽는 자리입니다 — 맞춤과 원본은 위에 따로 있습니다. */}
-      <span className="zoom-now" aria-live="off">{percent}%</span>
+      {/* 지금 몇 할인지. 눌러서 손으로 적어 넣을 수도 있습니다 — 단계로는 닿지 않는 값을 쓸 때. */}
+      <button
+        type="button"
+        className="zoom-now"
+        data-tip="눌러서 배율을 적어 넣습니다 (Z)"
+        aria-label={`지금 배율 ${percent}%. 눌러서 적어 넣기`}
+        onClick={() => void askPercent()}
+      >
+        {percent}%
+      </button>
       <button
         type="button"
         className="zoom-btn"
