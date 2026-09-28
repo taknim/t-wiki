@@ -6,6 +6,7 @@ import {
   clampCrop, clampSide, FORMATS, keepRatio, MAX_SIDE, MIN_SIDE, outputName, renderImage,
   type Crop, type ImageFormat,
 } from '../lib/imageEdit'
+import { clampPercent } from '../lib/zoom'
 import { ZoomControl } from './ZoomControl'
 
 interface ImageEditorProps {
@@ -24,6 +25,9 @@ type Natural = { width: number; height: number }
  */
 const GRIPS = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'] as const
 type Grip = (typeof GRIPS)[number]
+
+/** 그림 칸의 안쪽 여백(CSS 와 같은 값). 꽉 차게 맞출 때 이만큼 빼고 잽니다. */
+const STAGE_PAD = 16
 
 /** 이 두께 안으로 들어오면 저절로 굴러가기 시작합니다. */
 const EDGE_ZONE = 56
@@ -101,6 +105,25 @@ export function ImageEditor({ root, path, onSave, onCancel }: ImageEditorProps) 
     setNatural(size)
     setWidth(size.width)
     setHeight(size.height)
+
+    /*
+     * 처음에는 칸에 꽉 차게 맞춥니다.
+     *
+     * 100% 로 열었더니 큰 그림은 한 귀퉁이만 보여 어디를 고르는지 알 수 없었고, 작은 그림은
+     * 너른 칸 한가운데 조그맣게 놓여 픽셀을 집어내기 어려웠습니다. 잘라낼 자리를 고르는
+     * 화면이므로 그림이 가장 크게 보이는 자리에서 시작하는 편이 낫습니다.
+     * 여기서 한 번만 잡고, 그 뒤로는 사람이 고른 배율을 덮지 않습니다.
+     */
+    const box = stage.current
+    if (!box || size.width === 0 || size.height === 0) return
+    const room = { width: box.clientWidth - STAGE_PAD * 2, height: box.clientHeight - STAGE_PAD * 2 }
+    const fit = Math.min(room.width / size.width, room.height / size.height)
+    /*
+     * 내림으로 셉니다. 반올림하면 한 픽셀 넘쳐 굴림대가 생기는데, 꽉 채우려다 굴림대를
+     * 부르는 것은 얻는 것보다 잃는 것이 큽니다.
+     * 배율은 사람이 적어 넣을 수 있는 자리 안에 둡니다(10 ~ 300%).
+     */
+    setZoom(clampPercent(Math.floor(fit * 100)) / 100)
   }
 
   const changeFormat = (next: ImageFormat) => {
@@ -366,8 +389,13 @@ export function ImageEditor({ root, path, onSave, onCancel }: ImageEditorProps) 
                 <span className="hint" style={{ margin: 0 }}>
                   {crop.x}, {crop.y} 에서 {crop.width} × {crop.height}
                 </span>
-                <button type="button" className="btn btn-small" onClick={() => applyCrop(null)}>
-                  통째로 되돌리기
+                <button
+                  type="button"
+                  className="btn btn-small"
+                  data-tip="고른 자리를 지웁니다. 그림 전체를 내놓습니다"
+                  onClick={() => applyCrop(null)}
+                >
+                  선택 영역 해제
                 </button>
               </>
             ) : (

@@ -224,6 +224,40 @@ try {
   await page.fill('.search-input', '')
   await page.waitForTimeout(300)
 
+  /*
+   * 100% 로 열었더니 큰 그림은 한 귀퉁이만 보여 어디를 고르는지 알 수 없었고, 작은 그림은
+   * 너른 칸 한가운데 조그맣게 놓여 픽셀을 집어내기 어려웠습니다.
+   */
+  step('2-2. 수정 화면은 칸에 꽉 차는 배율로 열린다')
+  await page.click('.tree-row:has-text("큰 그림") .tree-name')
+  await page.waitForSelector('.asset-image', { timeout: 8000 })
+  await page.waitForTimeout(400)
+  await openEditor()
+  const opened = await page.evaluate(() => {
+    const image = document.querySelector('.image-edit-frame img')
+    const box = document.querySelector('.image-edit-stage')
+    const drawn = image.getBoundingClientRect()
+    return {
+      적힌: document.querySelector('.image-edit .zoom-now').textContent,
+      그림: [Math.round(drawn.width), Math.round(drawn.height)],
+      칸: [box.clientWidth, box.clientHeight],
+      넘침: box.scrollWidth > box.clientWidth + 1 || box.scrollHeight > box.clientHeight + 1,
+    }
+  })
+  console.log('  ' + JSON.stringify(opened))
+  expect('100% 가 아니라 줄여서 엶', opened.적힌 !== '100%', JSON.stringify(opened))
+  expect('칸 안에 다 들어옴', !opened.넘침, JSON.stringify(opened))
+  /*
+   * 한 쪽은 칸을 거의 채워야 "꽉 차게" 맞춘 것입니다. 여백(16px씩)을 빼고 재고,
+   * 배율은 1% 눈금으로 내림하므로 그만큼의 헐거움은 봐 줍니다.
+   */
+  const room = [opened.칸[0] - 32, opened.칸[1] - 32]
+  const fill = Math.max(opened.그림[0] / room[0], opened.그림[1] / room[1])
+  console.log('  채운 몫: ' + Math.round(fill * 100) + '%')
+  expect('한 쪽이 칸을 거의 채움', fill >= 0.9 && fill <= 1, String(fill))
+  await page.click('.image-edit button:has-text("취소")')
+  await page.waitForTimeout(400)
+
   step('3. 수정은 덮개 창이 아니라 본문 자리에서 열린다')
   await page.click('.tree-row:has-text("사진.png") .tree-name')
   await page.waitForSelector('.doc-head', { timeout: 8000 })
@@ -326,6 +360,9 @@ try {
   await page.waitForSelector('.asset-image', { timeout: 8000 })
   await page.waitForTimeout(400)
   await openEditor()
+  // 화면 픽셀과 그림 픽셀을 1:1 로 맞춰 놓고 잽니다.
+  await page.click('.image-edit .zoom-control button[aria-label="원본 크기"]')
+  await page.waitForTimeout(300)
   const picked = await page.locator('.image-edit-frame img').boundingBox()
   await page.mouse.move(picked.x + 60, picked.y + 40)
   await page.mouse.down()
@@ -339,6 +376,7 @@ try {
   const first = await box()
   console.log('  처음 고른 것: ' + JSON.stringify(first))
   expect('손잡이가 여덟 개', (await page.locator('.crop-grip').count()) === 8)
+  expect('고른 자리를 지우는 단추가 섬', (await page.locator('.image-edit button:has-text("선택 영역 해제")').count()) === 1)
 
   /*
    * 오른쪽 단추는 브라우저에 넘깁니다. pointerdown 은 어느 단추든 똑같이 오므로, 가리지
@@ -392,6 +430,13 @@ try {
   console.log('  왼쪽 변 안으로: ' + JSON.stringify(narrowed))
   expect('안으로 밀면 줄어듦', narrowed.width < bigger.width && narrowed.height === bigger.height,
     JSON.stringify(narrowed))
+  // 지우면 고른 자리가 없어지고 그림 전체 크기로 돌아옵니다.
+  await page.click('.image-edit button:has-text("선택 영역 해제")')
+  await page.waitForTimeout(300)
+  const cleared = await box()
+  console.log('  해제한 뒤: ' + JSON.stringify(cleared))
+  expect('덮개가 걷힘', (await page.locator('.image-edit-crop').count()) === 0)
+  expect('그림 전체 크기로 돌아감', cleared.width === 300 && cleared.height === 200, JSON.stringify(cleared))
   await page.click('.image-edit button:has-text("취소")')
   await page.waitForTimeout(400)
 
@@ -399,6 +444,8 @@ try {
   await page.click('.tree-row:has-text("사진.png") >> nth=0')
   await page.waitForTimeout(400)
   await openEditor()
+  await page.click('.image-edit .zoom-control button[aria-label="원본 크기"]')
+  await page.waitForTimeout(300)
   const frame = await page.locator('.image-edit-frame img').boundingBox()
   /*
    * 그림은 왼쪽 절반만 칠해져 있습니다. **오른쪽(빈 자리)만** 끌어 고르면, 자른 자리를
