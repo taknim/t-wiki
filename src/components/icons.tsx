@@ -235,6 +235,26 @@ export function SaveIcon(props: IconProps) {
   )
 }
 
+/** 화면에 맞추기. 네 귀퉁이를 안으로 모으는 모양입니다. */
+export function FitIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M2.6 6V2.6H6M10 2.6h3.4V6M13.4 10v3.4H10M6 13.4H2.6V10" />
+      <rect x="5.6" y="5.6" width="4.8" height="4.8" rx="0.6" />
+    </Svg>
+  )
+}
+
+/** 본디 크기(1:1). 그림이 지닌 크기 그대로 봅니다. */
+export function ActualSizeIcon(props: IconProps) {
+  return (
+    <Svg {...props} strokeWidth={1.4}>
+      <rect x="2.4" y="3.4" width="11.2" height="9.2" rx="1.2" />
+      <path d="M5.6 6.6l1.1-.8v4.4M9.4 10.2h1.8M10.3 6.2v4" />
+    </Svg>
+  )
+}
+
 /** 더하기·빼기. 보기 배율을 키우고 줄일 때 씁니다. */
 export function PlusIcon(props: IconProps) {
   return (

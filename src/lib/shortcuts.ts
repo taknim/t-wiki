@@ -20,7 +20,7 @@ export interface Shortcut {
   label: string
   keys: KeySpec
   /** 어디서 도는지. 목록에서 묶어 보여 줍니다. */
-  scope: '앱 어디서나' | '편집기 안' | '창·목록'
+  scope: '앱 어디서나' | '그림 볼 때' | '편집기 안' | '창·목록'
   /** 눌러도 앱까지 오지 않는 자판이 있으면 그 사연. */
   note?: string
 }
@@ -48,6 +48,16 @@ export const SHORTCUTS: Shortcut[] = [
   { id: 'caret-position', label: '아래 표시줄에 커서 위치 보이기 / 감추기', keys: { key: 'y', mod: true, shift: true }, scope: '앱 어디서나' },
   { id: 'settings', label: '설정 열기', keys: { key: ',', mod: true }, scope: '앱 어디서나' },
   { id: 'help', label: '이 단축키 목록', keys: { key: '/', mod: true }, scope: '앱 어디서나' },
+
+  /*
+   * 그림을 볼 때는 글을 치지 않으므로 맨 글쇠를 씁니다. 그림 보기에서 손이 가장 자주
+   * 가는 일이라, 글쇠를 누르는 데 다른 글쇠를 함께 잡을 까닭이 없습니다.
+   * 셈은 늘 지금 그려진 배율에서 한 걸음입니다.
+   */
+  { id: 'zoom-in', label: '크게 보기', keys: { key: '=' }, scope: '그림 볼 때', note: '＋(⇧=) 로 눌러도 됩니다' },
+  { id: 'zoom-out', label: '작게 보기', keys: { key: '-' }, scope: '그림 볼 때' },
+  { id: 'zoom-fit', label: '화면에 맞추기', keys: { key: '0' }, scope: '그림 볼 때' },
+  { id: 'zoom-actual', label: '원본 크기로', keys: { key: '1' }, scope: '그림 볼 때' },
 
   { id: 'save', label: '지금 바로 저장', keys: { key: 's', mod: true }, scope: '편집기 안' },
   { id: 'bold', label: '굵게', keys: { key: 'b', mod: true }, scope: '편집기 안' },
@@ -79,16 +89,26 @@ export function formatKeys(keys: KeySpec): string {
   return parts.join(mac ? '' : '+')
 }
 
+/*
+ * 더하기·빼기 글쇠. 자리는 하나인데 누르는 법이 여럿입니다.
+ * 셈판(Numpad)에도 있고, 글판에서는 ＋ 가 ⇧= 라 event.key 가 '+' 로 옵니다.
+ * 어느 쪽으로 눌러도 같은 일이 되도록 물리 글쇠 이름을 한 글자로 모읍니다.
+ */
+const SIGN_KEYS: Record<string, string> = {
+  Equal: '=', NumpadAdd: '=', Minus: '-', NumpadSubtract: '-',
+}
+
 /** 이 눌림이 그 단축키인지. 글쇠 이름은 대소문자를 가리지 않습니다. */
 export function matches(event: KeyboardEvent, keys: KeySpec): boolean {
   const mod = isMac() ? event.metaKey : event.ctrlKey
   if (Boolean(keys.mod) !== mod) return false
-  if (Boolean(keys.shift) !== event.shiftKey) return false
+  // ＋ 는 ⇧= 로 누릅니다. 이 둘만은 ⇧ 를 가리지 않습니다 — 가리면 ＋ 가 듣지 않습니다.
+  if (!(keys.key === '=' || keys.key === '-') && Boolean(keys.shift) !== event.shiftKey) return false
   if (Boolean(keys.alt) !== event.altKey) return false
   // ⌥ 를 누르면 맥에서 event.key 가 딴 글자(˜)가 됩니다. 물리 글쇠 이름으로 견줍니다.
   // ⇧ 를 누르면 숫자 글쇠도 딴 글자(!)가 됩니다. 이쪽도 물리 글쇠 이름으로 견줍니다.
   const code = event.code.startsWith('Key')
     ? event.code.slice(3).toLowerCase()
-    : event.code.startsWith('Digit') ? event.code.slice(5) : null
+    : event.code.startsWith('Digit') ? event.code.slice(5) : SIGN_KEYS[event.code] ?? null
   return event.key.toLowerCase() === keys.key.toLowerCase() || (code !== null && code === keys.key.toLowerCase())
 }

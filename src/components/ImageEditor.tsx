@@ -193,7 +193,8 @@ export function ImageEditor({ root, path, onSave, onCancel }: ImageEditorProps) 
           </p>
           <div className="row" style={{ alignItems: 'center', gap: 6 }}>
             <span className="hint" style={{ margin: 0 }}>보기 배율</span>
-            <ZoomControl zoom={zoom} onZoom={setZoom} />
+            {/* 고칠 때는 늘 배율을 정해 두고 봅니다(맞춤 없음). 잘라 낼 자리를 재려면 기준이 있어야 합니다. */}
+            <ZoomControl scale={zoom} fitted={false} canFit={false} onZoom={(next) => setZoom(next ?? 1)} />
           </div>
           <div className="row" style={{ alignItems: 'center' }}>
             {crop ? (

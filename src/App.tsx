@@ -20,7 +20,6 @@ import { SettingsPanel } from './components/SettingsPanel'
 import { SplitResizer } from './components/SplitResizer'
 import { BackdropSwitch } from './components/BackdropSwitch'
 import { ImageEditor } from './components/ImageEditor'
-import { ZoomControl } from './components/ZoomControl'
 import { SyncReportSheet } from './components/SyncReportSheet'
 import { SyncHistorySheet } from './components/SyncHistorySheet'
 import { TreeView } from './components/TreeView'
@@ -41,6 +40,7 @@ import { SyncProgress } from './components/SyncProgress'
 import { useTheme } from './components/themeContext'
 import { MoveSheet } from './components/MoveSheet'
 import { matches, SHORTCUTS } from './lib/shortcuts'
+import { stepZoom } from './lib/zoom'
 import { readTrashPolicy } from './lib/saveOptions'
 import type { TrashItem } from './lib/trash'
 import { entryKind, readFile } from './lib/fsAccess'
@@ -1100,7 +1100,7 @@ export default function App() {
   }, [sidebarOpen])
   const shortcutRefs = useRef({
     handleNewDoc, currentDir, textPreview, startSync, handleGoTo, look,
-    hasDoc: false, image: null as string | null,
+    hasDoc: false, image: null as string | null, canZoom: false,
   })
   useEffect(() => {
     shortcutRefs.current = {
@@ -1110,10 +1110,34 @@ export default function App() {
       image: selectedPath !== null && attachmentKind(selectedPath) === 'image' && imagePreview
         ? selectedPath
         : null,
+      // 수정 화면에서는 제 손잡이가 따로 있습니다. 보는 중일 때만 맨 글쇠가 듣습니다.
+      canZoom: editingImage === null,
     }
   })
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
+      /*
+       * 그림을 볼 때만 도는 맨 글쇠들. 글을 치는 자리에서는 가로채지 않습니다 —
+       * 검색 칸에 '0' 을 치는데 그림이 줄어들면 안 됩니다.
+       */
+      const typing = event.target instanceof HTMLElement
+        && (event.target.closest('input, textarea, [contenteditable]') !== null)
+      const zoomHit = !typing && shortcutRefs.current.image !== null && shortcutRefs.current.canZoom
+        ? SHORTCUTS.find((one) => one.scope === '그림 볼 때' && matches(event, one.keys))
+        : undefined
+      if (zoomHit) {
+        event.preventDefault()
+        // 셈은 늘 지금 그려진 배율에서 셉니다. 화면 맞춤으로 줄어 있으면 그 값부터입니다.
+        const image = document.querySelector<HTMLImageElement>('.main .asset-image')
+        const scale = image && image.naturalWidth > 0
+          ? image.getBoundingClientRect().width / image.naturalWidth
+          : 1
+        if (zoomHit.id === 'zoom-fit') setImageZoom(null)
+        else if (zoomHit.id === 'zoom-actual') setImageZoom(1)
+        else setImageZoom(stepZoom(scale, zoomHit.id === 'zoom-in' ? 1 : -1))
+        return
+      }
+
       const hit = SHORTCUTS.find((one) => one.scope === '앱 어디서나' && matches(event, one.keys))
       // ⌘N 이 오는 브라우저에서는 그것도 새 문서입니다.
       const newDocPlain = event.key.toLowerCase() === 'n' && (event.metaKey || event.ctrlKey) && !event.altKey && !event.shiftKey
@@ -1869,15 +1893,7 @@ export default function App() {
                   <ViewModeSwitch mode={viewMode} onChange={setViewMode} />
                 )}
                 {selection.kind === 'image' && imagePreview && editingImage !== selection.path && (
-                  <>
-                    <BackdropSwitch backdrop={imageBackdrop} onChange={applyImageBackdrop} />
-                    <ZoomControl
-                      zoom={imageZoom ?? 1}
-                      fitted={imageZoom === null}
-                      onZoom={setImageZoom}
-                      onFit={() => setImageZoom(null)}
-                    />
-                  </>
+                  <BackdropSwitch backdrop={imageBackdrop} onChange={applyImageBackdrop} />
                 )}
                 {selection.kind === 'image' && imagePreview && editingImage !== selection.path && (
                   <button
@@ -1936,6 +1952,7 @@ export default function App() {
                   officePreview={officePreview}
                   backdrop={imageBackdrop}
                   zoom={selection.kind === 'image' ? imageZoom : null}
+                  onZoom={setImageZoom}
                   version={selection.lastModified ?? 0}
                 />
               ) : (

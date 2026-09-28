@@ -1735,9 +1735,19 @@ a.btn { text-decoration: none; color: inherit; display: inline-block; }
   padding: 16px;
 }
 /* 손대지 않은 본디 모습. 이것만 테마를 따릅니다. */
-/* 배율을 정해 둔 회차. 그림이 칸보다 커질 수 있으므로 이 안에서 굴립니다. */
-.asset-canvas.is-zoomed { overflow: auto; align-items: flex-start; justify-content: flex-start; }
-.asset-canvas.is-zoomed .asset-image { align-self: flex-start; flex: none; }
+/*
+ * 배율을 정해 둔 회차. 그림이 칸보다 커질 수 있으므로 이 안에서 굴립니다.
+ *
+ * `safe` 를 붙이는 것이 핵심입니다. 그냥 가운데로 모으면 그림이 칸보다 커졌을 때 위와
+ * 왼쪽이 칸 밖으로 밀려 굴려도 닿지 않습니다. `safe` 는 넘칠 때만 처음 자리로 붙입니다 —
+ * 작은 그림은 가운데에 그대로, 큰 그림은 왼쪽 위부터 보입니다.
+ */
+.asset-canvas.is-zoomed {
+  overflow: auto;
+  align-items: safe center;
+  justify-content: safe center;
+}
+.asset-canvas.is-zoomed .asset-image { flex: none; align-self: safe center; }
 .asset-canvas.is-theme { background-color: var(--bg); }
 .asset-canvas.is-light { background-color: var(--img-light); }
 .asset-canvas.is-mid { background-color: var(--img-mid); }
@@ -2285,6 +2295,11 @@ button.info-caret:focus-visible { outline: 2px solid var(--accent); outline-offs
 .image-edit {
   display: grid;
   grid-template-rows: minmax(0, 1fr) auto;
+  /*
+   * 본문에 남은 키를 다 씁니다. 내용만큼만 서 있었더니 아래가 잘린 것처럼 보였고,
+   * 저장·취소가 그림 한가운데쯤에 떠 있었습니다.
+   */
+  flex: 1;
   min-height: 0;
   background: var(--bg);
   overflow: hidden;
@@ -2323,22 +2338,84 @@ button.info-caret:focus-visible { outline: 2px solid var(--accent); outline-offs
 }
 .image-edit-panel {
   overflow: auto;
-  padding: 14px 16px;
+  padding: 0 16px 4px;
   border-block-start: 1px solid var(--border);
   display: flex;
   flex-direction: column;
   gap: 14px;
 }
+.image-edit-panel > .field:first-of-type { margin-block-start: 14px; }
 @media (min-width: 1000px) {
   .image-edit-panel { border-block-start: 0; border-inline-start: 1px solid var(--border); }
 }
 .image-edit-error { color: var(--danger); }
-.image-edit-actions { display: flex; justify-content: flex-end; gap: 8px; }
+/*
+ * 저장·취소는 손잡이 칸 맨 아래에 붙입니다. 위 칸이 짧으면 밀어 내리고(margin auto),
+ * 길어서 굴러가면 바닥에 붙어 따라옵니다(sticky). 어느 쪽이든 늘 같은 자리에 있습니다.
+ */
+.image-edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-block-start: auto;
+  position: sticky;
+  inset-block-end: 0;
+  padding-block: 10px;
+  background: var(--bg);
+}
 /* 제목 줄의 수정 단추. 아이콘과 글자가 나란히 섭니다. */
 .head-edit { display: inline-flex; align-items: center; gap: 5px; align-self: center; flex-shrink: 0; }
-/* 보기 배율 손잡이. 그림을 볼 때와 고칠 때 같은 것을 씁니다. */
-.zoom-control { display: inline-flex; align-items: center; gap: 4px; align-self: center; flex-shrink: 0; }
-.zoom-control .zoom-now { min-width: 4.2em; text-align: center; }
+/*
+ * 보기 배율 손잡이. 그림을 볼 때와 고칠 때 같은 것을 씁니다.
+ * 보기에서는 그림 위에 떠 있고(문서의 맨 위·맨 아래 단추와 같은 자리),
+ * 수정 화면에서는 손잡이 칸 안에 눕습니다.
+ */
+.zoom-control {
+  position: absolute;
+  inset-inline-end: 16px;
+  inset-block-end: 16px;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  background: var(--bg-raised);
+  /* 그림 위에 떠 있으므로 그림자로 층을 나눕니다. */
+  box-shadow: 0 2px 8px rgb(0 0 0 / 18%);
+}
+.zoom-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.zoom-btn:hover { color: var(--text); background: var(--bg-sunken); }
+.zoom-btn.is-on { background: var(--accent); color: #fff; }
+.zoom-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.zoom-now {
+  text-align: center;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+/* 수정 화면에서는 손잡이 칸 안에 가로로 눕습니다. 떠 있을 자리가 없습니다. */
+.image-edit .zoom-control {
+  position: static;
+  flex-direction: row;
+  align-items: center;
+  box-shadow: none;
+}
+.image-edit .zoom-now { min-width: 3.4em; }
 /* 미리보기 오른쪽 위 정보의 형식 딱지. 숫자와 붙지 않게 조금 띄웁니다. */
 .asset-size-kind {
   margin-inline-end: 6px;

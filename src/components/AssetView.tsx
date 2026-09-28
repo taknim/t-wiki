@@ -4,6 +4,7 @@ import {
 } from '../lib/attachments'
 import { readBinaryFile } from '../lib/fsAccess'
 import { imageFormatName } from '../lib/imageEdit'
+import { ZoomControl } from './ZoomControl'
 import { SheetPreview, WordPreview } from './OfficePreview'
 import type { ImageBackdrop } from '../types'
 
@@ -23,6 +24,8 @@ interface AssetViewProps {
    * 이 부품이 사라졌다 다시 서는 것과 상관없는 자리에 있어야 합니다.
    */
   zoom?: number | null
+  /** 배율을 바꿀 때. null 이면 화면 맞춤으로 돌아갑니다. 없으면 손잡이를 내놓지 않습니다. */
+  onZoom?: (next: number | null) => void
   /** 파일이 바뀐 때. 덮어쓴 뒤 같은 경로라도 다시 읽어야 합니다. */
   version?: number
 }
@@ -35,7 +38,7 @@ const TEXT_PREVIEW_LIMIT = 200_000
  * 이미지와 PDF 는 그대로 띄우고, 텍스트 계열은 내용을 읽어 보여 줍니다.
  */
 export function AssetView({
-  root, path, size, imagePreview, officePreview, backdrop, zoom = null, version = 0,
+  root, path, size, imagePreview, officePreview, backdrop, zoom = null, onZoom, version = 0,
 }: AssetViewProps) {
   const [url, setUrl] = useState<string | null>(null)
   const [text, setText] = useState<string | null>(null)
@@ -173,6 +176,13 @@ export function AssetView({
                 : null)
             }}
           />
+          {/*
+            배율 손잡이는 그림 위에 떠 있습니다. 제목 줄에 두었더니 그림을 보던 눈이
+            멀리 갔고, 좁은 화면에서는 제목 줄이 두 줄로 접혔습니다.
+          */}
+          {onZoom && pixels && drawn && (
+            <ZoomControl scale={drawn.width / pixels.width} fitted={zoom === null} onZoom={onZoom} />
+          )}
           {pixels && (
             /*
              * 크기는 두 가지가 궁금합니다. 지금 눈에 보이는 크기와 파일이 지닌 크기.

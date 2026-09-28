@@ -8,9 +8,16 @@
 /** 배율의 단계. 100% 는 그림이 지닌 크기 그대로입니다. */
 export const ZOOMS = [0.25, 0.5, 0.75, 1, 1.5, 2, 3, 4]
 
-/** 지금 배율에서 한 걸음 옮긴 배율. 끝에서는 그대로 둡니다. */
+/**
+ * 지금 배율에서 한 걸음 옮긴 배율. 끝에서는 그대로 둡니다.
+ *
+ * 표에 없는 값에서도 세어야 합니다. 화면 맞춤은 칸에 따라 37% 처럼 어중간한 값이 되는데,
+ * 표에서 자리를 못 찾아 100% 부터 세었더니 37% 에서 크게 보기를 눌렀는데 150% 로 건너뛰었습니다.
+ * 지금 값보다 바로 위(또는 바로 아래) 눈금으로 갑니다.
+ */
 export function stepZoom(zoom: number, delta: number): number {
-  const at = ZOOMS.indexOf(zoom)
-  const from = at === -1 ? ZOOMS.indexOf(1) : at
-  return ZOOMS[Math.min(Math.max(from + delta, 0), ZOOMS.length - 1)]
+  // 재서 나온 값은 소수점 아래가 지저분합니다. 0.5% 안쪽은 같은 값으로 봅니다.
+  const near = 0.005
+  if (delta > 0) return ZOOMS.find((one) => one > zoom + near) ?? ZOOMS[ZOOMS.length - 1]
+  return [...ZOOMS].reverse().find((one) => one < zoom - near) ?? ZOOMS[0]
 }
