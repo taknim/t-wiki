@@ -2350,8 +2350,39 @@ button.info-caret:focus-visible { outline: 2px solid var(--accent); outline-offs
   position: absolute;
   border: 1px solid var(--accent);
   box-shadow: 0 0 0 9999px color-mix(in srgb, #000 45%, transparent);
+  /* 안쪽을 끌면 새로 고르는 일이 되어야 하므로, 손잡이만 사건을 받습니다. */
   pointer-events: none;
 }
+/*
+ * 고른 자리를 잡아 늘이는 손잡이.
+ *
+ * 꼭지점은 네모로 눈에 띄게 두고, 변은 보이지 않는 띠로 둡니다. 변마다 네모를 세우면
+ * 작게 고른 자리에서는 네모가 서로 겹쳐 무엇을 잡는지 알 수 없습니다.
+ * 띠는 테두리 바깥으로도 조금 걸쳐 둡니다 — 한 픽셀 선을 정확히 짚기는 어렵습니다.
+ */
+.crop-grip {
+  position: absolute;
+  pointer-events: auto;
+}
+.crop-grip-n, .crop-grip-s { left: 0; right: 0; height: 11px; cursor: ns-resize; }
+.crop-grip-n { top: -6px; }
+.crop-grip-s { bottom: -6px; }
+.crop-grip-e, .crop-grip-w { top: 0; bottom: 0; width: 11px; cursor: ew-resize; }
+.crop-grip-w { left: -6px; }
+.crop-grip-e { right: -6px; }
+/* 꼭지점은 변보다 위에 서야 합니다. 겹치는 자리에서는 대각선 늘이기가 이깁니다. */
+.crop-grip-nw, .crop-grip-ne, .crop-grip-se, .crop-grip-sw {
+  z-index: 1;
+  width: 11px;
+  height: 11px;
+  border: 1px solid var(--accent);
+  border-radius: 2px;
+  background: #fff;
+}
+.crop-grip-nw { top: -6px; left: -6px; cursor: nwse-resize; }
+.crop-grip-ne { top: -6px; right: -6px; cursor: nesw-resize; }
+.crop-grip-se { bottom: -6px; right: -6px; cursor: nwse-resize; }
+.crop-grip-sw { bottom: -6px; left: -6px; cursor: nesw-resize; }
 .image-edit-panel {
   overflow: auto;
   padding: 0 16px 4px;
@@ -2365,6 +2396,22 @@ button.info-caret:focus-visible { outline: 2px solid var(--accent); outline-offs
   .image-edit-panel { border-block-start: 0; border-inline-start: 1px solid var(--border); }
 }
 .image-edit-error { color: var(--danger); }
+/*
+ * 손가락을 따라다니는 쪽지. 고르기 전에는 짚고 있는 자리, 고르는 중에는 고른 크기.
+ * 손 밑에 깔리지 않도록 오른쪽 아래에 조금 떨어뜨리고, 누르는 것을 막지 않습니다.
+ */
+.image-edit-readout {
+  position: fixed;
+  z-index: 8;
+  padding: 2px 7px;
+  border-radius: 5px;
+  background: rgb(0 0 0 / 78%);
+  color: #fff;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  pointer-events: none;
+}
 /*
  * 저장·취소는 손잡이 칸 맨 아래에 붙입니다. 위 칸이 짧으면 밀어 내리고(margin auto),
  * 길어서 굴러가면 바닥에 붙어 따라옵니다(sticky). 어느 쪽이든 늘 같은 자리에 있습니다.

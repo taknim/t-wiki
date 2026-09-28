@@ -317,6 +317,60 @@ try {
   await page.click('.image-edit button:has-text("취소")')
   await page.waitForTimeout(400)
 
+  /*
+   * 한 번에 딱 맞게 끄는 일은 드뭅니다. 조금 넓거나 좁게 고른 것을 다시 그리지 않고
+   * 변과 꼭지점을 잡아 고칠 수 있어야 합니다.
+   */
+  step('4-2. 고른 자리를 변과 꼭지점으로 늘인다')
+  await page.click('.tree-row:has-text("사진.png") .tree-name')
+  await page.waitForSelector('.asset-image', { timeout: 8000 })
+  await page.waitForTimeout(400)
+  await openEditor()
+  const picked = await page.locator('.image-edit-frame img').boundingBox()
+  await page.mouse.move(picked.x + 60, picked.y + 40)
+  await page.mouse.down()
+  await page.mouse.move(picked.x + 160, picked.y + 120, { steps: 6 })
+  await page.mouse.up()
+  await page.waitForTimeout(300)
+  const box = () => page.evaluate(() => ({
+    width: Number(document.querySelector('#image-width').value),
+    height: Number(document.querySelector('#image-height').value),
+  }))
+  const first = await box()
+  console.log('  처음 고른 것: ' + JSON.stringify(first))
+  expect('손잡이가 여덟 개', (await page.locator('.crop-grip').count()) === 8)
+
+  /** 손잡이를 잡아 그만큼 끕니다. */
+  const pull = async (grip, dx, dy) => {
+    const at = await page.locator(`.crop-grip-${grip}`).boundingBox()
+    await page.mouse.move(at.x + at.width / 2, at.y + at.height / 2)
+    await page.mouse.down()
+    await page.mouse.move(at.x + at.width / 2 + dx, at.y + at.height / 2 + dy, { steps: 6 })
+    await page.mouse.up()
+    await page.waitForTimeout(300)
+    return box()
+  }
+
+  const wider = await pull('e', 50, 0)
+  console.log('  오른쪽 변: ' + JSON.stringify(wider))
+  expect('변을 잡으면 그 축만 바뀜', wider.width > first.width && wider.height === first.height,
+    JSON.stringify(wider))
+  const taller = await pull('s', 0, 40)
+  console.log('  아래 변: ' + JSON.stringify(taller))
+  expect('아래 변은 높이만', taller.height > wider.height && taller.width === wider.width,
+    JSON.stringify(taller))
+  const bigger = await pull('nw', -30, -20)
+  console.log('  왼쪽 위 꼭지점: ' + JSON.stringify(bigger))
+  expect('꼭지점은 두 축이 함께', bigger.width > taller.width && bigger.height > taller.height,
+    JSON.stringify(bigger))
+  // 줄이는 쪽으로도 움직입니다.
+  const narrowed = await pull('w', 40, 0)
+  console.log('  왼쪽 변 안으로: ' + JSON.stringify(narrowed))
+  expect('안으로 밀면 줄어듦', narrowed.width < bigger.width && narrowed.height === bigger.height,
+    JSON.stringify(narrowed))
+  await page.click('.image-edit button:has-text("취소")')
+  await page.waitForTimeout(400)
+
   step('5. 끌어서 자른 만큼만 나온다')
   await page.click('.tree-row:has-text("사진.png") >> nth=0')
   await page.waitForTimeout(400)
@@ -326,9 +380,22 @@ try {
    * 그림은 왼쪽 절반만 칠해져 있습니다. **오른쪽(빈 자리)만** 끌어 고르면, 자른 자리를
    * 실제로 쓰는지 색으로 가릴 수 있습니다. 크기만 맞춰서는 통째로 그려도 같은 수가 나옵니다.
    */
+  /*
+   * 잘라내기는 픽셀 단위로 맞추는 일인데, 아래 칸의 숫자를 보려면 눈이 손에서 멀리
+   * 떠나야 했습니다. 손가락 옆에 짚은 자리와 고른 크기를 적어 줍니다.
+   */
+  const note = () => page.evaluate(() => document.querySelector('.image-edit-readout')?.textContent ?? null)
   await page.mouse.move(frame.x + frame.width * 0.6, frame.y + 20)
+  await page.waitForTimeout(200)
+  const pointedAt = await note()
+  console.log('  짚은 자리: ' + String(pointedAt))
+  expect('누르기 전에는 짚은 자리(x, y)', /^\d+, \d+$/.test(pointedAt ?? ''), String(pointedAt))
   await page.mouse.down()
   await page.mouse.move(frame.x + frame.width * 0.6 + 100, frame.y + 100, { steps: 8 })
+  await page.waitForTimeout(200)
+  const sizing = await note()
+  console.log('  고르는 중: ' + String(sizing))
+  expect('고르는 중에는 크기(너비 × 높이)', /^\d+ × \d+$/.test(sizing ?? ''), String(sizing))
   await page.mouse.up()
   await page.waitForTimeout(300)
   const cropped = await page.evaluate(() => ({
