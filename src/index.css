@@ -2273,6 +2273,44 @@ button.info-caret:focus-visible { outline: 2px solid var(--accent); outline-offs
 }
 .trash-peek-entries li { display: flex; align-items: center; gap: 6px; padding: 2px 0; }
 
+/* ---------- 그림 고치기 ---------- */
+
+.image-edit { width: min(680px, 100%); }
+.image-edit-body { display: flex; flex-direction: column; gap: 14px; }
+.image-edit-error { color: var(--danger); }
+/*
+ * 잘라 낼 자리를 끄는 칸. 그림은 이 칸 너비에 맞춰 줄어들고, 덮개는 그 위에 비율(%)로
+ * 얹힙니다. 그래서 창을 늘이고 줄여도 고른 자리가 그대로 따라갑니다.
+ */
+.image-edit-frame {
+  position: relative;
+  align-self: start;
+  /*
+   * 줄어들지 않게 못 박습니다. 세로로 쌓는 칸에서 flex 기본값대로 두었더니, 창이 꽉 차면
+   * 이 칸만 눌려 그림이 잘리고 잘라 낼 자리도 어긋났습니다. 넘치면 창이 굴러가면 됩니다.
+   */
+  flex: none;
+  max-width: 100%;
+  line-height: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--bg-sunken);
+  /* 끄는 동안 그림이 잡혀 끌리지 않도록 막습니다. */
+  touch-action: none;
+  cursor: crosshair;
+  user-select: none;
+}
+.image-edit-frame img { display: block; max-width: 100%; max-height: 320px; width: auto; height: auto; }
+/* 고른 자리. 테두리만으로는 밝은 그림 위에서 안 보여 바깥을 덮어 어둡게 합니다. */
+.image-edit-crop {
+  position: absolute;
+  border: 1px solid var(--accent);
+  box-shadow: 0 0 0 9999px color-mix(in srgb, #000 45%, transparent);
+  pointer-events: none;
+}
+.image-edit .field + .field { margin-block-start: 0; }
+
 /* ---------- 단축키 목록 ---------- */
 
 /*

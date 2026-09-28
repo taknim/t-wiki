@@ -18,6 +18,7 @@ import { TextPreview } from './components/TextPreview'
 import { SettingsPanel } from './components/SettingsPanel'
 import { SplitResizer } from './components/SplitResizer'
 import { BackdropSwitch } from './components/BackdropSwitch'
+import { ImageEditSheet } from './components/ImageEditSheet'
 import { SyncReportSheet } from './components/SyncReportSheet'
 import { SyncHistorySheet } from './components/SyncHistorySheet'
 import { TreeView } from './components/TreeView'
@@ -108,6 +109,8 @@ export default function App() {
   const { settings: look, update: updateLook } = useTheme()
   /** 옮길 폴더를 고르는 창에 올라와 있는 것. 없으면 닫힘. */
   const [moving, setMoving] = useState<string | null>(null)
+  /** 고치는 중인 그림의 경로. 창을 띄우는 동안만 값이 있습니다. */
+  const [editingImage, setEditingImage] = useState<string | null>(null)
   const [reportOpen, setReportOpen] = useState(false)
   const [historyOpen, setHistoryOpen] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
@@ -1791,6 +1794,16 @@ export default function App() {
                 {selection.kind === 'image' && imagePreview && (
                   <BackdropSwitch backdrop={imageBackdrop} onChange={applyImageBackdrop} />
                 )}
+                {selection.kind === 'image' && (
+                  <button
+                    type="button"
+                    className="btn btn-small doc-save"
+                    data-tip="형식을 바꾸거나 크기를 줄이거나 잘라 새 파일로 냅니다"
+                    onClick={() => setEditingImage(selection.path)}
+                  >
+                    고치기
+                  </button>
+                )}
               </div>
 
               {editableText ? (
@@ -1958,6 +1971,26 @@ export default function App() {
           onAutoSave={applyAutoSave}
           onShowHistory={() => setHistoryOpen(true)}
           onClose={() => setSettingsTab(null)}
+        />
+      )}
+
+      {editingImage !== null && vault.root && (
+        <ImageEditSheet
+          root={vault.root}
+          path={editingImage}
+          onClose={() => setEditingImage(null)}
+          onSave={async (name, blob) => {
+            const dir = editingImage.split('/').slice(0, -1).join('/')
+            const made = await vault.addFiles(dir, [new File([blob], name, { type: blob.type })])
+            setEditingImage(null)
+            if (made.added.length === 0) {
+              flash('그 형식은 넣을 수 없습니다.')
+              return
+            }
+            // 만든 것을 곧바로 열어 줍니다. 무엇이 나왔는지 눈으로 봐야 다시 고칠지 정합니다.
+            await openAsset(made.added[0])
+            flash(`${fileNameOf(made.added[0])} 를 만들었습니다.`)
+          }}
         />
       )}
 
