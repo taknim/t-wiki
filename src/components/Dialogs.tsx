@@ -15,7 +15,7 @@ interface NumbersRequest {
   kind: 'numbers'
   title: string
   label: string
-  fields: { id: string; label: string; value: number; min: number; max?: number }[]
+  fields: { id: string; label: string; value: number; min: number; max?: number; suffix?: string }[]
   confirmText: string
 }
 
@@ -174,22 +174,28 @@ export function DialogProvider({ children }: { children: ReactNode }) {
               <div className="dialog-fields">
                 {request.fields.map((field, at) => (
                   <label key={field.id} className="dialog-field">
-                    <span>{field.label}</span>
-                    <input
-                      ref={at === 0 ? inputRef : undefined}
-                      className="dialog-input"
-                      type="number"
-                      inputMode="numeric"
-                      min={field.min}
-                      max={field.max}
-                      value={values[field.id] ?? ''}
-                      autoFocus={at === 0}
-                      onChange={(event) => setValues((current) => ({ ...current, [field.id]: event.target.value }))}
-                      onKeyDown={(event) => {
-                        if (event.key === 'Enter') submit()
-                        if (event.key === 'Escape') close(null)
-                      }}
-                    />
+                    {/* 이름이 없는 칸도 있습니다(배율처럼 창 이름만으로 충분한 때). */}
+                    {field.label && <span>{field.label}</span>}
+                    {/* 단위는 칸 **뒤에** 붙습니다. 위에 얹으면 숫자와 떨어져 어디에 걸리는 말인지 흐려집니다. */}
+                    <span className="dialog-field-row">
+                      <input
+                        ref={at === 0 ? inputRef : undefined}
+                        className="dialog-input"
+                        type="number"
+                        inputMode="numeric"
+                        min={field.min}
+                        max={field.max}
+                        value={values[field.id] ?? ''}
+                        aria-label={field.label || `${request.title}${field.suffix ? ` (${field.suffix})` : ''}`}
+                        autoFocus={at === 0}
+                        onChange={(event) => setValues((current) => ({ ...current, [field.id]: event.target.value }))}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter') submit()
+                          if (event.key === 'Escape') close(null)
+                        }}
+                      />
+                      {field.suffix && <span className="dialog-field-suffix">{field.suffix}</span>}
+                    </span>
                   </label>
                 ))}
               </div>

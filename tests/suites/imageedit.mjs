@@ -176,6 +176,19 @@ try {
   await page.waitForSelector('.dialog-field input', { timeout: 4000 })
   expect('지금 배율이 미리 적혀 있음', (await page.inputValue('.dialog-field input')) === String(fit.잰),
     await page.inputValue('.dialog-field input'))
+  /*
+   * 단위는 칸 **뒤에** 섭니다. 위에 얹었더니 숫자와 떨어져 어디에 걸리는 말인지 흐렸습니다.
+   * 칸 뒤에 있는지는 자리를 재서 가립니다.
+   */
+  const unit = await page.evaluate(() => {
+    const box = document.querySelector('.dialog-field input').getBoundingClientRect()
+    const mark = document.querySelector('.dialog-field-suffix')
+    if (!mark) return null
+    const at = mark.getBoundingClientRect()
+    return { 글: mark.textContent, 뒤에: at.left >= box.right - 1, 같은줄: Math.abs(at.top - box.top) < 20 }
+  })
+  console.log('  단위: ' + JSON.stringify(unit))
+  expect('% 가 칸 뒤 같은 줄에 섬', unit?.글 === '%' && unit.뒤에 && unit.같은줄, JSON.stringify(unit))
   await page.fill('.dialog-field input', '110')
   await page.keyboard.press('Enter')
   await page.waitForTimeout(400)
@@ -250,6 +263,59 @@ try {
   expect('원본은 그대로', kept?.size.width === 300 && kept.size.height === 200, JSON.stringify(kept))
   expect('만든 것을 곧바로 엶', (await page.textContent('.doc-head h1')) === '사진_modified.png',
     await page.textContent('.doc-head h1'))
+
+  /*
+   * 크게 키워 놓으면 그림이 칸보다 커집니다. 폭을 칸에 묶어 두었더니 거기서 더 키워지지
+   * 않아 크게 보며 고를 수가 없었고, 보이는 데까지만 고를 수 있었습니다.
+   */
+  step('4-1. 칸보다 크게 키워 가로로 굴려 가며 고른다')
+  // 칸보다 큰 그림으로 봅니다. 작은 그림은 아무리 키워도 칸을 넘지 못합니다.
+  await page.click('.tree-row:has-text("큰 그림") .tree-name')
+  await page.waitForSelector('.asset-image', { timeout: 8000 })
+  await page.waitForTimeout(400)
+  await openEditor()
+  const stageSize = () => page.evaluate(() => {
+    const image = document.querySelector('.image-edit-frame img')
+    const box = document.querySelector('.image-edit-stage')
+    return {
+      그림폭: Math.round(image.getBoundingClientRect().width),
+      칸폭: box.clientWidth,
+      굴릴것: box.scrollWidth - box.clientWidth,
+      굴린자리: Math.round(box.scrollLeft),
+    }
+  })
+  const small = await stageSize()
+  for (let at = 0; at < 3; at += 1) {
+    await page.click('.image-edit .zoom-control button[aria-label="확대"]')
+    await page.waitForTimeout(200)
+  }
+  const grown = await stageSize()
+  console.log('  ' + JSON.stringify({ small, grown }))
+  expect('칸 너비를 넘겨 커짐', grown.그림폭 > small.그림폭 && grown.그림폭 > grown.칸폭,
+    JSON.stringify(grown))
+  expect('넘친 만큼 가로로 굴러감', grown.굴릴것 > 0, JSON.stringify(grown))
+  /*
+   * 잡은 손으로는 굴림대를 만질 수 없고 놓으면 거기서 끝납니다. 칸 가장자리까지 끌고
+   * 가면 저절로 굴러가며 이어서 고를 수 있어야 합니다.
+   */
+  const stageBox = await page.locator('.image-edit-stage').boundingBox()
+  await page.mouse.move(stageBox.x + 30, stageBox.y + 30)
+  await page.mouse.down()
+  await page.mouse.move(stageBox.x + stageBox.width - 8, stageBox.y + stageBox.height / 2, { steps: 10 })
+  await page.waitForTimeout(800)
+  const rolled = await stageSize()
+  console.log('  끌고 있는 중: ' + JSON.stringify(rolled))
+  expect('가장자리에서 저절로 굴러감', rolled.굴린자리 > 0, JSON.stringify(rolled))
+  await page.mouse.up()
+  await page.waitForTimeout(300)
+  const wide = Number(await page.inputValue('#image-width'))
+  console.log('  고른 너비: ' + wide)
+  // 보이는 칸(200% 에서 224 픽셀 남짓)보다 넓게 골렸어야 굴려 가며 고른 것입니다.
+  // 보이는 칸은 그림의 몇 분의 일입니다. 그보다 넓게 골랐다면 굴려 가며 고른 것입니다.
+  const visible = Math.round(rolled.칸폭 * (2000 / rolled.그림폭))
+  expect('보이던 자리보다 넓게 고름', wide > visible, `${wide} > ${visible}`)
+  await page.click('.image-edit button:has-text("취소")')
+  await page.waitForTimeout(400)
 
   step('5. 끌어서 자른 만큼만 나온다')
   await page.click('.tree-row:has-text("사진.png") >> nth=0')

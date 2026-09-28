@@ -94,6 +94,18 @@ try {
   expect('원래 자리에는 없음', !(await names('회사')).includes('온보딩.md'), JSON.stringify(await names('회사')))
 
   step('2. 휴지통 화면에 원래 자리와 때가 보인다')
+  // 아이콘이 글자의 밑줄에 앉아 한 픽셀씩 내려가 보이던 것. 가운데가 맞아야 합니다.
+  await page.click('.trash-row')
+  await page.waitForSelector('.trash-view', { timeout: 5000 })
+  const iconAt = await page.evaluate(() => {
+    const button = document.querySelector('.trash-head .btn')
+    const icon = button.querySelector('.icon')
+    const one = button.getBoundingClientRect()
+    const other = icon.getBoundingClientRect()
+    return Math.round(Math.abs((one.top + one.bottom) / 2 - (other.top + other.bottom) / 2))
+  })
+  console.log('  아이콘과 단추의 가운데 차이: ' + iconAt)
+  expect('아이콘이 글자와 가운데를 맞춤', iconAt <= 1, String(iconAt))
   await page.click('.trash-row')
   await page.waitForSelector('.trash-view', { timeout: 5000 })
   const shown = await listed()

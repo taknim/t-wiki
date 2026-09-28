@@ -18,6 +18,11 @@ interface ImageEditorProps {
 
 type Natural = { width: number; height: number }
 
+/** 이 두께 안으로 들어오면 저절로 굴러가기 시작합니다. */
+const EDGE_ZONE = 56
+/** 한 프레임에 굴러가는 최대 거리. 가장자리에 가까울수록 이만큼까지 빨라집니다. */
+const EDGE_SPEED = 18
+
 /**
  * 그림 수정 화면.
  *
@@ -43,8 +48,12 @@ export function ImageEditor({ root, path, onSave, onCancel }: ImageEditorProps) 
   const [name, setName] = useState(() => outputName(path, 'png'))
   const [zoom, setZoom] = useState(1)
 
+  const stage = useRef<HTMLDivElement>(null)
   const shown = useRef<HTMLImageElement>(null)
   const dragFrom = useRef<{ x: number; y: number } | null>(null)
+  /** 끄는 동안의 마지막 손가락 자리(화면 좌표). 저절로 굴릴 때 다시 씁니다. */
+  const dragAt = useRef<{ x: number; y: number } | null>(null)
+  const rolling = useRef(0)
 
   useEffect(() => {
     let alive = true
@@ -117,17 +126,11 @@ export function ImageEditor({ root, path, onSave, onCancel }: ImageEditorProps) 
     }
   }
 
-  const onDown = (event: React.PointerEvent) => {
-    if (!natural) return
-    const at = pointAt(event)
-    if (!at) return
-    dragFrom.current = at
-    event.currentTarget.setPointerCapture(event.pointerId)
-  }
-  const onMove = (event: React.PointerEvent) => {
+  /** 지금 손가락 자리까지를 고른 자리로 삼습니다. 굴러가는 동안에도 같은 셈을 씁니다. */
+  const dragTo = (where: { clientX: number; clientY: number }) => {
     const from = dragFrom.current
     if (!from || !natural) return
-    const to = pointAt(event)
+    const to = pointAt(where)
     if (!to) return
     applyCrop(clampCrop({
       x: Math.min(from.x, to.x),
@@ -136,9 +139,71 @@ export function ImageEditor({ root, path, onSave, onCancel }: ImageEditorProps) 
       height: Math.abs(to.y - from.y),
     }, natural))
   }
+
+  /*
+   * 칸 가장자리까지 끌고 가면 저절로 굴러갑니다.
+   *
+   * 크게 키워 놓으면 그림이 칸보다 커서, 화면에 보이는 데까지만 고를 수 있었습니다.
+   * 잡은 손으로는 굴림대를 만질 수 없고 놓으면 거기서 끝나므로, 끌고 있는 동안 칸을
+   * 대신 굴려 줍니다. 손가락을 멈춰 두어도 이어지도록 프레임마다 다시 봅니다.
+   */
+  const rollNearEdge = () => {
+    const box = stage.current
+    const at = dragAt.current
+    if (!box || !at || !dragFrom.current) {
+      rolling.current = 0
+      return
+    }
+    const view = box.getBoundingClientRect()
+    const reach = (gap: number) => Math.ceil(EDGE_SPEED * (1 - Math.max(gap, 0) / EDGE_ZONE))
+    const left = at.x - view.left
+    const right = view.right - at.x
+    const top = at.y - view.top
+    const bottom = view.bottom - at.y
+
+    let dx = 0
+    let dy = 0
+    if (left < EDGE_ZONE) dx = -reach(left)
+    else if (right < EDGE_ZONE) dx = reach(right)
+    if (top < EDGE_ZONE) dy = -reach(top)
+    else if (bottom < EDGE_ZONE) dy = reach(bottom)
+
+    if (dx !== 0 || dy !== 0) {
+      box.scrollLeft += dx
+      box.scrollTop += dy
+      // 칸이 움직였으니 같은 손가락 자리라도 그림에서는 다른 곳입니다. 다시 셉니다.
+      dragTo({ clientX: at.x, clientY: at.y })
+    }
+    rolling.current = requestAnimationFrame(rollNearEdge)
+  }
+
+  const stopRolling = () => {
+    if (rolling.current) cancelAnimationFrame(rolling.current)
+    rolling.current = 0
+  }
+
+  const onDown = (event: React.PointerEvent) => {
+    if (!natural) return
+    const at = pointAt(event)
+    if (!at) return
+    dragFrom.current = at
+    dragAt.current = { x: event.clientX, y: event.clientY }
+    event.currentTarget.setPointerCapture(event.pointerId)
+    if (!rolling.current) rolling.current = requestAnimationFrame(rollNearEdge)
+  }
+  const onMove = (event: React.PointerEvent) => {
+    if (!dragFrom.current) return
+    dragAt.current = { x: event.clientX, y: event.clientY }
+    dragTo(event)
+  }
   const onUp = () => {
     dragFrom.current = null
+    dragAt.current = null
+    stopRolling()
   }
+
+  // 창을 떠날 때도 돌던 것을 세웁니다. 남겨 두면 없는 칸을 굴리려 듭니다.
+  useEffect(() => stopRolling, [])
 
   const save = useCallback(async () => {
     if (!source || !natural) return
@@ -166,7 +231,7 @@ export function ImageEditor({ root, path, onSave, onCancel }: ImageEditorProps) 
 
   return (
     <div className="image-edit">
-      <div className="image-edit-stage">
+      <div className="image-edit-stage" ref={stage}>
         <div className="image-edit-canvas" style={natural ? { width: natural.width * zoom } : undefined}>
           {url && (
             <div

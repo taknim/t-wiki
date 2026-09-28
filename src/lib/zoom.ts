@@ -50,7 +50,7 @@ export async function askZoomPercent(
   ask: (options: {
     title: string
     label: string
-    fields: { id: string; label: string; value: number; min: number; max?: number }[]
+    fields: { id: string; label: string; value: number; min: number; max?: number; suffix?: string }[]
     confirmText?: string
   }) => Promise<Record<string, number> | null>,
   current: number,
@@ -58,7 +58,15 @@ export async function askZoomPercent(
   const answer = await ask({
     title: '배율 정하기',
     label: `${MIN_PERCENT} 에서 ${MAX_PERCENT} 사이로 적습니다. 그 밖의 값은 가까운 끝으로 맞춥니다.`,
-    fields: [{ id: 'percent', label: '%', value: clampPercent(Math.round(current * 100)), min: MIN_PERCENT, max: MAX_PERCENT }],
+    // 이름은 창 이름으로 갈음하고 단위만 칸 뒤에 붙입니다. "배율" 을 두 번 적을 까닭이 없습니다.
+    fields: [{
+      id: 'percent',
+      label: '',
+      suffix: '%',
+      value: clampPercent(Math.round(current * 100)),
+      min: MIN_PERCENT,
+      max: MAX_PERCENT,
+    }],
     confirmText: '맞추기',
   })
   return answer ? clampPercent(answer.percent) / 100 : null

@@ -85,6 +85,11 @@ button, input, select, textarea { font: inherit; color: inherit; }
   cursor: pointer;
   white-space: nowrap;
 }
+/*
+ * 아이콘을 품은 단추는 글자와 가운데를 맞춥니다. 그냥 두면 그림이 글자의 밑줄에 앉아
+ * 한 픽셀씩 내려가 보입니다(휴지통 비우기에서 눈에 띄었습니다).
+ */
+.btn:has(.icon) { display: inline-flex; align-items: center; gap: 5px; }
 .btn:hover:not(:disabled) { background: var(--bg-sunken); }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 /* 채워진 버튼은 투명도로 흐리면 흰 글자가 사라집니다. 배경을 죽이고 글자는 남깁니다. */
@@ -934,6 +939,9 @@ mark { background: var(--mark); color: inherit; border-radius: 2px; }
 .dialog-fields { display: flex; gap: 12px; }
 .dialog-field { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--text-muted); }
 .dialog-field .dialog-input { width: 7em; }
+/* 칸과 단위는 한 줄에 섭니다. */
+.dialog-field-row { display: flex; align-items: center; gap: 6px; }
+.dialog-field-suffix { font-size: 13px; color: var(--text-muted); }
 
 .sheet {
   width: min(720px, 100%);
@@ -2313,10 +2321,18 @@ button.info-caret:focus-visible { outline: 2px solid var(--accent); outline-offs
   padding: 16px;
   background: var(--bg-sunken);
   display: flex;
-  align-items: flex-start;
-  justify-content: center;
+  /* 칸보다 작으면 가운데에, 커지면 처음부터 보이게(safe). 굴려서 끝까지 닿아야 합니다. */
+  align-items: safe center;
+  justify-content: safe center;
+  /* 끄는 동안 브라우저가 화면을 밀지 않도록 막습니다. 저절로 굴리는 것은 우리가 합니다. */
+  touch-action: none;
 }
-.image-edit-canvas { flex: none; max-width: 100%; }
+/*
+ * 그림을 담는 칸. **폭을 묶지 않습니다.**
+ * 100% 로 묶어 두었더니 칸 너비에 닿는 순간 더 키워지지 않아, 크게 보며 고를 수가
+ * 없었습니다. 넘치면 칸이 가로로 굴러가면 됩니다.
+ */
+.image-edit-canvas { flex: none; }
 .image-edit-frame {
   position: relative;
   line-height: 0;
