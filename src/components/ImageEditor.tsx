@@ -64,6 +64,10 @@ export function ImageEditor({ root, path, onSave, onCancel }: ImageEditorProps) 
   const panFrom = useRef<{ x: number; y: number; left: number; top: number } | null>(null)
   /** 손이 그림 칸 위에 있는지. 스페이스를 가로챌지 가리는 잣대입니다. */
   const overStage = useRef(false)
+  /** 고른 자리를 통째로 옮기는 중. 잡은 자리와 그때의 자리를 들고 있습니다. */
+  const moveFrom = useRef<{ x: number; y: number; crop: Crop } | null>(null)
+  /** 손이 고른 자리 안에 있는지. 손 모양을 바꿔 옮길 수 있다고 알립니다. */
+  const [inside, setInside] = useState(false)
 
   const stage = useRef<HTMLDivElement>(null)
   const shown = useRef<HTMLImageElement>(null)
@@ -76,6 +80,8 @@ export function ImageEditor({ root, path, onSave, onCancel }: ImageEditorProps) 
   /** 끄는 동안의 마지막 손가락 자리(화면 좌표). 저절로 굴릴 때 다시 씁니다. */
   const dragAt = useRef<{ x: number; y: number } | null>(null)
   const rolling = useRef(0)
+  /** 이번에 누른 뒤 손이 움직였는지. 움직이지 않았으면 고르려던 것이 아니라 그냥 누른 것입니다. */
+  const dragMoved = useRef(false)
   /*
    * 손가락 옆에 따라다니는 쪽지. 고르기 전에는 그림에서 어디를 짚고 있는지(x, y),
    * 고르는 중에는 얼마나 골랐는지(너비 × 높이)를 적습니다. 잘라내기는 픽셀 단위로 맞추는
@@ -230,6 +236,22 @@ export function ImageEditor({ root, path, onSave, onCancel }: ImageEditorProps) 
 
   /** 지금 손가락 자리까지를 고른 자리로 삼습니다. 굴러가는 동안에도 같은 셈을 씁니다. */
   const dragTo = (where: { clientX: number; clientY: number }) => {
+    // 옮기는 중이면 크기는 그대로 두고 자리만 밀어 줍니다. 그림 밖으로는 나가지 않습니다.
+    const moving = moveFrom.current
+    if (moving && natural) {
+      const to = pointAt(where)
+      if (!to) return
+      const next = {
+        x: Math.min(Math.max(moving.crop.x + (to.x - moving.x), 0), natural.width - moving.crop.width),
+        y: Math.min(Math.max(moving.crop.y + (to.y - moving.y), 0), natural.height - moving.crop.height),
+        width: moving.crop.width,
+        height: moving.crop.height,
+      }
+      setCrop(next)
+      showReadout(where, `${next.x}, ${next.y}`)
+      return
+    }
+
     const from = dragFrom.current
     if (!from || !natural) return
     const to = pointAt(where)
@@ -256,7 +278,7 @@ export function ImageEditor({ root, path, onSave, onCancel }: ImageEditorProps) 
   const rollNearEdge = () => {
     const box = stage.current
     const at = dragAt.current
-    if (!box || !at || !dragFrom.current) {
+    if (!box || !at || (!dragFrom.current && !moveFrom.current)) {
       rolling.current = 0
       return
     }
@@ -297,6 +319,12 @@ export function ImageEditor({ root, path, onSave, onCancel }: ImageEditorProps) 
    */
   const isPicking = (event: React.PointerEvent) => event.button === 0 && event.isPrimary
 
+  /** 그 자리가 고른 칸 안인지. */
+  const within = (at: { x: number; y: number } | null) =>
+    at !== null && crop !== null
+    && at.x >= crop.x && at.x <= crop.x + crop.width
+    && at.y >= crop.y && at.y <= crop.y + crop.height
+
   const onDown = (event: React.PointerEvent) => {
     if (!natural || !isPicking(event)) return
     if (panning) {
@@ -308,7 +336,24 @@ export function ImageEditor({ root, path, onSave, onCancel }: ImageEditorProps) 
     }
     const at = pointAt(event)
     if (!at) return
+
+    /*
+     * 고른 칸 안을 누르면 그 자리를 통째로 옮깁니다.
+     *
+     * 크기는 맞는데 자리만 조금 어긋나는 일이 잦습니다. 그때마다 다시 고르게 하면
+     * 크기를 또 맞춰야 합니다. 안쪽은 옮기는 자리, 테두리는 늘이는 자리, 바깥은 새로
+     * 고르는 자리 — 그림 다루는 프로그램들이 쓰는 갈래를 그대로 따릅니다.
+     */
+    if (crop && within(at)) {
+      moveFrom.current = { x: at.x, y: at.y, crop }
+      dragAt.current = { x: event.clientX, y: event.clientY }
+      event.currentTarget.setPointerCapture(event.pointerId)
+      if (!rolling.current) rolling.current = requestAnimationFrame(rollNearEdge)
+      return
+    }
+
     // 새로 고르는 길. 누른 곳이 붙박이가 되고 두 축이 모두 움직입니다.
+    dragMoved.current = false
     dragFrom.current = at
     dragAxes.current = { x: true, y: true }
     dragBase.current = null
@@ -357,7 +402,9 @@ export function ImageEditor({ root, path, onSave, onCancel }: ImageEditorProps) 
       box.scrollTop = from.top - (event.clientY - from.y)
       return
     }
-    if (dragFrom.current) {
+    // 새로 고르는 중이거나 고른 자리를 옮기는 중. 둘 다 dragTo 가 갈라 다룹니다.
+    if (dragFrom.current || moveFrom.current) {
+      dragMoved.current = true
       dragAt.current = { x: event.clientX, y: event.clientY }
       dragTo(event)
       return
@@ -367,20 +414,30 @@ export function ImageEditor({ root, path, onSave, onCancel }: ImageEditorProps) 
       setReadout(null)
       return
     }
-    // 아직 고르기 전. 그림에서 어디를 짚고 있는지 적습니다.
+    // 아직 고르기 전. 그림에서 어디를 짚고 있는지 적고, 안쪽이면 옮길 수 있다고 알립니다.
     const at = pointAt(event)
+    setInside(within(at))
     if (at && natural) showReadout(event, `${at.x}, ${at.y}`)
   }
   const onUp = () => {
+    /*
+     * 바깥을 그냥 눌렀다 뗀 것은 "고르기를 그만두겠다" 는 뜻입니다.
+     * 새로 고르는 길로 들어왔는데 손이 움직이지 않았으면 고른 자리를 지웁니다.
+     * (끌었다면 새로 고른 것이므로 그대로 둡니다.)
+     */
+    if (dragFrom.current && !dragBase.current && !dragMoved.current && crop) applyCrop(null)
     dragFrom.current = null
     dragBase.current = null
     dragAt.current = null
     panFrom.current = null
+    moveFrom.current = null
     stopRolling()
   }
   const onLeave = () => {
     // 끌고 있는 중이면 칸 밖으로 나가도 쪽지를 지우지 않습니다. 저절로 굴러가는 중입니다.
-    if (!dragFrom.current) setReadout(null)
+    if (dragFrom.current || moveFrom.current) return
+    setReadout(null)
+    setInside(false)
   }
 
   // 창을 떠날 때도 돌던 것을 세웁니다. 남겨 두면 없는 칸을 굴리려 듭니다.
@@ -421,7 +478,7 @@ export function ImageEditor({ root, path, onSave, onCancel }: ImageEditorProps) 
         <div className="image-edit-canvas" style={natural ? { width: natural.width * zoom } : undefined}>
           {url && (
             <div
-              className={panning ? 'image-edit-frame is-panning' : 'image-edit-frame'}
+              className={`image-edit-frame${panning ? ' is-panning' : ''}${inside ? ' is-inside' : ''}`}
               onPointerDown={onDown}
               onPointerMove={onMove}
               onPointerUp={onUp}

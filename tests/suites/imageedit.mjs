@@ -430,6 +430,58 @@ try {
   console.log('  왼쪽 변 안으로: ' + JSON.stringify(narrowed))
   expect('안으로 밀면 줄어듦', narrowed.width < bigger.width && narrowed.height === bigger.height,
     JSON.stringify(narrowed))
+  /*
+   * 크기는 맞는데 자리만 조금 어긋나는 일이 잦습니다. 안쪽을 잡으면 크기를 그대로 두고
+   * 자리만 옮기고, 바깥을 그냥 누르면 고르기를 그만둡니다.
+   */
+  const spot = () => page.evaluate(() => {
+    const mark = document.querySelector('.image-edit-crop')
+    const frame = document.querySelector('.image-edit-frame').getBoundingClientRect()
+    if (!mark) return null
+    const at = mark.getBoundingClientRect()
+    return { left: Math.round(at.left - frame.left), top: Math.round(at.top - frame.top),
+      width: Math.round(at.width), height: Math.round(at.height) }
+  })
+  // 앞 걸음에서 키우고 옮겨 두었으므로 1:1 · 처음 자리로 돌려놓고 잽니다.
+  await page.click('.image-edit .zoom-control button[aria-label="원본 크기"]')
+  await page.evaluate(() => {
+    const box = document.querySelector('.image-edit-stage')
+    box.scrollLeft = 0
+    box.scrollTop = 0
+  })
+  await page.waitForTimeout(300)
+  const frameBox = await page.locator('.image-edit-frame img').boundingBox()
+  const wasAt = await spot()
+  await page.mouse.move(frameBox.x + wasAt.left + wasAt.width / 2, frameBox.y + wasAt.top + wasAt.height / 2)
+  await page.waitForTimeout(200)
+  const cursorInside = await page.evaluate(() =>
+    getComputedStyle(document.querySelector('.image-edit-frame')).cursor)
+  expect('안쪽에서는 옮기는 손 모양', cursorInside === 'move', cursorInside)
+  await page.mouse.down()
+  await page.mouse.move(frameBox.x + wasAt.left + wasAt.width / 2 + 40,
+    frameBox.y + wasAt.top + wasAt.height / 2 + 30, { steps: 6 })
+  await page.mouse.up()
+  await page.waitForTimeout(300)
+  const nowAt = await spot()
+  console.log('  옮기기: ' + JSON.stringify({ wasAt, nowAt }))
+  expect('안쪽을 끌면 자리가 옮겨짐', nowAt.left > wasAt.left && nowAt.top > wasAt.top,
+    JSON.stringify({ wasAt, nowAt }))
+  expect('크기는 그대로', nowAt.width === wasAt.width && nowAt.height === wasAt.height,
+    JSON.stringify({ wasAt, nowAt }))
+  // 바깥을 그냥 누르면 고른 자리가 풀립니다(끌면 새로 고르는 것이라 그대로 둡니다).
+  await page.mouse.move(frameBox.x + 8, frameBox.y + frameBox.height - 8)
+  await page.waitForTimeout(150)
+  await page.mouse.down()
+  await page.mouse.up()
+  await page.waitForTimeout(300)
+  expect('바깥을 누르면 풀림', (await spot()) === null, JSON.stringify(await spot()))
+  // 다시 하나 골라 두고 아래 걸음으로 넘어갑니다.
+  await page.mouse.move(frameBox.x + 60, frameBox.y + 40)
+  await page.mouse.down()
+  await page.mouse.move(frameBox.x + 160, frameBox.y + 120, { steps: 6 })
+  await page.mouse.up()
+  await page.waitForTimeout(300)
+
   // 지우면 고른 자리가 없어지고 그림 전체 크기로 돌아옵니다.
   /*
    * 크게 키워 놓으면 굴림대를 잡아 옮겨야 하는데, 그림 위에서는 끌기가 곧 고르기라
@@ -478,7 +530,9 @@ try {
   // 세로로는 다 들어와 굴릴 것이 없을 수 있습니다. 굴릴 것이 있는 축만 봅니다.
   expect('끌면 그림이 옮겨짐', moved.굴린자리[0] > beforePan.굴린자리[0],
     JSON.stringify({ beforePan, moved }))
-  expect('떼면 다시 고르는 손 모양', moved.손모양 === 'crosshair', JSON.stringify(moved))
+  // 고른 칸 안이면 옮기는 손 모양일 수 있습니다. 옮기는 자리가 아니게 된 것만 봅니다.
+  expect('떼면 옮기는 손 모양이 걷힘', moved.손모양 !== 'grab' && moved.손모양 !== 'grabbing',
+    JSON.stringify(moved))
   // 옮기는 동안 고른 자리는 건드리지 않습니다.
   expect('고른 자리는 그대로', JSON.stringify(await box()) === JSON.stringify(held),
     JSON.stringify([held, await box()]))
