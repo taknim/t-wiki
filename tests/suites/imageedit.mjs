@@ -157,14 +157,14 @@ try {
   expect('1 은 원본 크기', (await zoomed()).잰 === 100, JSON.stringify(await zoomed()))
   await page.keyboard.press('Equal')
   await page.waitForTimeout(300)
-  expect('= 는 확대', (await zoomed()).잰 === 150, JSON.stringify(await zoomed()))
+  expect('= 는 확대', (await zoomed()).잰 === 125, JSON.stringify(await zoomed()))
   // ＋ 는 ⇧= 로 누릅니다. 어느 쪽으로 눌러도 같은 일이어야 합니다.
   await page.keyboard.press('Shift+Equal')
   await page.waitForTimeout(300)
-  expect('＋(⇧=) 도 확대', (await zoomed()).잰 === 200, JSON.stringify(await zoomed()))
+  expect('＋(⇧=) 도 확대', (await zoomed()).잰 === 150, JSON.stringify(await zoomed()))
   await page.keyboard.press('Minus')
   await page.waitForTimeout(300)
-  expect('− 는 축소', (await zoomed()).잰 === 150, JSON.stringify(await zoomed()))
+  expect('− 는 축소', (await zoomed()).잰 === 125, JSON.stringify(await zoomed()))
   await page.keyboard.press('Digit0')
   await page.waitForTimeout(300)
   expect('0 은 화면 맞춤', (await zoomed()).잰 === fit.잰, JSON.stringify(await zoomed()))
@@ -207,14 +207,14 @@ try {
     await page.inputValue('#image-height'))
   await page.screenshot({ path: join(HERE, '..', 'shots', 'imageedit', '01-edit.png') })
   await saveEdit()
-  const smaller = await madeFile('사진 (고침).png')
+  const smaller = await madeFile('사진_modified.png')
   console.log('  ' + JSON.stringify(smaller))
   expect('절반 크기 PNG 가 나옴', smaller?.kind === 'png' && smaller.size.width === 150 && smaller.size.height === 100,
     JSON.stringify(smaller))
   // 원본은 그대로 둡니다. 고친 것은 되돌릴 수 없습니다.
   const kept = await madeFile('사진.png')
   expect('원본은 그대로', kept?.size.width === 300 && kept.size.height === 200, JSON.stringify(kept))
-  expect('만든 것을 곧바로 엶', (await page.textContent('.doc-head h1')) === '사진 (고침).png',
+  expect('만든 것을 곧바로 엶', (await page.textContent('.doc-head h1')) === '사진_modified.png',
     await page.textContent('.doc-head h1'))
 
   step('5. 끌어서 자른 만큼만 나온다')
@@ -271,11 +271,11 @@ try {
   await openEditor()
   await page.click('.image-edit .segmented button:has-text("JPG")')
   await page.waitForTimeout(200)
-  expect('이름이 jpg 로 바뀜', (await page.inputValue('.image-edit input[aria-label="파일 이름"]')) === '사진 (고침).jpg',
+  expect('이름이 jpg 로 바뀜', (await page.inputValue('.image-edit input[aria-label="파일 이름"]')) === '사진_modified.jpg',
     await page.inputValue('.image-edit input[aria-label="파일 이름"]'))
   expect('품질 자리가 나옴', (await page.locator('#image-quality').count()) === 1)
   await saveEdit()
-  const jpg = await madeFile('사진 (고침).jpg')
+  const jpg = await madeFile('사진_modified.jpg')
   console.log('  ' + JSON.stringify(jpg))
   expect('JPG 로 나옴', jpg?.kind === 'jpg', JSON.stringify(jpg))
   expect('크기는 그대로', jpg?.size.width === 300 && jpg.size.height === 200, JSON.stringify(jpg))
@@ -284,7 +284,7 @@ try {
    * 오른쪽 절반(투명하던 자리)의 색을 찍어 봅니다.
    */
   const corner = await page.evaluate(async () => {
-    const blob = window.__mockRoot._children.get('사진 (고침).jpg')._data
+    const blob = window.__mockRoot._children.get('사진_modified.jpg')._data
     const bitmap = await createImageBitmap(blob)
     const canvas = document.createElement('canvas')
     canvas.width = bitmap.width

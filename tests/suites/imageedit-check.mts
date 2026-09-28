@@ -46,15 +46,19 @@ same('두 배로 늘리면 높이도 두 배', keepRatio(600, 300, 200), 400)
 same('아주 작게 줄여도 1 아래로는 안 감', keepRatio(1, 300, 200), 1)
 
 console.log('\n>>> 4. 새 이름은 확장자를 갈고 원본을 덮지 않는다')
-same('png 를 jpg 로', outputName('사진.png', 'jpeg'), '사진 (고침).jpg')
-same('jpg 를 png 로', outputName('자료/사진.jpg', 'png'), '사진 (고침).png')
-same('확장자가 없어도', outputName('사진', 'png'), '사진 (고침).png')
-same('점이 여럿이어도 마지막만', outputName('a.b.c.png', 'png'), 'a.b.c (고침).png')
+same('png 를 jpg 로', outputName('사진.png', 'jpeg'), '사진_modified.jpg')
+same('jpg 를 png 로', outputName('자료/사진.jpg', 'png'), '사진_modified.png')
+same('확장자가 없어도', outputName('사진', 'png'), '사진_modified.png')
+same('점이 여럿이어도 마지막만', outputName('a.b.c.png', 'png'), 'a.b.c_modified.png')
 expect('원본 이름과 같지 않음', outputName('사진.png', 'png') !== '사진.png')
 
-console.log('\n>>> 5. 보기 배율은 지금 값에서 한 걸음씩 옮긴다')
-same('눈금 위에서 한 걸음 위로', stepZoom(1, 1), 1.5)
+console.log('\n>>> 5. 보기 배율은 지금 값에서 25% 씩 오르내린다')
+same('눈금 위에서 한 걸음 위로', stepZoom(1, 1), 1.25)
 same('눈금 위에서 한 걸음 아래로', stepZoom(1, -1), 0.75)
+// 아주 큰 그림은 25% 로도 한 화면에 들지 않습니다. 맨 아래만 10% 를 따로 둡니다.
+same('맨 아래는 10%', stepZoom(0.25, -1), 0.1)
+same('10% 에서 올라가면 25%', stepZoom(0.1, 1), 0.25)
+expect('400% 까지 커짐', ZOOMS[ZOOMS.length - 1] === 4, String(ZOOMS[ZOOMS.length - 1]))
 /*
  * 화면 맞춤은 칸에 따라 37% 처럼 어중간한 값이 됩니다. 표에서 자리를 못 찾아 100% 부터
  * 세었더니, 크게 보기를 눌렀는데 오히려 150% 로 건너뛰었습니다.
@@ -62,9 +66,9 @@ same('눈금 위에서 한 걸음 아래로', stepZoom(1, -1), 0.75)
 same('어중간한 값에서 위로는 바로 위 눈금', stepZoom(0.37, 1), 0.5)
 same('어중간한 값에서 아래로는 바로 아래 눈금', stepZoom(0.37, -1), 0.25)
 same('맨 위에서 더 눌러도 그대로', stepZoom(4, 1), ZOOMS[ZOOMS.length - 1])
-same('맨 아래에서 더 눌러도 그대로', stepZoom(0.25, -1), ZOOMS[0])
+same('맨 아래에서 더 눌러도 그대로', stepZoom(0.1, -1), ZOOMS[0])
 // 재서 나온 값은 소수점 아래가 지저분합니다. 100.2% 는 100% 로 봐야 150% 로 갑니다.
-same('재다 생긴 티끌은 같은 값으로', stepZoom(1.002, 1), 1.5)
+same('재다 생긴 티끌은 같은 값으로', stepZoom(1.002, 1), 1.25)
 
 console.log('\n' + (problems ? `FAIL ${problems}건` : '모두 통과'))
 if (problems) process.exitCode = 1

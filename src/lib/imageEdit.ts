@@ -71,9 +71,11 @@ export function keepRatio(side: number, from: number, to: number): number {
 
 /**
  * 내놓을 파일 이름. 확장자를 고른 형식으로 갈고, 원본을 덮지 않도록 꼬리말을 붙입니다.
- * (같은 이름이 이미 있으면 파일을 넣는 쪽에서 번호를 붙입니다.)
+ * 꼬리말은 빈칸도 괄호도 없는 `_modified` 입니다 — 웹에 올리거나 명령줄에서 다룰 때
+ * 빈칸과 괄호는 따옴표로 감싸야 하고, 주소에서는 `%20` 으로 바뀌어 읽기 어렵습니다.
+ * (같은 이름이 이미 있으면 덮을지 묻습니다.)
  */
-export function outputName(path: string, format: ImageFormat, suffix = ' (고침)'): string {
+export function outputName(path: string, format: ImageFormat, suffix = '_modified'): string {
   const name = path.split('/').pop() ?? path
   const at = name.lastIndexOf('.')
   const stem = at === -1 ? name : name.slice(0, at)
