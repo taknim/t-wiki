@@ -3,7 +3,7 @@ import type { AssetIndex, DocIndex, VaultNode } from '../types'
 import {
   attachmentKind, extensionOf, isAddable, isMarkdown, isSyncable, MAX_ATTACHMENT_BYTES,
 } from '../lib/attachments'
-import { clearAssetCache } from '../lib/assets'
+import { clearAssetCache, forgetAsset } from '../lib/assets'
 import { clearTextIndex } from '../lib/textIndex'
 import * as fs from '../lib/fsAccess'
 import { clearVaultHandle, loadVaultHandle, saveVaultHandle } from '../lib/store'
@@ -41,6 +41,8 @@ export interface Vault {
   move: (path: string, targetDir: string, overwrite?: boolean) => Promise<string>
   remove: (path: string) => Promise<void>
   addFiles: (dirPath: string, files: File[]) => Promise<AddResult>
+  /** 그 자리에 그대로 씁니다. 이미 있으면 덮습니다 — 부르는 쪽에서 먼저 물어야 합니다. */
+  putFile: (path: string, blob: Blob) => Promise<void>
   /** 휴지통에 든 것. 최근에 지운 것이 앞입니다. */
   trash: TrashItem[]
   /** 지우는 대신 휴지통으로 옮깁니다. */
@@ -429,6 +431,17 @@ export function useVault(): Vault {
    * 고른 파일을 폴더에 넣습니다.
    * 같은 이름이 있으면 덮지 않고 뒤에 번호를 붙입니다. 실수로 원본을 잃지 않도록.
    */
+  const putFile = useCallback(
+    async (path: string, blob: Blob) => {
+      const root = requireRoot()
+      await fs.writeBinaryFile(root, path, blob)
+      // 문서 안에 끼워 넣은 그림은 캐시를 보고 그립니다. 잊지 않으면 옛 그림이 그대로 남습니다.
+      forgetAsset(path)
+      await refresh()
+    },
+    [refresh, requireRoot],
+  )
+
   const addFiles = useCallback(
     async (dirPath: string, files: File[]): Promise<AddResult> => {
       const root = requireRoot()
@@ -482,6 +495,7 @@ export function useVault(): Vault {
     move,
     remove,
     addFiles,
+    putFile,
   }
 }
 

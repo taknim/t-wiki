@@ -33,7 +33,23 @@ let currentResolver: LinkResolver = () => null
 let currentSlugs = new Map<string, number>()
 
 const HEADING_LINE = /^(#{1,6})\s+(.+?)\s*#*\s*$/
-const FENCE_LINE = /^\s*(```|~~~)/
+const FENCE_LINE = /^\s*(`{3,}|~{3,})/
+
+/**
+ * 코드 울타리를 여닫습니다. 열어 둔 표시(`fence`)를 받아 새 표시를 돌려줍니다.
+ *
+ * 그냥 뒤집기만 했더니 울타리 안의 울타리에서 어긋났습니다. 코드 블록 쓰는 법을 글로
+ * 보이려면 바깥을 백틱 넷으로 두르고 안에 셋을 적는데, 안쪽 셋을 닫는 것으로 세어
+ * 그 뒤가 통째로 밀렸습니다 — 목차에 엉뚱한 제목이 들거나 빠지고, 할 일 네모도 어긋납니다.
+ * 규격대로 **같은 글자에 길이가 같거나 더 긴 울타리**만 닫는 것으로 봅니다.
+ */
+function nextFence(line: string, fence: string | null): string | null | undefined {
+  const match = FENCE_LINE.exec(line)
+  if (!match) return undefined
+  const mark = match[1]
+  if (fence === null) return mark
+  return mark[0] === fence[0] && mark.length >= fence.length ? null : fence
+}
 
 function escapeHtml(value: string): string {
   return value
@@ -64,7 +80,7 @@ function slugify(text: string, seenCounts: Map<string, number>): string {
 export function extractHeadings(markdown: string): Heading[] {
   const seenCounts = new Map<string, number>()
   const headings: Heading[] = []
-  let inFence = false
+  let fence: string | null = null
   // 줄 바꿈까지 세어 가며 글자 자리를 붙듭니다. 편집기로 뛰어갈 때 이 자리를 씁니다.
   let offset = 0
 
@@ -74,11 +90,12 @@ export function extractHeadings(markdown: string): Heading[] {
     const at = offset
     offset += raw.length + 1
 
-    if (FENCE_LINE.test(line)) {
-      inFence = !inFence
+    const fenced = nextFence(line, fence)
+    if (fenced !== undefined) {
+      fence = fenced
       continue
     }
-    if (inFence) continue
+    if (fence !== null) continue
 
     const match = HEADING_LINE.exec(line)
     if (!match) continue
@@ -104,18 +121,19 @@ const TASK_LINE = /^(\s*(?:>\s*)*(?:[-*+]|\d+[.)])\s+\[)([ xX])(\])/
  */
 export function toggleTask(markdown: string, index: number): string | null {
   const lines = markdown.split('\n')
-  let inFence = false
+  let fence: string | null = null
   let at = 0
 
   for (let where = 0; where < lines.length; where += 1) {
     const raw = lines[where]
     const line = raw.endsWith('\r') ? raw.slice(0, -1) : raw
 
-    if (FENCE_LINE.test(line)) {
-      inFence = !inFence
+    const fenced = nextFence(line, fence)
+    if (fenced !== undefined) {
+      fence = fenced
       continue
     }
-    if (inFence) continue
+    if (fence !== null) continue
 
     const match = TASK_LINE.exec(line)
     if (!match) continue

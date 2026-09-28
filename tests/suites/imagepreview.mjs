@@ -239,7 +239,9 @@ try {
   console.log('  ' + JSON.stringify(marked))
   expect('그림에 테두리가 둘림', marked.outline !== '0px', JSON.stringify(marked))
   expect('밝은 테도 함께 둘림', marked.ring !== 'none', JSON.stringify(marked))
-  expect('크기가 픽셀로 적힘', /^\d+ × \d+px$/.test(marked.size ?? ''), String(marked.size))
+  // 형식을 앞에 달고 크기가 뒤따릅니다. PNG 냐 JPG 냐에 따라 투명·품질이 갈립니다.
+  expect('형식과 크기가 함께 적힘', /^(PNG|JPG|SVG|GIF|WEBP|AVIF|BMP|ICO) \d+ × \d+px$/.test(marked.size ?? ''),
+    String(marked.size))
   expect('오른쪽 위 구석에 있음', marked.corner === true, JSON.stringify(marked))
   // 줄지 않은 그림에까지 본디 크기를 적으면 같은 숫자가 두 번 적힙니다.
   expect('줄지 않았으면 본디 크기는 안 적음', marked.origin === null, String(marked.origin))
@@ -257,7 +259,7 @@ try {
   console.log('  ' + JSON.stringify(big))
   expect('본디 크기가 함께 적힘', /^원본 2000 × 500px · \d+%$/.test(big.origin ?? ''),
     String(big.origin))
-  expect('지금 크기는 그려진 그대로', big.now === `${big.width} × ${Math.round(big.width / 4)}px`,
+  expect('지금 크기는 그려진 그대로', big.now.endsWith(`${big.width} × ${Math.round(big.width / 4)}px`),
     `${big.now} vs ${big.width}`)
   expect('본디보다 작게 그려짐', big.width < big.natural, JSON.stringify(big))
   await page.screenshot({ path: join(HERE, '..', 'shots', 'imagepreview', '04-size.png'),

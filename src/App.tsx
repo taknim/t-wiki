@@ -12,13 +12,15 @@ import { Favorites } from './components/Favorites'
 import { SyncCountdown } from './components/SyncCountdown'
 import { ViewModeSwitch } from './components/ViewModeSwitch'
 import {
-  FolderIcon, GitHubIcon, MenuIcon, SettingsIcon, SidebarCloseIcon, SidebarOpenIcon, StarIcon, SyncIcon, XIcon,
+  FolderIcon, GitHubIcon, MenuIcon, PencilIcon, SettingsIcon, SidebarCloseIcon, SidebarOpenIcon,
+  StarIcon, SyncIcon, XIcon,
 } from './components/icons'
 import { TextPreview } from './components/TextPreview'
 import { SettingsPanel } from './components/SettingsPanel'
 import { SplitResizer } from './components/SplitResizer'
 import { BackdropSwitch } from './components/BackdropSwitch'
-import { ImageEditSheet } from './components/ImageEditSheet'
+import { ImageEditor } from './components/ImageEditor'
+import { ZoomControl } from './components/ZoomControl'
 import { SyncReportSheet } from './components/SyncReportSheet'
 import { SyncHistorySheet } from './components/SyncHistorySheet'
 import { TreeView } from './components/TreeView'
@@ -27,7 +29,7 @@ import { useGitHubSync } from './hooks/useGitHubSync'
 import { useTextIndex } from './hooks/useTextIndex'
 import { useVault } from './hooks/useVault'
 import {
-  ACCEPT_ATTRIBUTE, attachmentKind, formatBytes, isEditableText, isMarkdown,
+  ACCEPT_ATTRIBUTE, attachmentKind, formatBytes, isAddable, isEditableText, isMarkdown,
   MAX_ATTACHMENT_BYTES,
 } from './lib/attachments'
 import { extractHeadings, parseFrontmatter, toggleTask } from './lib/markdown'
@@ -109,8 +111,10 @@ export default function App() {
   const { settings: look, update: updateLook } = useTheme()
   /** 옮길 폴더를 고르는 창에 올라와 있는 것. 없으면 닫힘. */
   const [moving, setMoving] = useState<string | null>(null)
-  /** 고치는 중인 그림의 경로. 창을 띄우는 동안만 값이 있습니다. */
+  /** 고치는 중인 그림의 경로. 수정 화면을 띄우는 동안만 값이 있습니다. */
   const [editingImage, setEditingImage] = useState<string | null>(null)
+  /** 그림을 볼 때의 배율. null 이면 화면에 맞춰 봅니다. */
+  const [imageZoom, setImageZoom] = useState<number | null>(null)
   const [reportOpen, setReportOpen] = useState(false)
   const [historyOpen, setHistoryOpen] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
@@ -439,6 +443,8 @@ export default function App() {
       setSelectedPath(path)
       setDraft(content)
       setDirty(false)
+      // 앞 그림의 배율이 다음 그림에 맞을 까닭이 없습니다. 볼 때마다 화면 맞춤에서 시작합니다.
+      setImageZoom(null)
     },
     [leaveDoc, report, vault.root],
   )
@@ -971,6 +977,55 @@ export default function App() {
     setCaret(caretAt(editor.value, editor.selectionStart))
   }, [caret, dialogs, flash])
 
+  /*
+   * 고친 그림을 씁니다.
+   *
+   * 같은 이름이 이미 있으면 **덮을지 먼저 묻습니다.** 덮으면 그 그림은 되돌릴 수 없고,
+   * 문서에 끼워 넣은 자리도 함께 바뀝니다. 물러서면 아무것도 쓰지 않고 수정 화면에 머뭅니다.
+   */
+  const saveEditedImage = useCallback(
+    async (from: string, name: string, blob: Blob) => {
+      const dir = from.split('/').slice(0, -1).join('/')
+      const target = dir ? `${dir}/${name}` : name
+      if (!isAddable(target)) {
+        flash('그 형식은 넣을 수 없습니다.')
+        return
+      }
+
+      try {
+        if (vault.assets.has(target) || vault.index.has(target)) {
+          const go = await dialogs.confirm({
+            title: '같은 이름이 이미 있습니다',
+            label: `"${displayPath(target)}" 을(를) 고친 그림으로 덮어씁니다.\n`
+              + '덮어쓰면 그 파일은 되돌릴 수 없고, 문서에 끼워 넣은 자리도 함께 바뀝니다.\n'
+              + '남겨 두려면 취소를 누르고 다른 이름으로 저장하세요.',
+            confirmText: '덮어쓰기',
+            danger: true,
+          })
+          if (!go) return
+          await vault.putFile(target, blob)
+          setEditingImage(null)
+          if (target !== selectedRef.current) await openAsset(target)
+          flash(`${fileNameOf(target)} 를 덮어썼습니다.`)
+          return
+        }
+
+        const made = await vault.addFiles(dir, [new File([blob], name, { type: blob.type })])
+        setEditingImage(null)
+        if (made.added.length === 0) {
+          flash('그 형식은 넣을 수 없습니다.')
+          return
+        }
+        // 만든 것을 곧바로 열어 줍니다. 무엇이 나왔는지 눈으로 봐야 다시 고칠지 정합니다.
+        await openAsset(made.added[0])
+        flash(`${fileNameOf(made.added[0])} 를 만들었습니다.`)
+      } catch (cause) {
+        report(cause)
+      }
+    },
+    [dialogs, flash, openAsset, report, vault],
+  )
+
   const handleNewDoc = useCallback(
     async (dirPath: string) => {
       const name = await dialogs.prompt({
@@ -1043,11 +1098,18 @@ export default function App() {
   useEffect(() => {
     sidebarOpenRef.current = sidebarOpen
   }, [sidebarOpen])
-  const shortcutRefs = useRef({ handleNewDoc, currentDir, textPreview, startSync, handleGoTo, look, hasDoc: false })
+  const shortcutRefs = useRef({
+    handleNewDoc, currentDir, textPreview, startSync, handleGoTo, look,
+    hasDoc: false, image: null as string | null,
+  })
   useEffect(() => {
     shortcutRefs.current = {
       handleNewDoc, currentDir, textPreview, startSync, handleGoTo, look,
       hasDoc: selectedPath !== null && (isMarkdown(selectedPath) || textPreview !== null),
+      // 그림을 보고 있을 때만. 미리보기를 꺼 두었으면 고칠 화면도 없습니다.
+      image: selectedPath !== null && attachmentKind(selectedPath) === 'image' && imagePreview
+        ? selectedPath
+        : null,
     }
   })
   useEffect(() => {
@@ -1059,7 +1121,10 @@ export default function App() {
       if (!id) return
       event.preventDefault()
 
-      const { handleNewDoc: newDoc, currentDir: dir, hasDoc, startSync: runSync, handleGoTo: goTo, look: shown } = shortcutRefs.current
+      const {
+        handleNewDoc: newDoc, currentDir: dir, hasDoc, startSync: runSync,
+        handleGoTo: goTo, look: shown, image,
+      } = shortcutRefs.current
       switch (id) {
         case 'search':
           if (!vault.tree) return
@@ -1070,7 +1135,15 @@ export default function App() {
         case 'new-doc':
           if (vault.tree) void newDoc(dir)
           return
+        /*
+         * 문서에서는 보기 모드를 돌리고, 그림에서는 수정 모드를 여닫습니다.
+         * 둘 다 "지금 보고 있는 것을 다르게 보는" 같은 일이라 한 글쇠에 둡니다.
+         */
         case 'view-mode':
+          if (image !== null) {
+            setEditingImage((open) => (open === image ? null : image))
+            return
+          }
           if (!hasDoc) return
           setViewMode((mode) => (mode === 'edit' ? 'split' : mode === 'split' ? 'preview' : 'edit'))
           return
@@ -1777,7 +1850,11 @@ export default function App() {
                 {editableText && (
                   <SaveState dirty={dirty} saving={saving} dueAt={saveDueAt} seconds={autoSave.seconds} onSave={() => void commit()} />
                 )}
-                {selection.kind !== 'dir' && !editableText && <span className="pill">읽기 전용</span>}
+                {selection.kind !== 'dir' && !editableText && (
+                  editingImage === selection.path
+                    ? <span className="pill pill-dirty">수정 모드</span>
+                    : <span className="pill">읽기 전용</span>
+                )}
                 {/*
                   앱이 쓰는 살림 파일입니다. 트리에는 감춰 두었지만 동기화 결과에서는
                   이름이 나오고, 그 이름을 눌러 여기까지 올 수 있습니다.
@@ -1791,17 +1868,26 @@ export default function App() {
                 {editableText && textPreview && (
                   <ViewModeSwitch mode={viewMode} onChange={setViewMode} />
                 )}
-                {selection.kind === 'image' && imagePreview && (
-                  <BackdropSwitch backdrop={imageBackdrop} onChange={applyImageBackdrop} />
+                {selection.kind === 'image' && imagePreview && editingImage !== selection.path && (
+                  <>
+                    <BackdropSwitch backdrop={imageBackdrop} onChange={applyImageBackdrop} />
+                    <ZoomControl
+                      zoom={imageZoom ?? 1}
+                      fitted={imageZoom === null}
+                      onZoom={setImageZoom}
+                      onFit={() => setImageZoom(null)}
+                    />
+                  </>
                 )}
-                {selection.kind === 'image' && (
+                {selection.kind === 'image' && imagePreview && editingImage !== selection.path && (
                   <button
                     type="button"
-                    className="btn btn-small doc-save"
-                    data-tip="형식을 바꾸거나 크기를 줄이거나 잘라 새 파일로 냅니다"
+                    className="btn btn-small head-edit"
+                    data-tip="형식을 바꾸거나 크기를 줄이거나 잘라 냅니다"
                     onClick={() => setEditingImage(selection.path)}
                   >
-                    고치기
+                    <PencilIcon />
+                    수정
                   </button>
                 )}
               </div>
@@ -1834,6 +1920,13 @@ export default function App() {
                     <TextPreview kind={textPreview} path={selection.path} text={draft} />
                   )}
                 </div>
+              ) : selection.kind === 'image' && editingImage === selection.path && vault.root ? (
+                <ImageEditor
+                  root={vault.root}
+                  path={selection.path}
+                  onCancel={() => setEditingImage(null)}
+                  onSave={(name, blob) => saveEditedImage(selection.path, name, blob)}
+                />
               ) : selection.kind !== 'dir' && vault.root ? (
                 <AssetView
                   root={vault.root}
@@ -1842,6 +1935,8 @@ export default function App() {
                   imagePreview={imagePreview}
                   officePreview={officePreview}
                   backdrop={imageBackdrop}
+                  zoom={selection.kind === 'image' ? imageZoom : null}
+                  version={selection.lastModified ?? 0}
                 />
               ) : (
                 <FolderView
@@ -1971,26 +2066,6 @@ export default function App() {
           onAutoSave={applyAutoSave}
           onShowHistory={() => setHistoryOpen(true)}
           onClose={() => setSettingsTab(null)}
-        />
-      )}
-
-      {editingImage !== null && vault.root && (
-        <ImageEditSheet
-          root={vault.root}
-          path={editingImage}
-          onClose={() => setEditingImage(null)}
-          onSave={async (name, blob) => {
-            const dir = editingImage.split('/').slice(0, -1).join('/')
-            const made = await vault.addFiles(dir, [new File([blob], name, { type: blob.type })])
-            setEditingImage(null)
-            if (made.added.length === 0) {
-              flash('그 형식은 넣을 수 없습니다.')
-              return
-            }
-            // 만든 것을 곧바로 열어 줍니다. 무엇이 나왔는지 눈으로 봐야 다시 고칠지 정합니다.
-            await openAsset(made.added[0])
-            flash(`${fileNameOf(made.added[0])} 를 만들었습니다.`)
-          }}
         />
       )}
 

@@ -13,6 +13,14 @@ export function clearAssetCache(): void {
   cache.clear()
 }
 
+/** 한 파일만 잊습니다. 덮어쓴 뒤에도 옛 그림이 문서에 남아 있으면 안 됩니다. */
+export function forgetAsset(path: string): void {
+  const url = cache.get(path)
+  if (!url) return
+  URL.revokeObjectURL(url)
+  cache.delete(path)
+}
+
 /**
  * 임베드 대상 경로를 볼트 안의 실제 파일 경로로 해석합니다.
  * 문서 기준 상대경로 → 볼트 루트 기준 → 파일명 일치 순으로 찾습니다.

@@ -3,6 +3,7 @@ import {
   attachmentKind, formatBytes, isAttachment, legacyOffice, MAX_ATTACHMENT_BYTES, withMime,
 } from '../lib/attachments'
 import { readBinaryFile } from '../lib/fsAccess'
+import { imageFormatName } from '../lib/imageEdit'
 import { SheetPreview, WordPreview } from './OfficePreview'
 import type { ImageBackdrop } from '../types'
 
@@ -16,6 +17,14 @@ interface AssetViewProps {
   officePreview: boolean
   /** 그림 뒤에 깔 바탕. 고르는 자리는 제목 줄입니다. */
   backdrop: ImageBackdrop
+  /**
+   * 보기 배율. null 이면 화면에 맞춰 봅니다(예전 그대로).
+   * 손잡이는 제목 줄에 있고, 값은 App 이 들고 있습니다 — 파일을 바꿔도 이어지게 하려면
+   * 이 부품이 사라졌다 다시 서는 것과 상관없는 자리에 있어야 합니다.
+   */
+  zoom?: number | null
+  /** 파일이 바뀐 때. 덮어쓴 뒤 같은 경로라도 다시 읽어야 합니다. */
+  version?: number
 }
 
 /** 텍스트 미리보기에서 한 번에 읽을 최대 길이. 큰 로그 파일로 화면이 멎지 않게 합니다. */
@@ -26,7 +35,7 @@ const TEXT_PREVIEW_LIMIT = 200_000
  * 이미지와 PDF 는 그대로 띄우고, 텍스트 계열은 내용을 읽어 보여 줍니다.
  */
 export function AssetView({
-  root, path, size, imagePreview, officePreview, backdrop,
+  root, path, size, imagePreview, officePreview, backdrop, zoom = null, version = 0,
 }: AssetViewProps) {
   const [url, setUrl] = useState<string | null>(null)
   const [text, setText] = useState<string | null>(null)
@@ -96,7 +105,7 @@ export function AssetView({
         objectUrl.current = null
       }
     }
-  }, [root, path, kind, skipped, office])
+  }, [root, path, kind, skipped, office, version])
 
   /*
    * 그려진 크기는 창을 늘이거나 설정을 바꿀 때마다 달라집니다.
@@ -145,10 +154,15 @@ export function AssetView({
         고르는 자리는 제목 줄(BackdropSwitch)입니다.
       */}
       {kind === 'image' && !skipped && url && (
-        <div className={`asset-canvas is-${backdrop}`}>
+        /*
+         * 배율을 정해 두면 그림을 그 크기로 그리고 칸 안에서 굴립니다.
+         * 정하지 않았으면 예전처럼 칸에 맞춰 줄입니다.
+         */
+        <div className={`asset-canvas is-${backdrop}${zoom === null ? '' : ' is-zoomed'}`}>
           <img
             ref={imageRef}
             className="asset-image"
+            style={zoom !== null && pixels ? { width: pixels.width * zoom, maxWidth: 'none', maxHeight: 'none' } : undefined}
             src={url}
             alt={name}
             onLoad={(event) => {
@@ -167,6 +181,9 @@ export function AssetView({
              */
             <span className="asset-size">
               <span className="asset-size-now">
+                {/* 무슨 형식인지부터 밝힙니다. PNG 인지 JPG 인지에 따라 투명·품질이 갈립니다. */}
+                <span className="asset-size-kind">{imageFormatName(path)}</span>
+                {' '}
                 {(drawn ?? pixels).width} × {(drawn ?? pixels).height}px
               </span>
               {drawn && drawn.width < pixels.width - 1 && (

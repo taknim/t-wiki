@@ -53,11 +53,15 @@ const madeFile = (name) => page.evaluate(async (which) => {
   }
 }, name)
 
-const names = () => page.evaluate(() => [...window.__mockRoot._children.keys()].filter((one) => one.includes('사진')))
+const names = () => page.evaluate(() => [...window.__mockRoot._children.keys()].filter((one) => /사진|자른/.test(one)))
 const openEditor = async () => {
-  await page.click('.doc-head button:has-text("고치기")')
+  await page.click('.doc-head button:has-text("수정")')
   await page.waitForSelector('.image-edit-frame img', { timeout: 5000 })
   await page.waitForTimeout(400)
+}
+const saveEdit = async () => {
+  await page.click('.image-edit button:has-text("저장")')
+  await page.waitForTimeout(1200)
 }
 
 try {
@@ -66,17 +70,64 @@ try {
   await page.click('button:has-text("폴더 열기")')
   await page.waitForSelector('.tree', { timeout: 10000 })
 
-  step('1. 그림을 고르면 제목 줄에 고치기 단추가 선다')
+  step('1. 그림을 고르면 제목 줄에 수정 단추와 배율 손잡이가 선다')
   await page.click('.tree-row:has-text("사진.png") .tree-name')
   await page.waitForSelector('.doc-head', { timeout: 8000 })
-  expect('그림에는 있음', (await page.locator('.doc-head button:has-text("고치기")').count()) === 1)
+  expect('그림에는 있음', (await page.locator('.doc-head button:has-text("수정")').count()) === 1)
+  expect('배율 손잡이도 있음', (await page.locator('.doc-head .zoom-control').count()) === 1)
+  expect('처음에는 화면 맞춤', (await page.textContent('.doc-head .zoom-now')) === '맞춤',
+    await page.textContent('.doc-head .zoom-now'))
+  // 오른쪽 위 정보에 형식도 적습니다. PNG 냐 JPG 냐에 따라 투명·품질이 갈립니다.
+  await page.waitForSelector('.asset-size', { timeout: 5000 })
+  const info = (await page.textContent('.asset-size')).replace(/\s+/g, ' ')
+  console.log('  ' + info)
+  expect('형식이 적힘', info.startsWith('PNG'), info)
+  expect('크기도 함께', info.includes('300 × 200px'), info)
   await page.click('.tree-row:has-text("개발 환경") .tree-name')
   await page.waitForTimeout(500)
-  expect('문서에는 없음', (await page.locator('.doc-head button:has-text("고치기")').count()) === 0)
+  expect('문서에는 없음', (await page.locator('.doc-head button:has-text("수정")').count()) === 0)
 
-  step('2. 크기만 줄여 PNG 로 낸다')
+  /*
+   * 큰 그림은 칸에 맞춰 줄여 보지만, 작은 그림이나 촘촘한 도표는 키워 봐야 합니다.
+   * 보기 배율은 볼 때와 고칠 때 같은 손잡이를 씁니다.
+   */
+  step('2. 보기 모드에서 배율을 키우고 줄인다')
   await page.click('.tree-row:has-text("사진.png") .tree-name')
-  await page.waitForSelector('.doc-head', { timeout: 8000 })
+  await page.waitForSelector('.asset-image', { timeout: 8000 })
+  await page.waitForTimeout(400)
+  const fitted = await page.evaluate(() => Math.round(document.querySelector('.asset-image').getBoundingClientRect().width))
+  await page.click('.doc-head .zoom-control button[aria-label="확대"]')
+  await page.waitForTimeout(300)
+  const bigger = await page.evaluate(() => Math.round(document.querySelector('.asset-image').getBoundingClientRect().width))
+  console.log(`  맞춤 ${fitted} → 확대 ${bigger}`)
+  expect('확대하면 그림이 커짐', bigger > fitted, `${fitted} → ${bigger}`)
+  expect('몇 할인지 적힘', (await page.textContent('.doc-head .zoom-now')) === '150%',
+    await page.textContent('.doc-head .zoom-now'))
+  await page.click('.doc-head .zoom-control button[aria-label="축소"]')
+  await page.waitForTimeout(300)
+  expect('축소하면 한 걸음 내려감', (await page.textContent('.doc-head .zoom-now')) === '100%',
+    await page.textContent('.doc-head .zoom-now'))
+  // 눌러서 다시 화면 맞춤으로 돌아갑니다.
+  await page.click('.doc-head .zoom-now')
+  await page.waitForTimeout(300)
+  expect('눌러서 화면 맞춤으로', (await page.textContent('.doc-head .zoom-now')) === '맞춤',
+    await page.textContent('.doc-head .zoom-now'))
+
+  step('3. 수정은 덮개 창이 아니라 본문 자리에서 열린다')
+  await openEditor()
+  expect('본문 자리에 뜸', (await page.locator('.main .image-edit').count()) === 1)
+  expect('덮개가 없음', (await page.locator('.overlay .image-edit').count()) === 0)
+  expect('옆줄이 그대로 보임', (await page.locator('.tree').count()) === 1)
+  expect('제목 줄이 수정 모드라고 알림', (await page.textContent('.doc-head .pill')) === '수정 모드',
+    await page.textContent('.doc-head .pill'))
+  expect('수정 중에는 수정 단추가 빠짐', (await page.locator('.doc-head button:has-text("수정")').count()) === 0)
+  await page.screenshot({ path: join(HERE, '..', 'shots', 'imageedit', '02-mode.png') })
+  await page.click('.image-edit button:has-text("취소")')
+  await page.waitForTimeout(400)
+  expect('취소하면 보기로 돌아감', (await page.locator('.asset-image').count()) === 1
+    && (await page.textContent('.doc-head .pill')) === '읽기 전용', await page.textContent('.doc-head .pill'))
+
+  step('4. 크기만 줄여 PNG 로 낸다')
   await openEditor()
   const offered = await page.evaluate(() => [
     document.querySelector('#image-width').value, document.querySelector('#image-height').value,
@@ -87,9 +138,8 @@ try {
   // 비율을 지키므로 높이는 저절로 따라옵니다.
   expect('높이가 비율대로 따라옴', (await page.inputValue('#image-height')) === '100',
     await page.inputValue('#image-height'))
-  await page.screenshot({ path: join(HERE, '..', 'shots', 'imageedit', '01-sheet.png') })
-  await page.click('.image-edit button:has-text("새 파일로 저장")')
-  await page.waitForTimeout(1200)
+  await page.screenshot({ path: join(HERE, '..', 'shots', 'imageedit', '01-edit.png') })
+  await saveEdit()
   const smaller = await madeFile('사진 (고침).png')
   console.log('  ' + JSON.stringify(smaller))
   expect('절반 크기 PNG 가 나옴', smaller?.kind === 'png' && smaller.size.width === 150 && smaller.size.height === 100,
@@ -100,7 +150,7 @@ try {
   expect('만든 것을 곧바로 엶', (await page.textContent('.doc-head h1')) === '사진 (고침).png',
     await page.textContent('.doc-head h1'))
 
-  step('3. 끌어서 자른 만큼만 나온다')
+  step('5. 끌어서 자른 만큼만 나온다')
   await page.click('.tree-row:has-text("사진.png") >> nth=0')
   await page.waitForTimeout(400)
   await openEditor()
@@ -121,18 +171,19 @@ try {
   }))
   console.log('  ' + JSON.stringify(cropped))
   expect('고른 자리가 덮개로 보임', cropped.overlay)
-  expect('자른 크기가 그대로 내놓을 크기', cropped.width === '100' && cropped.height === '80',
+  const near = (got, want) => Math.abs(Number(got) - want) <= 2
+  expect('자른 크기가 그대로 내놓을 크기', near(cropped.width, 100) && near(cropped.height, 80),
     JSON.stringify(cropped))
-  await page.click('.image-edit button:has-text("새 파일로 저장")')
-  await page.waitForTimeout(1200)
+  // 이름을 달리해 둡니다. 같은 이름이면 덮어쓸지 묻는 길로 빠집니다(7번 걸음).
+  await page.fill('.image-edit input[aria-label="파일 이름"]', '자른 것.png')
+  await saveEdit()
   // 같은 이름이 이미 있으므로 번호가 붙습니다.
-  const cut = await madeFile('사진 (고침) (2).png')
+  const cut = await madeFile('자른 것.png')
   console.log('  ' + JSON.stringify(cut))
-  expect('자른 만큼만 나옴', cut?.size.width === 100 && cut.size.height === 80, JSON.stringify(cut))
-  expect('같은 이름이면 번호를 붙임', (await names()).includes('사진 (고침) (2).png'), JSON.stringify(await names()))
+  expect('자른 만큼만 나옴', near(cut?.size.width, 100) && near(cut?.size.height, 80), JSON.stringify(cut))
   // 고른 자리는 빈 자리였으므로 칠해진 곳이 하나도 없어야 합니다.
   const inked = await page.evaluate(async () => {
-    const blob = window.__mockRoot._children.get('사진 (고침) (2).png')._data
+    const blob = window.__mockRoot._children.get('자른 것.png')._data
     const bitmap = await createImageBitmap(blob)
     const canvas = document.createElement('canvas')
     canvas.width = bitmap.width
@@ -147,17 +198,16 @@ try {
   console.log('  칠해진 점: ' + inked)
   expect('고른 자리(빈 쪽)만 잘려 나옴', inked === 0, String(inked))
 
-  step('4. JPG 로 바꾸면 이름도 따라 바뀌고 투명한 자리는 희게 깔린다')
+  step('6. JPG 로 바꾸면 이름도 따라 바뀌고 투명한 자리는 희게 깔린다')
   await page.click('.tree-row:has-text("사진.png") >> nth=0')
   await page.waitForTimeout(400)
   await openEditor()
   await page.click('.image-edit .segmented button:has-text("JPG")')
   await page.waitForTimeout(200)
-  expect('이름이 jpg 로 바뀜', (await page.inputValue('.image-edit input[aria-label="새 파일 이름"]')) === '사진 (고침).jpg',
-    await page.inputValue('.image-edit input[aria-label="새 파일 이름"]'))
+  expect('이름이 jpg 로 바뀜', (await page.inputValue('.image-edit input[aria-label="파일 이름"]')) === '사진 (고침).jpg',
+    await page.inputValue('.image-edit input[aria-label="파일 이름"]'))
   expect('품질 자리가 나옴', (await page.locator('#image-quality').count()) === 1)
-  await page.click('.image-edit button:has-text("새 파일로 저장")')
-  await page.waitForTimeout(1500)
+  await saveEdit()
   const jpg = await madeFile('사진 (고침).jpg')
   console.log('  ' + JSON.stringify(jpg))
   expect('JPG 로 나옴', jpg?.kind === 'jpg', JSON.stringify(jpg))
@@ -180,15 +230,63 @@ try {
   console.log('  투명하던 자리: ' + JSON.stringify(corner))
   expect('투명한 자리가 희게 깔림', corner.every((one) => one > 240), JSON.stringify(corner))
 
-  step('5. 닫으면 아무것도 만들지 않는다')
-  const before = (await names()).length
+  /*
+   * 같은 이름으로 저장하면 덮어쓸지 먼저 묻습니다. 덮으면 되돌릴 수 없고, 문서에 끼워 넣은
+   * 자리도 함께 바뀝니다. 물러서면 아무것도 쓰지 않고 수정 화면에 머뭅니다.
+   */
+  step('7. 같은 이름으로 저장하면 덮어쓸지 묻는다')
   await page.click('.tree-row:has-text("사진.png") >> nth=0')
   await page.waitForTimeout(400)
   await openEditor()
-  await page.fill('#image-width', '40')
+  await page.fill('#image-width', '60')
+  await page.fill('.image-edit input[aria-label="파일 이름"]', '사진.png')
+  await page.click('.image-edit button:has-text("저장")')
+  await page.waitForSelector('.dialog', { timeout: 4000 })
+  const asked = (await page.textContent('.dialog')).replace(/\s+/g, ' ')
+  console.log('  ' + asked.slice(0, 100))
+  expect('덮어쓴다고 알림', asked.includes('같은 이름이 이미 있습니다'), asked.slice(0, 60))
+  expect('되돌릴 수 없다고 경고', asked.includes('되돌릴 수 없고'), asked.slice(0, 120))
   await page.keyboard.press('Escape')
   await page.waitForTimeout(500)
-  expect('창이 닫힘', (await page.locator('.image-edit').count()) === 0)
+  expect('물러서면 그대로 수정 화면', (await page.locator('.image-edit').count()) === 1)
+  const kept2 = await madeFile('사진.png')
+  expect('원본도 그대로', kept2?.size.width === 300, JSON.stringify(kept2))
+  // 다시 눌러 이번에는 덮습니다.
+  await page.click('.image-edit button:has-text("저장")')
+  await page.waitForSelector('.dialog', { timeout: 4000 })
+  await page.click('.dialog button:has-text("덮어쓰기")')
+  await page.waitForTimeout(1500)
+  const over = await madeFile('사진.png')
+  console.log('  ' + JSON.stringify(over))
+  expect('덮어쓴 크기로 바뀜', over?.size.width === 60 && over.size.height === 40, JSON.stringify(over))
+  expect('수정 화면이 닫히고 그 파일을 봄', (await page.locator('.image-edit').count()) === 0
+    && (await page.textContent('.doc-head h1')) === '사진.png', await page.textContent('.doc-head h1'))
+  // 화면에 그려진 그림도 새것이어야 합니다. 덮었는데 옛 그림이 남으면 고친 줄 모릅니다.
+  const drawn = await page.evaluate(() => document.querySelector('.asset-image')?.naturalWidth ?? 0)
+  expect('보이는 그림도 새것', drawn === 60, String(drawn))
+
+  /*
+   * 문서에서 보기 모드를 돌리는 글쇠와 같은 것입니다. 둘 다 "지금 보고 있는 것을 다르게
+   * 보는" 일이라 하나로 둡니다.
+   */
+  step('8. ⌘⇧E 로도 수정 모드를 여닫는다')
+  const mod = process.platform === 'darwin' ? 'Meta' : 'Control'
+  await page.keyboard.press(`${mod}+Shift+KeyE`)
+  await page.waitForSelector('.image-edit', { timeout: 4000 })
+  expect('글쇠로 수정 모드가 열림', (await page.textContent('.doc-head .pill')) === '수정 모드',
+    await page.textContent('.doc-head .pill'))
+  await page.keyboard.press(`${mod}+Shift+KeyE`)
+  await page.waitForTimeout(400)
+  expect('다시 누르면 보기로 돌아감', (await page.locator('.image-edit').count()) === 0
+    && (await page.locator('.asset-image').count()) === 1)
+
+  step('9. 취소하면 아무것도 만들지 않는다')
+  const before = (await names()).length
+  await openEditor()
+  await page.fill('#image-width', '40')
+  await page.click('.image-edit button:has-text("취소")')
+  await page.waitForTimeout(500)
+  expect('수정 화면이 닫힘', (await page.locator('.image-edit').count()) === 0)
   expect('만들어진 것이 없음', (await names()).length === before, JSON.stringify(await names()))
 } catch (cause) {
   fail('묶음이 도중에 멈춤', cause instanceof Error ? (cause.stack ?? cause.message) : String(cause))

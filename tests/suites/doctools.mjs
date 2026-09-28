@@ -32,6 +32,13 @@ await page.addInitScript(({ xlsx, docx }) => {
     (_, at) => `## 제목 ${at + 1}\n\n본문 줄입니다.\n`)].join('\n'))
   make('짧은 문서.md', '# 짧은 문서\n\n한 줄뿐입니다.\n')
   // 목차가 서되 몇 줄 안 되는 글. 이쪽은 제 내용만큼만 서야 합니다.
+  /*
+   * 코드 블록 쓰는 법을 글로 보이는 문서. 바깥을 백틱 넷으로 두르고 안에 셋을 적습니다.
+   * 안쪽 셋을 닫는 것으로 세면 그 뒤가 통째로 밀려, 목차에서 제목이 빠지거나 코드 안의
+   * 제목이 들어옵니다.
+   */
+  make('울타리 안 울타리.md', ['# 울타리', '', '## 앞 제목', '', '````markdown',
+    '```js', '# 코드 안 제목', '````', '', '## 뒤 제목', '', '끝.'].join('\n'))
   make('짧은 목차.md', ['# 짧은 목차', '', '## 하나', '내용', '', '## 둘', '내용', ''].join('\n'))
   /*
    * 앞머리가 달린 글. 제목은 앞머리를 뗀 본문에서 뽑으므로, 뗀 만큼 자리를 밀어
@@ -376,7 +383,19 @@ try {
   console.log('  짧은 목차: ' + JSON.stringify(smallToc))
   expect('짧은 목차는 제 내용만큼만 섬', smallToc.rows === 3 && smallToc.height < smallToc.cap, JSON.stringify(smallToc))
 
-  step('12. 백링크 셈이 펼친 목록과 맞고, 어느 폴더의 것인지 밝힌다')
+  step('12. 울타리 안의 울타리를 닫는 것으로 세지 않는다')
+  await page.click('.tree-row:has-text("울타리 안 울타리") .tree-name')
+  await page.waitForSelector('.doc-head h1:has-text("울타리")', { timeout: 5000 })
+  await page.waitForTimeout(600)
+  if ((await page.locator('.info-panel .toc').count()) === 0) await page.click('.doc-tools button:has-text("목차")')
+  await page.waitForSelector('.info-panel .toc', { timeout: 3000 })
+  const tocRows = await page.evaluate(() =>
+    [...document.querySelectorAll('.info-panel .toc a')].map((one) => one.textContent.trim()))
+  console.log('  ' + JSON.stringify(tocRows))
+  expect('코드 뒤의 제목이 목차에 남음', tocRows.includes('뒤 제목'), JSON.stringify(tocRows))
+  expect('코드 안의 제목은 들어오지 않음', !tocRows.includes('코드 안 제목'), JSON.stringify(tocRows))
+
+  step('13. 백링크 셈이 펼친 목록과 맞고, 어느 폴더의 것인지 밝힌다')
   await page.click('.tree-row:has-text("자료") .tree-caret')
   await page.waitForTimeout(300)
   await page.click('.tree-row:has-text("깊은") .tree-caret')

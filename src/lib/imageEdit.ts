@@ -13,6 +13,17 @@ export const FORMATS: { id: ImageFormat; name: string; extension: string }[] = [
   { id: 'jpeg', name: 'JPG', extension: 'jpg' },
 ]
 
+/**
+ * 그림 파일의 형식 이름. 확장자를 사람이 부르는 이름으로 옮깁니다.
+ * jpe·jpeg 처럼 같은 것을 다르게 적은 확장자도 한 이름으로 모읍니다.
+ */
+export function imageFormatName(path: string): string {
+  const extension = (path.split('.').pop() ?? '').toLowerCase()
+  if (extension === 'jpg' || extension === 'jpeg' || extension === 'jpe') return 'JPG'
+  if (extension === 'svg') return 'SVG'
+  return extension.toUpperCase()
+}
+
 /** 잘라 낼 자리. 본디 크기(픽셀) 기준입니다. */
 export interface Crop {
   x: number

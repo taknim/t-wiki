@@ -235,6 +235,23 @@ export function SaveIcon(props: IconProps) {
   )
 }
 
+/** 더하기·빼기. 보기 배율을 키우고 줄일 때 씁니다. */
+export function PlusIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M8 3.4v9.2M3.4 8h9.2" />
+    </Svg>
+  )
+}
+
+export function MinusIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M3.4 8h9.2" />
+    </Svg>
+  )
+}
+
 export function TrashIcon(props: IconProps) {
   return (
     <Svg {...props}>

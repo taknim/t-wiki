@@ -33,7 +33,7 @@ export const SHORTCUTS: Shortcut[] = [
    */
   { id: 'new-doc', label: '새 문서', keys: { key: 'd', mod: true, shift: true }, scope: '앱 어디서나',
     note: '⌘N·⌘⇧N 은 브라우저가 새 창으로 가로채므로 D 를 씁니다' },
-  { id: 'view-mode', label: '보기 모드 바꾸기 (편집 → 나란히 → 미리보기)', keys: { key: 'e', mod: true, shift: true }, scope: '앱 어디서나' },
+  { id: 'view-mode', label: '보기 모드 바꾸기 (편집 → 나란히 → 미리보기), 그림에서는 수정 모드 여닫기', keys: { key: 'e', mod: true, shift: true }, scope: '앱 어디서나' },
   { id: 'tab-tree', label: '옆줄을 폴더 트리로', keys: { key: '1', mod: true, shift: true }, scope: '앱 어디서나' },
   { id: 'tab-favorites', label: '옆줄을 즐겨찾기로', keys: { key: '2', mod: true, shift: true }, scope: '앱 어디서나' },
   { id: 'sidebar', label: '옆줄(폴더 트리) 접기 / 펴기', keys: { key: 'b', mod: true, shift: true }, scope: '앱 어디서나' },
