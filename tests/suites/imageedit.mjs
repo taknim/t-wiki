@@ -340,6 +340,30 @@ try {
   console.log('  처음 고른 것: ' + JSON.stringify(first))
   expect('손잡이가 여덟 개', (await page.locator('.crop-grip').count()) === 8)
 
+  /*
+   * 오른쪽 단추는 브라우저에 넘깁니다. pointerdown 은 어느 단추든 똑같이 오므로, 가리지
+   * 않았더니 메뉴를 부르려던 손이 고른 자리를 통째로 지워 버렸습니다.
+   * (진짜 오른쪽 누르기는 시험을 멈추는 메뉴를 띄우므로 사건만 지어 보냅니다.)
+   */
+  const rightDrag = await page.evaluate(() => {
+    const frame = document.querySelector('.image-edit-frame')
+    const view = frame.getBoundingClientRect()
+    const send = (type, x, y) => frame.dispatchEvent(new PointerEvent(type, {
+      bubbles: true, cancelable: true, pointerId: 9, isPrimary: true, button: 2, buttons: 2,
+      clientX: view.left + x, clientY: view.top + y,
+    }))
+    send('pointerdown', 10, 10)
+    send('pointermove', 60, 50)
+    send('pointerup', 60, 50)
+    return {
+      width: Number(document.querySelector('#image-width').value),
+      height: Number(document.querySelector('#image-height').value),
+    }
+  })
+  console.log('  오른쪽 단추로 끈 뒤: ' + JSON.stringify(rightDrag))
+  expect('오른쪽 단추로는 고르지 않음', rightDrag.width === first.width && rightDrag.height === first.height,
+    JSON.stringify(rightDrag))
+
   /** 손잡이를 잡아 그만큼 끕니다. */
   const pull = async (grip, dx, dy) => {
     const at = await page.locator(`.crop-grip-${grip}`).boundingBox()

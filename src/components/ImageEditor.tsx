@@ -213,8 +213,17 @@ export function ImageEditor({ root, path, onSave, onCancel }: ImageEditorProps) 
     rolling.current = 0
   }
 
+  /*
+   * 왼쪽 단추로만 고릅니다.
+   *
+   * pointerdown 은 어느 단추든 똑같이 옵니다. 그래서 오른쪽 단추로 눌러도 고르기가
+   * 시작되어, 메뉴를 부르려던 손이 고른 자리를 통째로 지워 버렸습니다.
+   * 오른쪽 단추는 브라우저에 그대로 넘깁니다 — 그림 저장하기 같은 제 할 일이 있습니다.
+   */
+  const isPicking = (event: React.PointerEvent) => event.button === 0 && event.isPrimary
+
   const onDown = (event: React.PointerEvent) => {
-    if (!natural) return
+    if (!natural || !isPicking(event)) return
     const at = pointAt(event)
     if (!at) return
     // 새로 고르는 길. 누른 곳이 붙박이가 되고 두 축이 모두 움직입니다.
@@ -234,7 +243,7 @@ export function ImageEditor({ root, path, onSave, onCancel }: ImageEditorProps) 
    * 똑같은 셈으로 늘이기까지 다룰 수 있습니다.
    */
   const onGrip = (grip: Grip) => (event: React.PointerEvent) => {
-    if (!crop || !natural) return
+    if (!crop || !natural || !isPicking(event)) return
     // 손잡이를 잡은 것이 칸을 새로 고르는 일로 읽히면 안 됩니다.
     event.stopPropagation()
     dragBase.current = crop
