@@ -837,6 +837,48 @@ try {
   const upright = await facing()
   console.log('  열 때: ' + JSON.stringify(upright))
   expect('처음에는 손대지 않은 방향', upright.적힌방향 === '그대로', upright.적힌방향)
+
+  /*
+   * 단추는 한데 모으고, 눌러서 바뀐 것은 그 **아래 줄**에 적습니다. 단추 옆에 붙여 두었더니
+   * 마지막 단추의 이름처럼 읽혔습니다.
+   */
+  const laidOut = await page.evaluate(() => {
+    const group = document.querySelector('.image-edit .turn-group')
+    const now = document.querySelector('.image-edit .turn-now')
+    return {
+      같은줄: now.closest('.row') !== null,
+      // DOCUMENT_POSITION_FOLLOWING(4): 단추보다 뒤(아래)에 있음
+      아래: (group.compareDocumentPosition(now) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0,
+    }
+  })
+  console.log('  배치: ' + JSON.stringify(laidOut))
+  expect('바뀐 내용은 단추와 같은 줄에 있지 않음', laidOut.같은줄 === false, JSON.stringify(laidOut))
+  expect('바뀐 내용은 단추 아래에 적힘', laidOut.아래, JSON.stringify(laidOut))
+
+  /*
+   * 돌리기 아이콘의 화살 **머리는 획의 끝**에 붙고, 몸통은 지나온 쪽으로 뻗어야 합니다.
+   * 머리를 획의 시작에 붙였더니(12시에서 오른쪽을 가리키는데 획은 3시·6시·9시로 뻗음)
+   * 눈에는 반시계로 읽혀, 왼쪽·오른쪽 단추가 서로 바뀐 것처럼 보였습니다.
+   */
+  const arrowOf = (label) => page.evaluate((which) => {
+    const [arc, head] = document.querySelectorAll(`.turn-group button[aria-label="${which}"] svg path`)
+    const end = arc.getPointAtLength(arc.getTotalLength())
+    // 몸통의 한가운데. 270도 획이라 머리(12시)에서 가장 먼 자리입니다.
+    const belly = arc.getPointAtLength(arc.getTotalLength() / 2)
+    // 화살촉은 꺾쇠 둘이라 길이의 한가운데가 곧 뾰족한 끝입니다.
+    const tip = head.getPointAtLength(head.getTotalLength() / 2)
+    const round = (dot) => [Math.round(dot.x * 10) / 10, Math.round(dot.y * 10) / 10]
+    return { 획끝: round(end), 몸통: round(belly), 머리: round(tip) }
+  }, label)
+  for (const [label, side] of [['오른쪽으로 90도 돌리기', -1], ['왼쪽으로 90도 돌리기', 1]]) {
+    const drawn = await arrowOf(label)
+    console.log('  ' + label + ': ' + JSON.stringify(drawn))
+    const gap = Math.hypot(drawn.획끝[0] - drawn.머리[0], drawn.획끝[1] - drawn.머리[1])
+    expect(label + ' — 머리가 획의 끝에 붙음', gap < 1, String(Math.round(gap * 10) / 10))
+    // 오른쪽으로 돌리는 획은 왼쪽 아래를 지나 올라오고, 왼쪽으로 돌리는 획은 오른쪽 아래를 지납니다.
+    expect(label + ' — 몸통이 지나온 쪽에 있음',
+      (side < 0 ? drawn.몸통[0] < 8 : drawn.몸통[0] > 8) && drawn.몸통[1] > 8, JSON.stringify(drawn.몸통))
+  }
   expect('내놓을 크기는 본디 크기', `${upright.width}x${upright.height}` === '200x100',
     JSON.stringify(upright))
   expect('되돌리기 단추는 아직 없음',

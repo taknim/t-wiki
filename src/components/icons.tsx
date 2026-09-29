@@ -278,10 +278,19 @@ export function MinusIcon(props: IconProps) {
  * 돌리기는 둥근 화살로, 뒤집기는 가운데 접는 금과 그 양쪽 쐐기로 그립니다. 같은 모양을
  * 방향만 바꿔 쓰면 네 단추가 서로 구별되지 않아, 돌리기와 뒤집기를 아주 다르게 둡니다.
  */
+/*
+ * 돌리기.
+ *
+ * 화살 **머리는 획의 끝**에 붙고, 몸통은 머리가 지나온 쪽으로 뻗습니다. 처음에는 머리를
+ * 획의 시작에 붙였더니(12시에서 오른쪽을 가리키는데 획은 3시·6시·9시로 뻗음) 눈에는
+ * "9시에서 올라온 반시계" 로 읽혀, 두 단추가 서로 바뀐 것처럼 보였습니다.
+ * 그래서 오른쪽 돌리기는 3시에서 시계 방향으로 돌아 12시에서 끝나고(틈은 오른쪽 위),
+ * 왼쪽 돌리기는 그것을 거울에 비춘 모양입니다.
+ */
 export function RotateRightIcon(props: IconProps) {
   return (
     <Svg {...props}>
-      <path d="M8 3.2a4.8 4.8 0 1 1-4.8 4.8" />
+      <path d="M12.8 8a4.8 4.8 0 1 1-4.8-4.8" />
       <path d="M6.3 1.5 8.1 3.2 6.3 4.9" />
     </Svg>
   )
@@ -290,7 +299,7 @@ export function RotateRightIcon(props: IconProps) {
 export function RotateLeftIcon(props: IconProps) {
   return (
     <Svg {...props}>
-      <path d="M8 3.2a4.8 4.8 0 1 0 4.8 4.8" />
+      <path d="M3.2 8a4.8 4.8 0 1 0 4.8-4.8" />
       <path d="M9.7 1.5 7.9 3.2 9.7 4.9" />
     </Svg>
   )

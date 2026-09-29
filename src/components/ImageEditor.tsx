@@ -596,6 +596,13 @@ export function ImageEditor({ root, path, onSave, onCancel }: ImageEditorProps) 
 
         <section className="field">
           <h4 className="field-group-title">돌리기</h4>
+          <p className="hint" style={{ marginTop: 0 }}>
+            돌리거나 뒤집으면 고른 자리는 풀립니다. 방향을 먼저 잡고 잘라내기를 하면 됩니다.
+          </p>
+          {/*
+            단추는 칸의 맨 아래에 모으고, 눌러서 바뀐 것은 그 **아래**에 적습니다.
+            단추 옆에 붙여 두었더니 마지막 단추의 이름처럼 읽혔습니다.
+          */}
           <div className="row" style={{ alignItems: 'center', gap: 6 }}>
             <div className="turn-group" role="group" aria-label="돌리기와 뒤집기">
               <button
@@ -637,10 +644,6 @@ export function ImageEditor({ root, path, onSave, onCancel }: ImageEditorProps) 
                 <FlipYIcon />
               </button>
             </div>
-            {/* 무엇을 해 놓았는지 적습니다. 뒤집기는 그림에 따라 눈으로 가리기 어렵습니다. */}
-            <span className="hint turn-now" style={{ margin: 0 }}>
-              {orientName(orient)}
-            </span>
             {!isUpright(orient) && (
               <button
                 type="button"
@@ -652,8 +655,9 @@ export function ImageEditor({ root, path, onSave, onCancel }: ImageEditorProps) 
               </button>
             )}
           </div>
+          {/* 무엇을 해 놓았는지 적습니다. 뒤집기는 그림에 따라 눈으로 가리기 어렵습니다. */}
           <p className="hint" style={{ margin: 0 }}>
-            돌리거나 뒤집으면 고른 자리는 풀립니다. 방향을 먼저 잡고 잘라내기를 하면 됩니다.
+            지금 방향 · <span className="turn-now">{orientName(orient)}</span>
           </p>
         </section>
 
