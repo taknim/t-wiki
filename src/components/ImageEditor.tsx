@@ -123,15 +123,21 @@ export function ImageEditor({ root, path, onSave, onCancel }: ImageEditorProps) 
      * 화면이므로 그림이 가장 크게 보이는 자리에서 시작하는 편이 낫습니다.
      * 여기서 한 번만 잡고, 그 뒤로는 사람이 고른 배율을 덮지 않습니다.
      */
+    fitToStage(size)
+  }
+
+  /**
+   * 칸에 꽉 차는 배율로 맞춥니다.
+   *
+   * 내림으로 셉니다. 반올림하면 한 픽셀 넘쳐 굴림대가 생기는데, 꽉 채우려다 굴림대를
+   * 부르는 것은 얻는 것보다 잃는 것이 큽니다.
+   * 배율은 사람이 적어 넣을 수 있는 자리 안에 둡니다(10 ~ 300%).
+   */
+  const fitToStage = (size: Natural | null = natural) => {
     const box = stage.current
-    if (!box || size.width === 0 || size.height === 0) return
+    if (!box || !size || size.width === 0 || size.height === 0) return
     const room = { width: box.clientWidth - STAGE_PAD * 2, height: box.clientHeight - STAGE_PAD * 2 }
     const fit = Math.min(room.width / size.width, room.height / size.height)
-    /*
-     * 내림으로 셉니다. 반올림하면 한 픽셀 넘쳐 굴림대가 생기는데, 꽉 채우려다 굴림대를
-     * 부르는 것은 얻는 것보다 잃는 것이 큽니다.
-     * 배율은 사람이 적어 넣을 수 있는 자리 안에 둡니다(10 ~ 300%).
-     */
     setZoom(clampPercent(Math.floor(fit * 100)) / 100)
   }
 
@@ -457,8 +463,8 @@ export function ImageEditor({ root, path, onSave, onCancel }: ImageEditorProps) 
           </p>
           <div className="row" style={{ alignItems: 'center', gap: 6 }}>
             <span className="hint" style={{ margin: 0 }}>보기 배율</span>
-            {/* 고칠 때는 늘 배율을 정해 두고 봅니다(맞춤 없음). 잘라 낼 자리를 재려면 기준이 있어야 합니다. */}
-            <ZoomControl scale={zoom} fitted={false} canFit={false} onZoom={(next) => setZoom(next ?? 1)} />
+            {/* 화면 맞춤은 "지금 칸에 맞춰 다시 재라" 는 뜻입니다. 보기 모드와 달리 값으로 남습니다. */}
+            <ZoomControl scale={zoom} fitted={false} onZoom={(next) => (next === null ? fitToStage() : setZoom(next))} />
           </div>
           <div className="row" style={{ alignItems: 'center' }}>
             {crop ? (

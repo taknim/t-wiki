@@ -194,37 +194,39 @@ export function AssetView({
                 : null)
             }}
           />
-          {/*
-            배율 손잡이는 그림 위에 떠 있습니다. 제목 줄에 두었더니 그림을 보던 눈이
-            멀리 갔고, 좁은 화면에서는 제목 줄이 두 줄로 접혔습니다.
-          */}
-          {onZoom && pixels && drawn && (
-            <ZoomControl scale={drawn.width / pixels.width} fitted={zoom === null} onZoom={onZoom} />
-          )}
-          {pixels && (
-            /*
-             * 크기는 두 가지가 궁금합니다. 지금 눈에 보이는 크기와 파일이 지닌 크기.
-             * 줄지 않았을 때까지 둘을 늘어놓으면 같은 숫자가 두 번 적혀 되레 읽기
-             * 나쁩니다. 줄어든 회차에만 아래에 본디 크기와 몇 할인지를 붙입니다.
-             */
-            <span className="asset-size">
-              <span className="asset-size-now">
-                {/* 무슨 형식인지부터 밝힙니다. PNG 인지 JPG 인지에 따라 투명·품질이 갈립니다. */}
-                <span className="asset-size-kind">{imageFormatName(path)}</span>
-                {' '}
-                {(drawn ?? pixels).width} × {(drawn ?? pixels).height}px
-              </span>
-              {drawn && drawn.width < pixels.width - 1 && (
-                <span className="asset-size-origin">
-                  원본 {pixels.width} × {pixels.height}px
-                  {' · '}
-                  {Math.round((drawn.width / pixels.width) * 100)}%
-                </span>
-              )}
-            </span>
-          )}
         </div>
       )}
+
+      {/*
+        배율 손잡이와 크기 딱지는 그림 위에 떠 있되, **굴러가는 칸 밖**에 둡니다.
+        칸 안에 두었더니 크게 키워 놓고 그림을 옮길 때 함께 밀려 나가 손잡이를 쫓아가야 했습니다.
+        제목 줄로 되돌릴 수도 없습니다 — 그림을 보던 눈이 멀리 가고 좁은 화면에서는 줄이 접힙니다.
+      */}
+      {kind === 'image' && !skipped && url && onZoom && pixels && drawn && (
+        <ZoomControl scale={drawn.width / pixels.width} fitted={zoom === null} onZoom={onZoom} />
+      )}
+      {kind === 'image' && !skipped && url && pixels && (
+          /*
+           * 크기는 두 가지가 궁금합니다. 지금 눈에 보이는 크기와 파일이 지닌 크기.
+           * 줄지 않았을 때까지 둘을 늘어놓으면 같은 숫자가 두 번 적혀 되레 읽기
+           * 나쁩니다. 줄어든 회차에만 아래에 본디 크기와 몇 할인지를 붙입니다.
+           */
+          <span className="asset-size">
+            <span className="asset-size-now">
+              {/* 무슨 형식인지부터 밝힙니다. PNG 인지 JPG 인지에 따라 투명·품질이 갈립니다. */}
+              <span className="asset-size-kind">{imageFormatName(path)}</span>
+              {' '}
+              {(drawn ?? pixels).width} × {(drawn ?? pixels).height}px
+            </span>
+            {drawn && drawn.width < pixels.width - 1 && (
+              <span className="asset-size-origin">
+                원본 {pixels.width} × {pixels.height}px
+                {' · '}
+                {Math.round((drawn.width / pixels.width) * 100)}%
+              </span>
+            )}
+          </span>
+        )}
 
       {kind === 'pdf' && url && <iframe className="asset-frame" src={url} title={name} />}
 

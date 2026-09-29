@@ -82,7 +82,9 @@ try {
   await page.click('.tree-row:has-text("사진.png") .tree-name')
   await page.waitForSelector('.doc-head', { timeout: 8000 })
   expect('그림에는 있음', (await page.locator('.doc-head button:has-text("수정")').count()) === 1)
-  expect('배율 손잡이는 그림 위에 있음', (await page.locator('.asset-canvas .zoom-control').count()) === 1)
+  expect('배율 손잡이는 그림 위에 있음', (await page.locator('.asset-view > .zoom-control').count()) === 1)
+  // 굴러가는 칸 안에 두면 그림을 옮길 때 함께 밀려납니다.
+  expect('굴러가는 칸 밖에 있음', (await page.locator('.asset-canvas .zoom-control').count()) === 0)
   // 오른쪽 위 정보에 형식도 적습니다. PNG 냐 JPG 냐에 따라 투명·품질이 갈립니다.
   await page.waitForSelector('.asset-size', { timeout: 5000 })
   const info = (await page.textContent('.asset-size')).replace(/\s+/g, ' ')
@@ -117,7 +119,7 @@ try {
       왼쪽밖: box.left < canvas.left - 1,
     }
   })
-  expect('손잡이가 그림 위에 있음', (await page.locator('.asset-canvas .zoom-control').count()) === 1)
+  expect('손잡이가 그림 위에 있음', (await page.locator('.asset-view > .zoom-control').count()) === 1)
   expect('제목 줄에는 없음', (await page.locator('.doc-head .zoom-control').count()) === 0)
   const fit = await zoomed()
   console.log('  맞춤: ' + JSON.stringify(fit))
@@ -127,12 +129,12 @@ try {
    * 37% 처럼 어중간한 값에서 눌러도 바로 위 눈금으로 가야 합니다. 100% 부터 세었더니
    * 키우려고 눌렀는데 150% 로 건너뛰었습니다.
    */
-  await page.click('.asset-canvas .zoom-control button[aria-label="확대"]')
+  await page.click('.asset-view > .zoom-control button[aria-label="확대"]')
   await page.waitForTimeout(300)
   const up = await zoomed()
   console.log('  확대: ' + JSON.stringify(up))
   expect('지금 배율에서 한 걸음 위로', up.잰 > fit.잰 && up.잰 <= 75, JSON.stringify(up))
-  await page.click('.asset-canvas .zoom-control button[aria-label="축소"]')
+  await page.click('.asset-view > .zoom-control button[aria-label="축소"]')
   await page.waitForTimeout(300)
   const down = await zoomed()
   console.log('  축소: ' + JSON.stringify(down))
@@ -140,13 +142,13 @@ try {
   // 배율을 정해 두었어도 칸보다 작으면 가운데에 있어야 합니다. 늘 왼쪽 위로 붙이면 허전합니다.
   expect('줄여 놓아도 가운데', down.가운데 && !down.왼쪽밖, JSON.stringify(down))
   // 원본 크기로. 칸보다 커지므로 왼쪽 위부터 보입니다.
-  await page.click('.asset-canvas .zoom-control button[aria-label="원본 크기"]')
+  await page.click('.asset-view > .zoom-control button[aria-label="원본 크기"]')
   await page.waitForTimeout(300)
   const actual = await zoomed()
   console.log('  원본: ' + JSON.stringify(actual))
   expect('원본 크기는 100%', actual.잰 === 100 && actual.적힌 === '100%', JSON.stringify(actual))
   expect('칸보다 크면 왼쪽 위부터', !actual.왼쪽밖, JSON.stringify(actual))
-  await page.click('.asset-canvas .zoom-control button[aria-label="화면에 맞추기"]')
+  await page.click('.asset-view > .zoom-control button[aria-label="화면에 맞추기"]')
   await page.waitForTimeout(300)
   expect('다시 화면 맞춤', (await zoomed()).잰 === fit.잰, JSON.stringify(await zoomed()))
 
@@ -194,20 +196,20 @@ try {
   await page.waitForTimeout(400)
   expect('적어 넣은 배율로 감', (await zoomed()).잰 === 110, JSON.stringify(await zoomed()))
   // 끝을 넘겨 적으면 가까운 끝으로 맞춥니다.
-  await page.click('.asset-canvas .zoom-now')
+  await page.click('.asset-view .zoom-now')
   await page.waitForSelector('.dialog-field input', { timeout: 4000 })
   await page.fill('.dialog-field input', '900')
   await page.keyboard.press('Enter')
   await page.waitForTimeout(400)
   expect('300% 를 넘지 않음', (await zoomed()).잰 === 300, JSON.stringify(await zoomed()))
-  await page.click('.asset-canvas .zoom-now')
+  await page.click('.asset-view .zoom-now')
   await page.waitForSelector('.dialog-field input', { timeout: 4000 })
   await page.fill('.dialog-field input', '1')
   await page.keyboard.press('Enter')
   await page.waitForTimeout(400)
   expect('10% 아래로는 안 감', (await zoomed()).잰 === 10, JSON.stringify(await zoomed()))
   // 물러서면 보던 그대로.
-  await page.click('.asset-canvas .zoom-now')
+  await page.click('.asset-view .zoom-now')
   await page.waitForSelector('.dialog-field input', { timeout: 4000 })
   await page.fill('.dialog-field input', '200')
   await page.keyboard.press('Escape')
@@ -236,7 +238,7 @@ try {
   await page.click('.tree-row:has-text("큰 그림") .tree-name')
   await page.waitForSelector('.asset-image', { timeout: 8000 })
   await page.waitForTimeout(400)
-  await page.click('.asset-canvas .zoom-control button[aria-label="원본 크기"]')
+  await page.click('.asset-view > .zoom-control button[aria-label="원본 크기"]')
   await page.waitForTimeout(300)
   const canvasAt = () => page.evaluate(() => {
     const box = document.querySelector('.asset-canvas')
@@ -249,6 +251,10 @@ try {
   const seen = await canvasAt()
   console.log('  보기 모드: ' + JSON.stringify(seen))
   expect('원본 크기에서는 굴릴 것이 있음', seen.굴릴것[0] > 0, JSON.stringify(seen))
+  const knobBefore = await page.evaluate(() => {
+    const knob = document.querySelector('.zoom-control').getBoundingClientRect()
+    return [Math.round(knob.left), Math.round(knob.top)]
+  })
   await page.keyboard.down('Space')
   await page.waitForTimeout(200)
   expect('누르면 손 모양', (await canvasAt()).손모양 === 'grab', JSON.stringify(await canvasAt()))
@@ -261,11 +267,29 @@ try {
   await page.waitForTimeout(300)
   const panned = await canvasAt()
   console.log('  옮긴 뒤: ' + JSON.stringify(panned))
+  /*
+   * 손잡이는 굴러가는 칸 밖에 있어야 합니다. 안에 두었더니 그림을 옮길 때 함께 밀려 나가
+   * 손잡이를 쫓아가야 했습니다.
+   */
+  const knobAfter = await page.evaluate(() => {
+    const knob = document.querySelector('.zoom-control').getBoundingClientRect()
+    const canvas = document.querySelector('.asset-canvas').getBoundingClientRect()
+    return {
+      자리: [Math.round(knob.left), Math.round(knob.top)],
+      // 그림 칸의 오른쪽 아래에 붙어 있어야 합니다(본문 전체가 아니라).
+      칸안: knob.right <= canvas.right + 2 && knob.bottom <= canvas.bottom + 2
+        && knob.left >= canvas.left - 2,
+    }
+  })
+  console.log('  손잡이: ' + JSON.stringify({ knobBefore, knobAfter }))
+  expect('옮겨도 손잡이는 제자리', JSON.stringify(knobAfter.자리) === JSON.stringify(knobBefore),
+    JSON.stringify({ knobBefore, knobAfter }))
+  expect('손잡이가 그림 칸에 붙어 있음', knobAfter.칸안, JSON.stringify(knobAfter))
   // 손이 간 만큼(80px 남짓) 따라와야 합니다. 몇 픽셀만 움직였다면 옮긴 것이 아닙니다.
   expect('끌면 손이 간 만큼 옮겨짐', panned.굴린자리[0] >= 70, JSON.stringify({ seen, panned }))
   expect('떼면 손 모양이 걷힘', panned.손모양 !== 'grab', JSON.stringify(panned))
   // 화면 맞춤으로 돌려 놓습니다. 옮길 것이 없을 때는 스페이스를 가로채지 않습니다.
-  await page.click('.asset-canvas .zoom-control button[aria-label="화면에 맞추기"]')
+  await page.click('.asset-view > .zoom-control button[aria-label="화면에 맞추기"]')
   await page.waitForTimeout(300)
 
   step('2-2. 수정 화면은 칸에 꽉 차는 배율로 열린다')
@@ -295,6 +319,30 @@ try {
   const fill = Math.max(opened.그림[0] / room[0], opened.그림[1] / room[1])
   console.log('  채운 몫: ' + Math.round(fill * 100) + '%')
   expect('한 쪽이 칸을 거의 채움', fill >= 0.9 && fill <= 1, String(fill))
+  /*
+   * 크게 키워 보다가 다시 한눈에 담고 싶을 때가 있습니다. 수정 화면에도 화면 맞춤을 둡니다.
+   * 보기 모드와 달리 값으로 남습니다 — 잘라 낼 자리를 재려면 배율이 또렷한 값이어야 합니다.
+   */
+  await page.click('.image-edit .zoom-control button[aria-label="원본 크기"]')
+  await page.waitForTimeout(300)
+  const atFull = await page.evaluate(() => document.querySelector('.image-edit .zoom-now').textContent)
+  await page.click('.image-edit .zoom-control button[aria-label="화면에 맞추기"]')
+  await page.waitForTimeout(300)
+  const refit = await page.evaluate(() => {
+    const image = document.querySelector('.image-edit-frame img')
+    const box = document.querySelector('.image-edit-stage')
+    return {
+      적힌: document.querySelector('.image-edit .zoom-now').textContent,
+      넘침: box.scrollWidth > box.clientWidth + 1 || box.scrollHeight > box.clientHeight + 1,
+      채움: Math.max(image.getBoundingClientRect().width / (box.clientWidth - 32),
+        image.getBoundingClientRect().height / (box.clientHeight - 32)),
+    }
+  })
+  console.log('  ' + JSON.stringify({ atFull, refit }))
+  expect('수정 화면에도 화면 맞춤이 있음', (await page.locator('.image-edit .zoom-control button[aria-label="화면에 맞추기"]').count()) === 1)
+  expect('누르면 다시 칸에 꽉 참', !refit.넘침 && refit.채움 >= 0.9 && refit.적힌 !== atFull,
+    JSON.stringify({ atFull, refit }))
+
   await page.click('.image-edit button:has-text("취소")')
   await page.waitForTimeout(400)
 

@@ -1671,6 +1671,8 @@ a.btn { text-decoration: none; color: inherit; display: inline-block; }
 /* ---------- 첨부 미리보기 ---------- */
 
 .asset-view {
+  /* 배율 손잡이와 크기 딱지가 여기에 붙습니다. 굴러가는 칸(.asset-canvas) 안이면 함께 밀려납니다. */
+  position: relative;
   flex: 1;
   min-height: 0;
   display: flex;
