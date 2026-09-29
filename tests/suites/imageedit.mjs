@@ -1022,6 +1022,30 @@ try {
   expect('줄마다 이름이 섬', JSON.stringify(named) === JSON.stringify(['비율 고정', '긴 쪽', '고른 자리']),
     JSON.stringify(named))
 
+  /*
+   * 손잡이 칸의 단추·고르개·입력란은 **키가 하나**여야 합니다. 저마다 다른 키를 지니고 있어
+   * 줄마다 높이가 들쑥날쑥했고, 같은 줄에 섞여 서면 가운데가 맞지 않았습니다.
+   * 비율 딱지는 너비까지 같아야 여덟이 한 묶음으로 읽힙니다.
+   */
+  const measured = await page.evaluate(() => {
+    const boxes = [...document.querySelectorAll(
+      '.image-edit-panel .field .btn, .image-edit-panel .field .segmented, .image-edit-panel .field .dialog-input',
+    )]
+    const chips = [...document.querySelectorAll('.image-edit-panel .ratio-group .btn')]
+    const tall = (el) => Math.round(el.getBoundingClientRect().height)
+    const wide = (el) => Math.round(el.getBoundingClientRect().width)
+    return {
+      잰것: boxes.length,
+      키: [...new Set(boxes.map(tall))],
+      딱지너비: [...new Set(chips.map(wide))],
+    }
+  })
+  console.log('  키 재기: ' + JSON.stringify(measured))
+  expect('잴 것이 여럿 있음', measured.잰것 >= 8, JSON.stringify(measured))
+  expect('단추와 입력란의 키가 하나', measured.키.length === 1, JSON.stringify(measured.키))
+  expect('작은 단추에 맞춤', measured.키[0] === 28, JSON.stringify(measured.키))
+  expect('비율 딱지는 너비도 하나', measured.딱지너비.length === 1, JSON.stringify(measured.딱지너비))
+
   const sides = () => page.evaluate(() => ({
     width: Number(document.querySelector('#image-width').value),
     height: Number(document.querySelector('#image-height').value),
