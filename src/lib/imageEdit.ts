@@ -127,6 +127,120 @@ export function clampCrop(crop: Crop, natural: { width: number; height: number }
   return { x, y, width, height }
 }
 
+/**
+ * 잘라낼 자리에 씌울 수 있는 비율. **긴 쪽이 앞**입니다.
+ *
+ * 흔히 쓰는 것만 둡니다 — 정사각(1:1), 화면(4:3·16:9), 사진(3:2·5:3), 인화지(5:4·7:5).
+ * 임의의 비율을 적어 넣는 길은 두지 않습니다. 여기서 하려는 일은 "어디에 넣을 그림인지"를
+ * 고르는 것이지 비를 만들어 내는 것이 아닙니다.
+ */
+export const CROP_RATIOS: { id: string; long: number; short: number }[] = [
+  { id: '1:1', long: 1, short: 1 },
+  { id: '4:3', long: 4, short: 3 },
+  { id: '16:9', long: 16, short: 9 },
+  { id: '3:2', long: 3, short: 2 },
+  { id: '5:3', long: 5, short: 3 },
+  { id: '5:4', long: 5, short: 4 },
+  { id: '7:5', long: 7, short: 5 },
+]
+
+/** 눕힐지 세울지. 긴 쪽이 가로면 `wide`, 세로면 `tall`. */
+export type Lay = 'wide' | 'tall'
+
+/** 너비 ÷ 높이. 세우면 뒤집힙니다 — 16:9 를 세우면 9:16 입니다. */
+export function ratioOf(id: string | null, lay: Lay): number | null {
+  const one = CROP_RATIOS.find((each) => each.id === id)
+  if (!one) return null
+  return lay === 'wide' ? one.long / one.short : one.short / one.long
+}
+
+/** 끌어서 크기를 잡는 한 번의 셈. 새로 고르기와 손잡이로 늘이기가 같은 길을 씁니다. */
+export interface Sizing {
+  /** 붙박이 자리. 새로 고를 때는 처음 누른 곳, 늘일 때는 잡은 손잡이의 맞은편입니다. */
+  from: { x: number; y: number }
+  /** 지금 손가락이 짚은 자리. */
+  to: { x: number; y: number }
+  /** 이번 끌기가 건드리는 축. 변을 잡으면 한 축만 움직입니다. */
+  axes: { x: boolean; y: boolean }
+  /** 늘이기 전의 자리. 건드리지 않는 축은 여기서 그대로 가져옵니다. */
+  base: Crop | null
+}
+
+/**
+ * 끌어 고른 자리를 셉니다. 비율을 씌워 두면 그 비를 지킵니다.
+ *
+ * 비율을 지킬 때는 **손끝을 덮는 쪽**에 맞춥니다(두 축 가운데 큰 쪽). 작은 쪽에 맞추면
+ * 손은 저만치 갔는데 네모는 따라오지 않아 끌리지 않는 것처럼 보입니다.
+ * 변을 잡아 한 축만 움직일 때는 다른 축이 **가운데를 지키며** 따라옵니다 — 한쪽 끝을
+ * 붙박이로 두면 옆으로 늘일 때마다 네모가 위나 아래로 미끄러집니다.
+ *
+ * 그림 밖으로 넘치면 **비율을 지킨 채 줄입니다.** clampCrop 처럼 안으로 밀어 넣기만 하면
+ * 붙박이로 둔 자리가 함께 밀려, 잡고 있던 꼭지점이 손에서 빠져나갑니다.
+ */
+export function sizeCrop(spec: Sizing, ratio: number | null, paper: { width: number; height: number }): Crop {
+  const { from, to, axes, base } = spec
+  const rightward = to.x >= from.x
+  const downward = to.y >= from.y
+  let width = axes.x ? Math.abs(to.x - from.x) : base?.width ?? MIN_SIDE
+  let height = axes.y ? Math.abs(to.y - from.y) : base?.height ?? MIN_SIDE
+
+  if (ratio === null) {
+    return clampCrop({
+      x: axes.x ? Math.min(from.x, to.x) : base?.x ?? 0,
+      y: axes.y ? Math.min(from.y, to.y) : base?.y ?? 0,
+      width,
+      height,
+    }, paper)
+  }
+
+  if (axes.x && axes.y) {
+    width = Math.max(width, height * ratio)
+    // 붙박이에서 손이 간 쪽으로 남은 자리만큼만 자랍니다.
+    const room = Math.min(
+      rightward ? paper.width - from.x : from.x,
+      (downward ? paper.height - from.y : from.y) * ratio,
+    )
+    width = Math.round(Math.min(width, room))
+    height = Math.round(width / ratio)
+    return clampCrop({
+      x: rightward ? from.x : from.x - width,
+      y: downward ? from.y : from.y - height,
+      width,
+      height,
+    }, paper)
+  }
+
+  // 한 축만 잡은 자리. 움직인 축이 크기를 정하고 다른 축은 가운데를 지키며 따라옵니다.
+  const middle = base
+    ? { x: base.x + base.width / 2, y: base.y + base.height / 2 }
+    : { x: from.x, y: from.y }
+  if (axes.x) {
+    width = Math.round(Math.min(width, rightward ? paper.width - from.x : from.x, paper.height * ratio))
+    height = Math.round(width / ratio)
+    return clampCrop({ x: rightward ? from.x : from.x - width, y: middle.y - height / 2, width, height }, paper)
+  }
+  height = Math.round(Math.min(height, downward ? paper.height - from.y : from.y, paper.width / ratio))
+  width = Math.round(height * ratio)
+  return clampCrop({ x: middle.x - width / 2, y: downward ? from.y : from.y - height, width, height }, paper)
+}
+
+/**
+ * 이미 고른 자리를 새 비율에 맞춰 다시 잡습니다.
+ *
+ * 고른 네모 **안에 들어가도록** 줄이고 가운데를 지킵니다. 넓이를 지키며 늘이는 길도
+ * 있었지만, 가장자리에 붙여 고른 자리가 그림 밖으로 삐져나가 되레 다시 잡아야 했습니다.
+ */
+export function reshapeCrop(crop: Crop, ratio: number, paper: { width: number; height: number }): Crop {
+  const width = Math.round(Math.min(crop.width, crop.height * ratio))
+  const height = Math.round(width / ratio)
+  return clampCrop({
+    x: crop.x + (crop.width - width) / 2,
+    y: crop.y + (crop.height - height) / 2,
+    width,
+    height,
+  }, paper)
+}
+
 /** 한쪽을 정했을 때 비율을 지키는 다른 쪽 길이. */
 export function keepRatio(side: number, from: number, to: number): number {
   return clampSide((side * to) / from)

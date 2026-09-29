@@ -1,6 +1,6 @@
 import {
   clampCrop, clampSide, isUpright, keepRatio, MAX_SIDE, orientCss, orientedSize, orientName,
-  outputName, turnBy, UPRIGHT,
+  outputName, ratioOf, reshapeCrop, sizeCrop, turnBy, UPRIGHT,
 } from '../../src/lib/imageEdit'
 import { clampPercent, MAX_PERCENT, MIN_PERCENT, stepZoom, ZOOMS } from '../../src/lib/zoom'
 
@@ -111,6 +111,53 @@ same('손대지 않았으면', orientName(UPRIGHT), '그대로')
 same('돌리고 뒤집었으면 함께', orientName({ turn: 180, flipX: true, flipY: false }),
   '오른쪽으로 180° · 좌우 뒤집음')
 same('뒤집기만', orientName({ turn: 0, flipX: false, flipY: true }), '상하 뒤집음')
+
+console.log('\n>>> 10. 씌운 비율은 눕히고 세울 수 있다')
+same('가로로 누우면 긴 쪽이 너비', ratioOf('16:9', 'wide'), 16 / 9)
+same('세우면 뒤집힘', ratioOf('16:9', 'tall'), 9 / 16)
+same('정사각은 어느 쪽이든 1', ratioOf('1:1', 'tall'), 1)
+same('씌우지 않았으면 없음', ratioOf(null, 'wide'), null)
+
+console.log('\n>>> 11. 비율을 씌우고 끌면 그 비를 지킨다')
+const sheet = { width: 400, height: 300 }
+const both = { x: true, y: true }
+// 마음대로 고를 때는 두 점이 만드는 네모 그대로입니다.
+same('씌우지 않으면 끈 대로', sizeCrop({ from: { x: 10, y: 10 }, to: { x: 90, y: 40 }, axes: both, base: null }, null, sheet),
+  { x: 10, y: 10, width: 80, height: 30 })
+/*
+ * 비율을 씌우면 **손끝을 덮는 쪽**에 맞춥니다. 작은 쪽에 맞추면 손은 저만치 갔는데
+ * 네모가 따라오지 않아 끌리지 않는 것처럼 보입니다.
+ */
+same('가로가 길면 가로에 맞춤', sizeCrop({ from: { x: 0, y: 0 }, to: { x: 160, y: 20 }, axes: both, base: null }, 16 / 9, sheet),
+  { x: 0, y: 0, width: 160, height: 90 })
+same('세로가 길면 세로에 맞춤', sizeCrop({ from: { x: 0, y: 0 }, to: { x: 10, y: 90 }, axes: both, base: null }, 16 / 9, sheet),
+  { x: 0, y: 0, width: 160, height: 90 })
+// 왼쪽·위로 끌면 붙박이가 오른쪽 아래가 됩니다.
+same('거꾸로 끌어도 붙박이는 그대로', sizeCrop({ from: { x: 200, y: 200 }, to: { x: 40, y: 190 }, axes: both, base: null }, 16 / 9, sheet),
+  { x: 40, y: 110, width: 160, height: 90 })
+/*
+ * 그림 밖으로 넘치면 비율을 지킨 채 줄입니다. 안으로 밀어 넣기만 하면 잡고 있던
+ * 꼭지점이 손에서 빠져나갑니다.
+ */
+const spilled = sizeCrop({ from: { x: 0, y: 0 }, to: { x: 399, y: 299 }, axes: both, base: null }, 16 / 9, sheet)
+same('넘치면 비율을 지킨 채 줄임', spilled, { x: 0, y: 0, width: 400, height: 225 })
+// 변을 잡아 한 축만 움직이면 다른 축이 가운데를 지키며 따라옵니다.
+const sideways = sizeCrop({
+  from: { x: 100, y: 0 }, to: { x: 260, y: 0 }, axes: { x: true, y: false },
+  base: { x: 100, y: 100, width: 40, height: 40 },
+}, 16 / 9, sheet)
+same('변을 잡으면 다른 축이 가운데로 따라옴', sideways, { x: 100, y: 75, width: 160, height: 90 })
+
+console.log('\n>>> 12. 비율을 갈아 끼우면 이미 고른 자리도 다시 잡는다')
+// 고른 네모 **안에** 들어가도록 줄입니다. 늘이면 그림 밖으로 삐져나갑니다.
+same('넓은 네모는 높이에 맞춰 줄임', reshapeCrop({ x: 10, y: 10, width: 200, height: 100 }, 1, sheet),
+  { x: 60, y: 10, width: 100, height: 100 })
+same('가운데를 지킴', reshapeCrop({ x: 0, y: 0, width: 160, height: 160 }, 16 / 9, sheet),
+  { x: 0, y: 35, width: 160, height: 90 })
+expect('줄인 자리는 그림 안', (() => {
+  const got = reshapeCrop({ x: 380, y: 280, width: 20, height: 20 }, 16 / 9, sheet)
+  return got.x >= 0 && got.y >= 0 && got.x + got.width <= sheet.width && got.y + got.height <= sheet.height
+})())
 
 console.log('\n' + (problems ? `FAIL ${problems}건` : '모두 통과'))
 if (problems) process.exitCode = 1

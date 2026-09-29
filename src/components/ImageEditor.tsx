@@ -3,9 +3,9 @@ import { formatBytes, withMime } from '../lib/attachments'
 import { readBinaryFile } from '../lib/fsAccess'
 import { fileNameOf } from '../lib/paths'
 import {
-  clampCrop, clampSide, FORMATS, isUpright, keepRatio, MAX_SIDE, MIN_SIDE, orientCss, orientedSize,
-  orientName, outputName, renderImage, turnBy, UPRIGHT,
-  type Crop, type ImageFormat, type Orient,
+  clampSide, CROP_RATIOS, FORMATS, isUpright, keepRatio, MAX_SIDE, MIN_SIDE, orientCss, orientedSize,
+  orientName, outputName, ratioOf, renderImage, reshapeCrop, sizeCrop, turnBy, UPRIGHT,
+  type Crop, type ImageFormat, type Lay, type Orient,
 } from '../lib/imageEdit'
 import { askZoomPercent, clampPercent, stepZoom } from '../lib/zoom'
 import { FlipXIcon, FlipYIcon, RotateLeftIcon, RotateRightIcon } from './icons'
@@ -58,6 +58,10 @@ export function ImageEditor({ root, path, onSave, onCancel }: ImageEditorProps) 
 
   const [orient, setOrient] = useState<Orient>(UPRIGHT)
   const [crop, setCrop] = useState<Crop | null>(null)
+  /** 잘라낼 자리에 씌운 비율(`4:3` 같은 이름). null 이면 마음대로 고릅니다. */
+  const [shape, setShape] = useState<string | null>(null)
+  /** 긴 쪽이 가로인지 세로인지. */
+  const [lay, setLay] = useState<Lay>('wide')
   const [width, setWidth] = useState(0)
   const [height, setHeight] = useState(0)
   const [ratio, setRatio] = useState(true)
@@ -226,6 +230,20 @@ export function ImageEditor({ root, path, onSave, onCancel }: ImageEditorProps) 
   }
 
   /*
+   * 비율을 갈아 끼웁니다. 이미 고른 자리가 있으면 새 비에 맞춰 다시 잡아 줍니다.
+   *
+   * 그대로 두면 "16:9 를 골랐는데 화면의 네모는 아무 비" 인 채로 남아, 다시 끌어야 비로소
+   * 비율이 먹습니다. 고른 네모 안에 들어가도록 줄이므로 그림 밖으로 나갈 일도 없습니다.
+   */
+  const applyShape = (nextShape: string | null, nextLay: Lay) => {
+    setShape(nextShape)
+    setLay(nextLay)
+    const ratio = ratioOf(nextShape, nextLay)
+    if (ratio === null || !crop || !paperSize) return
+    applyCrop(reshapeCrop(crop, ratio, paperSize))
+  }
+
+  /*
    * 화면에 그려진 그림 위에서 끌어 잘라 낼 자리를 정합니다.
    * 재는 것은 칸이 아니라 **그림**입니다. 칸은 여백만큼 크고, 배율을 키우면 그림이 칸보다
    * 커져 굴러갑니다. 그림의 자리를 그대로 재서 보이는 대로의 크기로 되돌립니다.
@@ -275,14 +293,11 @@ export function ImageEditor({ root, path, onSave, onCancel }: ImageEditorProps) 
     if (!from || !paperSize) return
     const to = pointAt(where)
     if (!to) return
-    const base = dragBase.current
-    const axes = dragAxes.current
-    const next = clampCrop({
-      x: axes.x ? Math.min(from.x, to.x) : base?.x ?? 0,
-      y: axes.y ? Math.min(from.y, to.y) : base?.y ?? 0,
-      width: axes.x ? Math.abs(to.x - from.x) : base?.width ?? MIN_SIDE,
-      height: axes.y ? Math.abs(to.y - from.y) : base?.height ?? MIN_SIDE,
-    }, paperSize)
+    const next = sizeCrop(
+      { from, to, axes: dragAxes.current, base: dragBase.current },
+      ratioOf(shape, lay),
+      paperSize,
+    )
     applyCrop(next)
     showReadout(where, `${next.width} × ${next.height}`)
   }
@@ -679,6 +694,55 @@ export function ImageEditor({ root, path, onSave, onCancel }: ImageEditorProps) 
               onZoom={(next) => (next === null ? fitToStage() : setZoom(next))}
             />
           </div>
+          {/*
+            씌울 비율. 딱지의 글은 **고르면 나올 그대로**(세우면 16:9 가 9:16) 적습니다.
+            이름만 그대로 두고 속으로만 뒤집으면, 눌러 보기 전에는 어느 쪽이 길어지는지
+            알 수 없습니다. 좁은 칸이라 줄이 넘치면 접힙니다.
+          */}
+          <div className="row" style={{ alignItems: 'center', gap: 6 }}>
+            <span className="hint" style={{ margin: 0 }}>긴 쪽</span>
+            <div className="segmented" role="group" aria-label="긴 쪽">
+              <button
+                type="button"
+                className={lay === 'wide' ? 'is-active' : ''}
+                aria-pressed={lay === 'wide'}
+                onClick={() => applyShape(shape, 'wide')}
+              >
+                가로
+              </button>
+              <button
+                type="button"
+                className={lay === 'tall' ? 'is-active' : ''}
+                aria-pressed={lay === 'tall'}
+                onClick={() => applyShape(shape, 'tall')}
+              >
+                세로
+              </button>
+            </div>
+          </div>
+          <div className="ratio-group" role="group" aria-label="잘라낼 비율">
+            <button
+              type="button"
+              className={shape === null ? 'btn btn-small is-active' : 'btn btn-small'}
+              aria-pressed={shape === null}
+              data-tip="비율을 씌우지 않고 마음대로 고릅니다"
+              onClick={() => applyShape(null, lay)}
+            >
+              자유
+            </button>
+            {CROP_RATIOS.map((one) => (
+              <button
+                key={one.id}
+                type="button"
+                className={shape === one.id ? 'btn btn-small is-active' : 'btn btn-small'}
+                aria-pressed={shape === one.id}
+                onClick={() => applyShape(one.id, lay)}
+              >
+                {lay === 'wide' ? `${one.long}:${one.short}` : `${one.short}:${one.long}`}
+              </button>
+            ))}
+          </div>
+
           <div className="row" style={{ alignItems: 'center' }}>
             {crop ? (
               <>

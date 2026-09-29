@@ -2545,7 +2545,13 @@ button.info-caret:focus-visible { outline: 2px solid var(--accent); outline-offs
  */
 .turn-group { display: flex; gap: 4px; }
 .turn-group .btn { padding-inline: 7px; }
-.turn-group .is-active { background: var(--accent); border-color: var(--accent); color: #fff; }
+/*
+ * 씌울 비율 딱지. 여덟이라 320px 칸에서는 한 줄에 못 서므로 접힙니다.
+ * 고른 것은 돌리기 단추와 같은 낯으로 켭니다 — 둘 다 "눌러 둔 채로 남는" 자리입니다.
+ */
+.ratio-group { display: flex; flex-wrap: wrap; gap: 4px; }
+.turn-group .is-active,
+.ratio-group .is-active { background: var(--accent); border-color: var(--accent); color: #fff; }
 /* 눌러서 바뀐 것은 설명글보다 또렷하게. 아래에 따로 적는 줄이라 묻히면 적은 뜻이 없습니다. */
 .turn-now { color: var(--text); font-weight: 600; }
 /* 미리보기 오른쪽 위 정보의 형식 딱지. 숫자와 붙지 않게 조금 띄웁니다. */

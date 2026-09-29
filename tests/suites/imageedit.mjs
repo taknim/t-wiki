@@ -981,6 +981,73 @@ try {
   await page.click('.image-edit button:has-text("취소")')
   await page.waitForTimeout(400)
 
+  /*
+   * 인화지나 화면에 맞춰 넣을 그림은 비가 정해져 있습니다. 눈으로 맞춰 끌면 늘 한두 픽셀이
+   * 어긋나고, 어긋난 것은 넣어 보기 전에는 보이지 않습니다.
+   */
+  step('4-4. 비율을 씌우면 그 비로만 골라진다')
+  await page.click('.tree-row:has-text("사진.png") >> nth=0')
+  await page.waitForTimeout(400)
+  await openEditor()
+  await page.click('.image-edit .zoom-control button[aria-label="원본 크기"]')
+  await page.waitForTimeout(300)
+  const sides = () => page.evaluate(() => ({
+    width: Number(document.querySelector('#image-width').value),
+    height: Number(document.querySelector('#image-height').value),
+  }))
+  const dragBox = async (dx, dy) => {
+    const at = await page.locator('.image-edit-frame img').boundingBox()
+    await page.mouse.move(at.x + 20, at.y + 20)
+    await page.mouse.down()
+    await page.mouse.move(at.x + 20 + dx, at.y + 20 + dy, { steps: 8 })
+    await page.mouse.up()
+    await page.waitForTimeout(250)
+  }
+  const holds = (got, ratio) => Math.abs(got.width - got.height * ratio) <= 2
+
+  await page.click('.ratio-group button:has-text("16:9")')
+  await page.waitForTimeout(200)
+  // 세로로 짧게 끌어도 가로에 맞춰 16:9 가 됩니다(손끝을 덮는 쪽).
+  await dragBox(160, 20)
+  const laidWide = await sides()
+  console.log('  16:9 로 끌기: ' + JSON.stringify(laidWide))
+  expect('끈 자리가 16:9 로 잡힘', holds(laidWide, 16 / 9), JSON.stringify(laidWide))
+
+  // 긴 쪽을 세로로 바꾸면 딱지의 글도 나올 그대로(9:16) 바뀌고, 이미 고른 자리도 다시 잡힙니다.
+  await page.click('.image-edit .segmented button:has-text("세로")')
+  await page.waitForTimeout(300)
+  const stood = await sides()
+  const label = await page.textContent('.ratio-group .is-active')
+  console.log('  세우면: ' + JSON.stringify(stood) + ' · 딱지 ' + label)
+  expect('딱지도 나올 그대로 바뀜', label.trim() === '9:16', label)
+  expect('고른 자리가 9:16 으로 다시 잡힘', holds(stood, 9 / 16), JSON.stringify(stood))
+  expect('세로가 더 김', stood.height > stood.width, JSON.stringify(stood))
+
+  // 자유로 돌리면 끈 대로 골라집니다.
+  await page.click('.ratio-group button:has-text("자유")')
+  await page.waitForTimeout(200)
+  await dragBox(120, 30)
+  const free = await sides()
+  console.log('  자유: ' + JSON.stringify(free))
+  expect('자유는 끈 대로', Math.abs(free.width - 120) <= 3 && Math.abs(free.height - 30) <= 3,
+    JSON.stringify(free))
+
+  // 씌운 비율은 내놓는 파일까지 이어집니다. 화면에서만 맞고 파일이 어긋나면 헛일입니다.
+  await page.click('.image-edit .segmented button:has-text("가로")')
+  await page.waitForTimeout(200)
+  await page.click('.ratio-group button:has-text("1:1")')
+  await page.waitForTimeout(200)
+  await dragBox(140, 60)
+  const square = await sides()
+  console.log('  1:1: ' + JSON.stringify(square))
+  expect('1:1 은 네모반듯', Math.abs(square.width - square.height) <= 1, JSON.stringify(square))
+  await page.fill('.image-edit input[aria-label="파일 이름"]', '네모.png')
+  await saveEdit()
+  const evened = await madeFile('네모.png')
+  console.log('  ' + JSON.stringify(evened))
+  expect('나온 파일도 네모반듯', Math.abs(evened.size.width - evened.size.height) <= 1,
+    JSON.stringify(evened))
+
   step('5. 끌어서 자른 만큼만 나온다')
   await page.click('.tree-row:has-text("사진.png") >> nth=0')
   await page.waitForTimeout(400)
