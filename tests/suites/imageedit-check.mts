@@ -1,4 +1,7 @@
-import { clampCrop, clampSide, keepRatio, MAX_SIDE, outputName } from '../../src/lib/imageEdit'
+import {
+  clampCrop, clampSide, isUpright, keepRatio, MAX_SIDE, orientCss, orientedSize, orientName,
+  outputName, turnBy, UPRIGHT,
+} from '../../src/lib/imageEdit'
 import { clampPercent, MAX_PERCENT, MIN_PERCENT, stepZoom, ZOOMS } from '../../src/lib/zoom'
 
 /*
@@ -80,6 +83,34 @@ same('위로 넘치면 맨 위', clampPercent(1000), MAX_PERCENT)
 same('소수는 반올림', clampPercent(42.6), 43)
 // 숫자가 아니면 본디 크기로 둡니다. 빈 칸을 100% 로 읽는 것이 가장 덜 놀랍습니다.
 same('숫자가 아니면 100', clampPercent(Number.NaN), 100)
+
+console.log('\n>>> 7. 돌리기와 뒤집기는 90도 단위로 돌고 가로세로를 바꾼다')
+same('오른쪽으로 한 번', turnBy(0, 1), 90)
+same('왼쪽으로 한 번은 한 바퀴 뒤에서', turnBy(0, -1), 270)
+// 한 바퀴를 넘으면 처음으로 돌아옵니다. 눌린 횟수를 세어 두면 그 수가 끝없이 자랍니다.
+same('세 번 더 돌면 제자리', turnBy(270, 1), 0)
+same('90도면 가로세로가 바뀜', orientedSize({ width: 200, height: 100 }, 90), { width: 100, height: 200 })
+same('180도면 그대로', orientedSize({ width: 200, height: 100 }, 180), { width: 200, height: 100 })
+same('270도도 바뀜', orientedSize({ width: 200, height: 100 }, 270), { width: 100, height: 200 })
+expect('손대지 않은 방향', isUpright(UPRIGHT))
+expect('뒤집기만 해도 손댄 것', !isUpright({ ...UPRIGHT, flipX: true }))
+
+console.log('\n>>> 8. 화면에 그리는 변환은 canvas 에 그리는 차례와 같다')
+/*
+ * 뒤집기가 돌리기보다 **앞에** 적혀야 합니다(나중에 적은 것이 먼저 먹으므로 그림은 돌아간
+ * 뒤에 뒤집힙니다). 차례가 어긋나면 90도 돌려 놓은 그림에서 좌우 뒤집기가 상하로 듭니다.
+ */
+same('그대로', orientCss(UPRIGHT), 'translate(-50%, -50%) scale(1, 1) rotate(0deg)')
+same('돌리고 좌우 뒤집기', orientCss({ turn: 90, flipX: true, flipY: false }),
+  'translate(-50%, -50%) scale(-1, 1) rotate(90deg)')
+same('상하 뒤집기', orientCss({ turn: 0, flipX: false, flipY: true }),
+  'translate(-50%, -50%) scale(1, -1) rotate(0deg)')
+
+console.log('\n>>> 9. 지금 방향을 사람 말로 적는다')
+same('손대지 않았으면', orientName(UPRIGHT), '그대로')
+same('돌리고 뒤집었으면 함께', orientName({ turn: 180, flipX: true, flipY: false }),
+  '오른쪽으로 180° · 좌우 뒤집음')
+same('뒤집기만', orientName({ turn: 0, flipX: false, flipY: true }), '상하 뒤집음')
 
 console.log('\n' + (problems ? `FAIL ${problems}건` : '모두 통과'))
 if (problems) process.exitCode = 1

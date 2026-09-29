@@ -49,10 +49,22 @@ await page.addInitScript(() => {
   edge.height = 600
   edge.getContext('2d').fillStyle = 'rgb(120, 90, 160)'
   edge.getContext('2d').fillRect(0, 0, 1000, 600)
+  /*
+   * 방향을 눈으로 가릴 수 있는 그림. 200 × 100 에서 **왼쪽 위 네모만** 칠하고 나머지는
+   * 비워 둡니다. 돌리거나 뒤집으면 칠한 자리가 어디로 갔는지로 가릴 수 있습니다.
+   * 네 귀퉁이를 다 칠하면 어느 것이 어디로 갔는지 되짚기 어려워 한 곳만 칠합니다.
+   */
+  const facing = document.createElement('canvas')
+  facing.width = 200
+  facing.height = 100
+  const mark = facing.getContext('2d')
+  mark.fillStyle = 'rgb(220, 40, 40)'
+  mark.fillRect(0, 0, 100, 50)
   window.__seedImage = () => Promise.all([
     new Promise((done) => canvas.toBlob((blob) => { put('사진.png', blob); done() }, 'image/png')),
     new Promise((done) => big.toBlob((blob) => { put('큰 그림.png', blob); done() }, 'image/png')),
     new Promise((done) => edge.toBlob((blob) => { put('가장자리.png', blob); done() }, 'image/png')),
+    new Promise((done) => facing.toBlob((blob) => { put('방향.png', blob); done() }, 'image/png')),
   ])
 })
 
@@ -71,6 +83,22 @@ const madeFile = (name) => page.evaluate(async (which) => {
     kind: head[0] === 0x89 && head[1] === 0x50 ? 'png' : head[0] === 0xff && head[1] === 0xd8 ? 'jpg' : '?',
   }
 }, name)
+
+/** 만들어진 그림의 한 점 색. 방향이 바뀌었는지는 칠한 자리가 어디로 갔는지로 가립니다. */
+const pixelAt = (name, x, y) => page.evaluate(async (where) => {
+  const blob = window.__mockRoot._children.get(where.name)._data
+  const bitmap = await createImageBitmap(blob)
+  const canvas = document.createElement('canvas')
+  canvas.width = bitmap.width
+  canvas.height = bitmap.height
+  canvas.getContext('2d').drawImage(bitmap, 0, 0)
+  bitmap.close()
+  const [r, g, b, a] = canvas.getContext('2d').getImageData(where.x, where.y, 1, 1).data
+  return { r, g, b, a }
+}, { name, x, y })
+/** 칠해진 점인지(붉게 칠한 자리) / 빈 점인지. */
+const painted = (dot) => dot.a > 200 && dot.r > 180 && dot.g < 90
+const blank = (dot) => dot.a < 20
 
 const names = () => page.evaluate(() => [...window.__mockRoot._children.keys()].filter((one) => /사진|자른/.test(one)))
 const openEditor = async () => {
@@ -781,6 +809,133 @@ try {
   console.log('  해제한 뒤: ' + JSON.stringify(cleared))
   expect('덮개가 걷힘', (await page.locator('.image-edit-crop').count()) === 0)
   expect('그림 전체 크기로 돌아감', cleared.width === 300 && cleared.height === 200, JSON.stringify(cleared))
+  await page.click('.image-edit button:has-text("취소")')
+  await page.waitForTimeout(400)
+
+  /*
+   * 폰으로 찍은 그림이 옆으로 누워 있거나 거울에 비친 듯 뒤집혀 있는 일이 흔합니다.
+   * 돌리기·뒤집기는 **보이는 대로** 셈해야 합니다 — 화면에서 오른쪽으로 돌린 것이 파일에서
+   * 왼쪽으로 돌아가 있으면 두 번 고쳐야 합니다.
+   */
+  step('4-3. 돌리고 뒤집으면 내놓는 그림도 그 방향으로 나온다')
+  await page.click('.tree-row:has-text("방향.png") .tree-name')
+  await page.waitForSelector('.asset-image', { timeout: 8000 })
+  await page.waitForTimeout(400)
+  await openEditor()
+  const facing = () => page.evaluate(() => {
+    const canvas = document.querySelector('.image-edit-canvas')
+    const box = canvas.getBoundingClientRect()
+    return {
+      width: document.querySelector('#image-width').value,
+      height: document.querySelector('#image-height').value,
+      적힌방향: document.querySelector('.image-edit .turn-now').textContent.trim(),
+      변환: document.querySelector('.image-edit-frame img').style.transform,
+      칸: [Math.round(box.width), Math.round(box.height)],
+      덮개: document.querySelector('.image-edit-crop') !== null,
+    }
+  })
+  const upright = await facing()
+  console.log('  열 때: ' + JSON.stringify(upright))
+  expect('처음에는 손대지 않은 방향', upright.적힌방향 === '그대로', upright.적힌방향)
+  expect('내놓을 크기는 본디 크기', `${upright.width}x${upright.height}` === '200x100',
+    JSON.stringify(upright))
+  expect('되돌리기 단추는 아직 없음',
+    (await page.locator('.image-edit button:has-text("되돌리기")').count()) === 0)
+
+  // 먼저 한 자리를 골라 둡니다. 돌리면 그 자리는 뜻을 잃으므로 함께 풀려야 합니다.
+  const facingBox = await page.locator('.image-edit-frame img').boundingBox()
+  await page.mouse.move(facingBox.x + 10, facingBox.y + 10)
+  await page.mouse.down()
+  await page.mouse.move(facingBox.x + facingBox.width * 0.5, facingBox.y + facingBox.height * 0.5, { steps: 6 })
+  await page.mouse.up()
+  await page.waitForTimeout(300)
+  expect('고른 자리가 생김', (await facing()).덮개)
+
+  await page.click('.image-edit button[aria-label="오른쪽으로 90도 돌리기"]')
+  await page.waitForTimeout(400)
+  const turned = await facing()
+  console.log('  오른쪽으로 한 번: ' + JSON.stringify(turned))
+  expect('적힌 방향이 바뀜', turned.적힌방향 === '오른쪽으로 90°', turned.적힌방향)
+  expect('가로와 세로가 바뀜', `${turned.width}x${turned.height}` === '100x200', JSON.stringify(turned))
+  expect('그림도 돌아감', turned.변환.includes('rotate(90deg)'), turned.변환)
+  // 칸이 함께 서지 않으면 돌린 그림이 옆으로 삐져나가 잘립니다.
+  expect('칸도 세로로 섬', turned.칸[1] > turned.칸[0], JSON.stringify(turned.칸))
+  expect('고른 자리는 풀림', turned.덮개 === false, JSON.stringify(turned))
+  await page.screenshot({ path: join(HERE, '..', 'shots', 'imageedit', '03-turn.png') })
+  await page.fill('.image-edit input[aria-label="파일 이름"]', '돌린 것.png')
+  await saveEdit()
+  const spun = await madeFile('돌린 것.png')
+  console.log('  ' + JSON.stringify(spun))
+  expect('세로로 선 그림이 나옴', spun?.size.width === 100 && spun.size.height === 200, JSON.stringify(spun))
+  /*
+   * 왼쪽 위에 있던 자리는 오른쪽으로 돌리면 오른쪽 위로 갑니다. 왼쪽 위가 그대로 남아
+   * 있으면 크기만 바꾸고 그림은 그대로 그린 것입니다(크기만 보면 놓칩니다).
+   */
+  const rightTop = await pixelAt('돌린 것.png', 75, 50)
+  const leftTop = await pixelAt('돌린 것.png', 25, 50)
+  console.log('  오른쪽 위 ' + JSON.stringify(rightTop) + ' · 왼쪽 위 ' + JSON.stringify(leftTop))
+  expect('칠한 자리가 오른쪽 위로 감', painted(rightTop), JSON.stringify(rightTop))
+  expect('왼쪽 위는 비어 있음', blank(leftTop), JSON.stringify(leftTop))
+
+  // 좌우 뒤집기. 크기는 그대로고 칠한 자리만 오른쪽으로 갑니다.
+  await page.click('.tree-row:has-text("방향.png") .tree-name')
+  await page.waitForTimeout(400)
+  await openEditor()
+  await page.click('.image-edit button[aria-label="좌우 뒤집기"]')
+  await page.waitForTimeout(300)
+  const flipped = await facing()
+  console.log('  좌우 뒤집음: ' + JSON.stringify(flipped))
+  expect('적힌 방향이 바뀜', flipped.적힌방향 === '좌우 뒤집음', flipped.적힌방향)
+  expect('크기는 그대로', `${flipped.width}x${flipped.height}` === '200x100', JSON.stringify(flipped))
+  expect('단추가 켜짐', (await page.getAttribute('.image-edit button[aria-label="좌우 뒤집기"]', 'aria-pressed')) === 'true')
+  await page.fill('.image-edit input[aria-label="파일 이름"]', '좌우.png')
+  await saveEdit()
+  const mirrored = await madeFile('좌우.png')
+  expect('크기는 그대로 나옴', mirrored?.size.width === 200 && mirrored.size.height === 100,
+    JSON.stringify(mirrored))
+  expect('칠한 자리가 오른쪽으로 감', painted(await pixelAt('좌우.png', 150, 25)),
+    JSON.stringify(await pixelAt('좌우.png', 150, 25)))
+  expect('왼쪽은 비워짐', blank(await pixelAt('좌우.png', 50, 25)),
+    JSON.stringify(await pixelAt('좌우.png', 50, 25)))
+
+  // 상하 뒤집기. 칠한 자리가 아래로 내려갑니다.
+  await page.click('.tree-row:has-text("방향.png") .tree-name')
+  await page.waitForTimeout(400)
+  await openEditor()
+  await page.click('.image-edit button[aria-label="상하 뒤집기"]')
+  await page.waitForTimeout(300)
+  expect('적힌 방향이 바뀜', (await facing()).적힌방향 === '상하 뒤집음', (await facing()).적힌방향)
+  await page.fill('.image-edit input[aria-label="파일 이름"]', '상하.png')
+  await saveEdit()
+  expect('칠한 자리가 아래로 감', painted(await pixelAt('상하.png', 25, 75)),
+    JSON.stringify(await pixelAt('상하.png', 25, 75)))
+  expect('위쪽은 비워짐', blank(await pixelAt('상하.png', 25, 25)),
+    JSON.stringify(await pixelAt('상하.png', 25, 25)))
+
+  /*
+   * 두 번 돌리면 180도, 되돌리기 한 번으로 모두 풀립니다. 돌리기를 거꾸로 세어 가며
+   * 풀게 하면 몇 번 눌렀는지 세어야 합니다.
+   */
+  await page.click('.tree-row:has-text("방향.png") .tree-name')
+  await page.waitForTimeout(400)
+  await openEditor()
+  await page.click('.image-edit button[aria-label="오른쪽으로 90도 돌리기"]')
+  await page.waitForTimeout(200)
+  await page.click('.image-edit button[aria-label="오른쪽으로 90도 돌리기"]')
+  await page.waitForTimeout(200)
+  await page.click('.image-edit button[aria-label="좌우 뒤집기"]')
+  await page.waitForTimeout(300)
+  const twice = await facing()
+  console.log('  두 번 돌리고 뒤집음: ' + JSON.stringify(twice))
+  expect('두 번 돌리면 180도', twice.적힌방향 === '오른쪽으로 180° · 좌우 뒤집음', twice.적힌방향)
+  expect('180도면 가로세로는 그대로', `${twice.width}x${twice.height}` === '200x100', JSON.stringify(twice))
+  await page.click('.image-edit button:has-text("되돌리기")')
+  await page.waitForTimeout(300)
+  const undone = await facing()
+  console.log('  되돌린 뒤: ' + JSON.stringify(undone))
+  expect('한 번에 다 풀림', undone.적힌방향 === '그대로', undone.적힌방향)
+  expect('크기도 돌아옴', `${undone.width}x${undone.height}` === '200x100', JSON.stringify(undone))
+  expect('변환도 걷힘', !undone.변환.includes('rotate(90deg)') && !undone.변환.includes('-1'), undone.변환)
   await page.click('.image-edit button:has-text("취소")')
   await page.waitForTimeout(400)
 

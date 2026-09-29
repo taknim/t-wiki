@@ -272,6 +272,55 @@ export function MinusIcon(props: IconProps) {
   )
 }
 
+/*
+ * 돌리기와 뒤집기.
+ *
+ * 돌리기는 둥근 화살로, 뒤집기는 가운데 접는 금과 그 양쪽 쐐기로 그립니다. 같은 모양을
+ * 방향만 바꿔 쓰면 네 단추가 서로 구별되지 않아, 돌리기와 뒤집기를 아주 다르게 둡니다.
+ */
+export function RotateRightIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M8 3.2a4.8 4.8 0 1 1-4.8 4.8" />
+      <path d="M6.3 1.5 8.1 3.2 6.3 4.9" />
+    </Svg>
+  )
+}
+
+export function RotateLeftIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M8 3.2a4.8 4.8 0 1 0 4.8 4.8" />
+      <path d="M9.7 1.5 7.9 3.2 9.7 4.9" />
+    </Svg>
+  )
+}
+
+/*
+ * 뒤집기는 접는 금을 사이에 두고 마주 보는 두 쐐기로 그립니다. 한쪽만 칠해 두면 "같은
+ * 그림이 거울에 비친 것" 이 한눈에 읽힙니다 — 둘 다 테두리로만 그렸더니 16픽셀에서는
+ * 두 쐐기가 붙어 마름모 하나로 보여, 좌우와 상하를 가릴 수 없었습니다.
+ */
+export function FlipXIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M8 2.4v11.2" strokeDasharray="1.6 1.6" />
+      <path d="M6.2 4.8v6.4L2.8 8z" fill="currentColor" stroke="none" />
+      <path d="M9.8 4.8v6.4L13.2 8z" />
+    </Svg>
+  )
+}
+
+export function FlipYIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M2.4 8h11.2" strokeDasharray="1.6 1.6" />
+      <path d="M4.8 6.2h6.4L8 2.8z" fill="currentColor" stroke="none" />
+      <path d="M4.8 9.8h6.4L8 13.2z" />
+    </Svg>
+  )
+}
+
 export function TrashIcon(props: IconProps) {
   return (
     <Svg {...props}>

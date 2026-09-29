@@ -2348,11 +2348,18 @@ button.info-caret:focus-visible { outline: 2px solid var(--accent); outline-offs
  * 100% 로 묶어 두었더니 칸 너비에 닿는 순간 더 키워지지 않아, 크게 보며 고를 수가
  * 없었습니다. 넘치면 칸이 가로로 굴러가면 됩니다.
  */
+/* 돌린 뒤의 크기를 지닌 칸. 그림은 이 안에서 가운데를 축으로 돌아갑니다. */
 .image-edit-canvas { flex: none; }
 .image-edit-frame {
   position: relative;
   line-height: 0;
-  border: 1px solid var(--border);
+  width: 100%;
+  height: 100%;
+  /*
+   * 테두리를 border 로 두면 그 두께만큼 안쪽이 줄어듭니다. 그림은 칸 크기 그대로 그려지므로
+   * 2픽셀이 어긋나, 고른 덮개가 그림보다 살짝 밀려 그려집니다. outline 은 자리를 먹지 않습니다.
+   */
+  outline: 1px solid var(--border);
   border-radius: 6px;
   overflow: hidden;
   /* 끄는 동안 그림이 잡혀 끌리거나 화면이 밀리지 않도록 막습니다. */
@@ -2367,7 +2374,17 @@ button.info-caret:focus-visible { outline: 2px solid var(--accent); outline-offs
 .image-edit-frame.is-panning:active { cursor: grabbing; }
 /* 옮기는 중에는 손잡이도 같은 모양이어야 합니다. 꼭지점 위에서만 화살표가 남으면 어리둥절합니다. */
 .image-edit-frame.is-panning .crop-grip { cursor: inherit; }
-.image-edit-frame img { display: block; width: 100%; height: auto; }
+/*
+ * 그림은 칸 가운데에 붙여 놓고 돌립니다. 흐름에 그대로 두면 돌아간 그림이 돌기 전의 자리를
+ * 그대로 차지해, 세로로 선 그림 옆에 가로만큼의 빈 자리가 남습니다.
+ */
+.image-edit-frame img {
+  display: block;
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-start: 50%;
+  transform-origin: center;
+}
 /* 고른 자리. 테두리만으로는 밝은 그림 위에서 안 보여 바깥을 덮어 어둡게 합니다. */
 .image-edit-crop {
   position: absolute;
@@ -2522,6 +2539,13 @@ button.info-caret:focus-visible { outline: 2px solid var(--accent); outline-offs
   box-shadow: none;
 }
 .image-edit .zoom-now { min-width: 3.4em; }
+/*
+ * 돌리기·뒤집기 단추. 네 개를 붙여 세워 한 묶음으로 읽히게 합니다.
+ * 뒤집기는 눌러 둔 채로 남으므로(같은 단추를 다시 눌러 풉니다) 켜진 것을 색으로 알립니다.
+ */
+.turn-group { display: flex; gap: 4px; }
+.turn-group .btn { padding-inline: 7px; }
+.turn-group .is-active { background: var(--accent); border-color: var(--accent); color: #fff; }
 /* 미리보기 오른쪽 위 정보의 형식 딱지. 숫자와 붙지 않게 조금 띄웁니다. */
 .asset-size-kind {
   margin-inline-end: 6px;

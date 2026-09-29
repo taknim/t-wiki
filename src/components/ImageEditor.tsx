@@ -3,10 +3,12 @@ import { formatBytes, withMime } from '../lib/attachments'
 import { readBinaryFile } from '../lib/fsAccess'
 import { fileNameOf } from '../lib/paths'
 import {
-  clampCrop, clampSide, FORMATS, keepRatio, MAX_SIDE, MIN_SIDE, outputName, renderImage,
-  type Crop, type ImageFormat,
+  clampCrop, clampSide, FORMATS, isUpright, keepRatio, MAX_SIDE, MIN_SIDE, orientCss, orientedSize,
+  orientName, outputName, renderImage, turnBy, UPRIGHT,
+  type Crop, type ImageFormat, type Orient,
 } from '../lib/imageEdit'
 import { askZoomPercent, clampPercent, stepZoom } from '../lib/zoom'
+import { FlipXIcon, FlipYIcon, RotateLeftIcon, RotateRightIcon } from './icons'
 import { ZoomControl } from './ZoomControl'
 import { useSpacePan } from '../hooks/useSpacePan'
 import { useEscapeClose } from '../hooks/useEscapeClose'
@@ -54,6 +56,7 @@ export function ImageEditor({ root, path, onSave, onCancel }: ImageEditorProps) 
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
+  const [orient, setOrient] = useState<Orient>(UPRIGHT)
   const [crop, setCrop] = useState<Crop | null>(null)
   const [width, setWidth] = useState(0)
   const [height, setHeight] = useState(0)
@@ -110,8 +113,16 @@ export function ImageEditor({ root, path, onSave, onCancel }: ImageEditorProps) 
     }
   }, [root, path])
 
+  /**
+   * 화면에 보이는 대로의 크기. 90도 돌려 놓으면 가로와 세로가 바뀝니다.
+   *
+   * 잘라내기·크기·덮개는 모두 **이 크기**로 셉니다. 본디 크기로 셈을 하면 돌린 뒤에
+   * 손가락이 짚은 자리와 그림의 자리가 어긋나, 고른 덮개가 딴 곳에 그려집니다.
+   */
+  const paperSize = natural ? orientedSize(natural, orient.turn) : null
+
   /** 잘라 낸 자리(없으면 통째로). 여기서부터 내놓을 크기를 셉니다. */
-  const base = crop ?? (natural ? { x: 0, y: 0, ...natural } : null)
+  const base = crop ?? (paperSize ? { x: 0, y: 0, ...paperSize } : null)
 
   const onLoaded = (event: { currentTarget: HTMLImageElement }) => {
     const image = event.currentTarget
@@ -154,7 +165,7 @@ export function ImageEditor({ root, path, onSave, onCancel }: ImageEditorProps) 
   }
 
   /** 칸에 꽉 차는 배율로 맞춥니다. */
-  const fitToStage = (size: Natural | null = natural) => {
+  const fitToStage = (size: Natural | null = paperSize) => {
     const fit = measureFit(size)
     if (fit === null) return
     setFitZoom(fit)
@@ -180,22 +191,53 @@ export function ImageEditor({ root, path, onSave, onCancel }: ImageEditorProps) 
   /** 잘라 낸 자리가 바뀌면 내놓을 크기도 그 크기로 되돌립니다. 앞서 정한 수는 뜻이 달라집니다. */
   const applyCrop = (next: Crop | null) => {
     setCrop(next)
-    const size = next ?? natural
+    const size = next ?? paperSize
     if (size) {
       setWidth(size.width)
       setHeight(size.height)
     }
   }
 
+  /** 칸에 꽉 차는 배율로 보고 있는지. 맞춤 단추를 켜 두는 데에도, 돌린 뒤 다시 맞추는 데에도 씁니다. */
+  const fitted = fitZoom !== null && Math.abs(zoom - fitZoom) < 0.005
+
+  /*
+   * 돌리거나 뒤집습니다.
+   *
+   * **고른 자리는 함께 지웁니다.** 그 자리는 보이는 대로의 좌표라, 돌리면 가로세로가 바뀌어
+   * 뜻을 잃습니다(가로로 길게 고른 자리를 세로 그림에 밀어 넣으면 엉뚱한 데가 남습니다).
+   * 뒤집기는 크기가 그대로지만 덮개 안의 그림이 딴 것으로 바뀌므로 함께 지웁니다 —
+   * 어떤 단추를 눌렀느냐에 따라 남기도 하고 지워지기도 하면 짐작할 수 없습니다.
+   *
+   * 맞춤으로 보고 있었으면 돌린 뒤에도 다시 맞춥니다. 가로로 길던 그림이 세로가 되면 칸을
+   * 넘쳐, 돌린 그림의 아래가 잘린 채로 남습니다. 배율을 손으로 정해 둔 사람은 그대로 둡니다.
+   */
+  const applyOrient = (next: Orient) => {
+    setOrient(next)
+    setCrop(null)
+    if (!natural) return
+    const size = orientedSize(natural, next.turn)
+    setWidth(size.width)
+    setHeight(size.height)
+    const fit = measureFit(size)
+    if (fit === null) return
+    setFitZoom(fit)
+    if (fitted) setZoom(fit)
+  }
+
   /*
    * 화면에 그려진 그림 위에서 끌어 잘라 낼 자리를 정합니다.
-   * 재는 것은 칸이 아니라 **그림**입니다. 칸은 테두리와 여백만큼 크고, 배율을 키우면
-   * 그림이 칸보다 커져 굴러갑니다. 그림의 자리를 그대로 재서 본디 크기로 되돌립니다.
+   * 재는 것은 칸이 아니라 **그림**입니다. 칸은 여백만큼 크고, 배율을 키우면 그림이 칸보다
+   * 커져 굴러갑니다. 그림의 자리를 그대로 재서 보이는 대로의 크기로 되돌립니다.
    */
   const pointAt = (event: { clientX: number; clientY: number }): { x: number; y: number } | null => {
+    /*
+     * 돌려 놓았어도 그림이 놓인 자리를 그대로 잽니다. CSS 로 돌린 그림의 자리(rect)는
+     * 돌아간 뒤의 테두리이므로, 보이는 대로의 크기로 나누면 곧 보이는 좌표가 됩니다.
+     */
     const box = shown.current?.getBoundingClientRect()
-    if (!box || !natural) return null
-    const scale = natural.width / box.width
+    if (!box || !paperSize) return null
+    const scale = paperSize.width / box.width
     return {
       x: Math.round((event.clientX - box.left) * scale),
       y: Math.round((event.clientY - box.top) * scale),
@@ -215,12 +257,12 @@ export function ImageEditor({ root, path, onSave, onCancel }: ImageEditorProps) 
   const dragTo = (where: { clientX: number; clientY: number }) => {
     // 옮기는 중이면 크기는 그대로 두고 자리만 밀어 줍니다. 그림 밖으로는 나가지 않습니다.
     const moving = moveFrom.current
-    if (moving && natural) {
+    if (moving && paperSize) {
       const to = pointAt(where)
       if (!to) return
       const next = {
-        x: Math.min(Math.max(moving.crop.x + (to.x - moving.x), 0), natural.width - moving.crop.width),
-        y: Math.min(Math.max(moving.crop.y + (to.y - moving.y), 0), natural.height - moving.crop.height),
+        x: Math.min(Math.max(moving.crop.x + (to.x - moving.x), 0), paperSize.width - moving.crop.width),
+        y: Math.min(Math.max(moving.crop.y + (to.y - moving.y), 0), paperSize.height - moving.crop.height),
         width: moving.crop.width,
         height: moving.crop.height,
       }
@@ -230,7 +272,7 @@ export function ImageEditor({ root, path, onSave, onCancel }: ImageEditorProps) 
     }
 
     const from = dragFrom.current
-    if (!from || !natural) return
+    if (!from || !paperSize) return
     const to = pointAt(where)
     if (!to) return
     const base = dragBase.current
@@ -240,7 +282,7 @@ export function ImageEditor({ root, path, onSave, onCancel }: ImageEditorProps) 
       y: axes.y ? Math.min(from.y, to.y) : base?.y ?? 0,
       width: axes.x ? Math.abs(to.x - from.x) : base?.width ?? MIN_SIDE,
       height: axes.y ? Math.abs(to.y - from.y) : base?.height ?? MIN_SIDE,
-    }, natural)
+    }, paperSize)
     applyCrop(next)
     showReadout(where, `${next.width} × ${next.height}`)
   }
@@ -303,7 +345,7 @@ export function ImageEditor({ root, path, onSave, onCancel }: ImageEditorProps) 
     && at.y >= crop.y && at.y <= crop.y + crop.height
 
   const onDown = (event: React.PointerEvent) => {
-    if (!natural || !isPicking(event)) return
+    if (!paperSize || !isPicking(event)) return
     if (pan.begin(event)) {
       event.currentTarget.setPointerCapture(event.pointerId)
       return
@@ -344,7 +386,7 @@ export function ImageEditor({ root, path, onSave, onCancel }: ImageEditorProps) 
    * 똑같은 셈으로 늘이기까지 다룰 수 있습니다.
    */
   const onGrip = (grip: Grip) => (event: React.PointerEvent) => {
-    if (!crop || !natural || !isPicking(event)) return
+    if (!crop || !paperSize || !isPicking(event)) return
     /*
      * 옮기는 중에는 손잡이도 옮기는 자리입니다. 여기서 사건을 붙들지 않고 흘려보내면
      * 아래 칸(그림 틀)이 받아 옮기기로 다룹니다. 붙들면 손잡이 위에서만 옮기기가
@@ -383,7 +425,7 @@ export function ImageEditor({ root, path, onSave, onCancel }: ImageEditorProps) 
     // 아직 고르기 전. 그림에서 어디를 짚고 있는지 적고, 안쪽이면 옮길 수 있다고 알립니다.
     const at = pointAt(event)
     setInside(within(at))
-    if (at && natural) showReadout(event, `${at.x}, ${at.y}`)
+    if (at) showReadout(event, `${at.x}, ${at.y}`)
   }
   const onUp = () => {
     /*
@@ -461,41 +503,49 @@ export function ImageEditor({ root, path, onSave, onCancel }: ImageEditorProps) 
   useEffect(() => {
     const box = stage.current
     if (!box || !natural) return
-    const watch = new ResizeObserver(() => setFitZoom(measureFit(natural)))
+    const watch = new ResizeObserver(() => setFitZoom(measureFit(orientedSize(natural, orient.turn))))
     watch.observe(box)
     return () => watch.disconnect()
     // measureFit 은 렌더마다 새로 지어지지만 하는 일은 같습니다. 크기만 지켜보면 됩니다.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [natural])
+  }, [natural, orient.turn])
 
   const save = useCallback(async () => {
     if (!source || !natural) return
     setBusy(true)
     setError(null)
     try {
-      const blob = await renderImage(source, { crop, width, height, format, quality: quality / 100 })
+      const blob = await renderImage(source, { orient, crop, width, height, format, quality: quality / 100 })
       await onSave(name.trim() || outputName(path, format), blob)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause))
     } finally {
       setBusy(false)
     }
-  }, [crop, format, height, name, natural, onSave, path, quality, source, width])
+  }, [crop, format, height, name, natural, onSave, orient, path, quality, source, width])
 
   // 잘라 낸 자리를 그림 안의 비율(%)로 옮겨 덮개를 그립니다. 배율이 바뀌어도 그대로 따라갑니다.
-  const overlay = crop && natural
+  const overlay = crop && paperSize
     ? {
-        left: `${(crop.x / natural.width) * 100}%`,
-        top: `${(crop.y / natural.height) * 100}%`,
-        width: `${(crop.width / natural.width) * 100}%`,
-        height: `${(crop.height / natural.height) * 100}%`,
+        left: `${(crop.x / paperSize.width) * 100}%`,
+        top: `${(crop.y / paperSize.height) * 100}%`,
+        width: `${(crop.width / paperSize.width) * 100}%`,
+        height: `${(crop.height / paperSize.height) * 100}%`,
       }
     : null
 
   return (
     <div className="image-edit">
       <div className="image-edit-stage" ref={stage}>
-        <div className="image-edit-canvas" style={natural ? { width: natural.width * zoom } : undefined}>
+        {/*
+          칸은 **돌린 뒤의** 크기를 지니고, 그 안에서 그림만 돌아갑니다. 칸째로 돌리면
+          고른 덮개와 손잡이까지 함께 돌아가, 왼쪽 위 손잡이가 오른쪽 아래에 가서 서고
+          가로로 늘이려던 손이 세로를 늘입니다.
+        */}
+        <div
+          className="image-edit-canvas"
+          style={paperSize ? { width: paperSize.width * zoom, height: paperSize.height * zoom } : undefined}
+        >
           {url && (
             <div
               className={`image-edit-frame${pan.held ? ' is-panning' : ''}${inside ? ' is-inside' : ''}`}
@@ -505,7 +555,16 @@ export function ImageEditor({ root, path, onSave, onCancel }: ImageEditorProps) 
               onPointerCancel={onUp}
               onPointerLeave={onLeave}
             >
-              <img ref={shown} src={url} alt={`${fileNameOf(path)} 미리보기`} onLoad={onLoaded} draggable={false} />
+              <img
+                ref={shown}
+                src={url}
+                alt={`${fileNameOf(path)} 미리보기`}
+                onLoad={onLoaded}
+                draggable={false}
+                style={natural
+                  ? { width: natural.width * zoom, height: natural.height * zoom, transform: orientCss(orient) }
+                  : undefined}
+              />
               {overlay && (
                 <div className="image-edit-crop" style={overlay}>
                   {GRIPS.map((grip) => (
@@ -536,6 +595,69 @@ export function ImageEditor({ root, path, onSave, onCancel }: ImageEditorProps) 
         {error && <p className="status image-edit-error">{error}</p>}
 
         <section className="field">
+          <h4 className="field-group-title">돌리기</h4>
+          <div className="row" style={{ alignItems: 'center', gap: 6 }}>
+            <div className="turn-group" role="group" aria-label="돌리기와 뒤집기">
+              <button
+                type="button"
+                className="btn btn-small"
+                aria-label="왼쪽으로 90도 돌리기"
+                data-tip="왼쪽으로 90° 돌립니다"
+                onClick={() => applyOrient({ ...orient, turn: turnBy(orient.turn, -1) })}
+              >
+                <RotateLeftIcon />
+              </button>
+              <button
+                type="button"
+                className="btn btn-small"
+                aria-label="오른쪽으로 90도 돌리기"
+                data-tip="오른쪽으로 90° 돌립니다"
+                onClick={() => applyOrient({ ...orient, turn: turnBy(orient.turn, 1) })}
+              >
+                <RotateRightIcon />
+              </button>
+              <button
+                type="button"
+                className={orient.flipX ? 'btn btn-small is-active' : 'btn btn-small'}
+                aria-label="좌우 뒤집기"
+                aria-pressed={orient.flipX}
+                data-tip="왼쪽과 오른쪽을 뒤집습니다"
+                onClick={() => applyOrient({ ...orient, flipX: !orient.flipX })}
+              >
+                <FlipXIcon />
+              </button>
+              <button
+                type="button"
+                className={orient.flipY ? 'btn btn-small is-active' : 'btn btn-small'}
+                aria-label="상하 뒤집기"
+                aria-pressed={orient.flipY}
+                data-tip="위와 아래를 뒤집습니다"
+                onClick={() => applyOrient({ ...orient, flipY: !orient.flipY })}
+              >
+                <FlipYIcon />
+              </button>
+            </div>
+            {/* 무엇을 해 놓았는지 적습니다. 뒤집기는 그림에 따라 눈으로 가리기 어렵습니다. */}
+            <span className="hint turn-now" style={{ margin: 0 }}>
+              {orientName(orient)}
+            </span>
+            {!isUpright(orient) && (
+              <button
+                type="button"
+                className="btn btn-small"
+                data-tip="돌리기와 뒤집기를 모두 풉니다"
+                onClick={() => applyOrient(UPRIGHT)}
+              >
+                되돌리기
+              </button>
+            )}
+          </div>
+          <p className="hint" style={{ margin: 0 }}>
+            돌리거나 뒤집으면 고른 자리는 풀립니다. 방향을 먼저 잡고 잘라내기를 하면 됩니다.
+          </p>
+        </section>
+
+        <section className="field">
           <h4 className="field-group-title">잘라내기</h4>
           <p className="hint" style={{ marginTop: 0 }}>
             그림 위를 끌어 남길 자리를 고릅니다. 작은 그림은 키워 놓고 고르면 쉽습니다.
@@ -549,7 +671,7 @@ export function ImageEditor({ root, path, onSave, onCancel }: ImageEditorProps) 
             */}
             <ZoomControl
               scale={zoom}
-              fitted={fitZoom !== null && Math.abs(zoom - fitZoom) < 0.005}
+              fitted={fitted}
               onZoom={(next) => (next === null ? fitToStage() : setZoom(next))}
             />
           </div>
@@ -571,7 +693,8 @@ export function ImageEditor({ root, path, onSave, onCancel }: ImageEditorProps) 
             ) : (
               <span className="hint" style={{ margin: 0 }}>
                 고른 자리가 없어 통째로 내놓습니다.
-                {natural && ` 본디 ${natural.width} × ${natural.height}`}
+                {/* 돌려 놓으면 가로세로가 바뀌므로 본디 크기가 아니라 지금 크기를 적습니다. */}
+                {paperSize && ` ${paperSize.width} × ${paperSize.height}`}
                 {source && ` · ${formatBytes(source.size)}`}
               </span>
             )}
