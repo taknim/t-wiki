@@ -142,6 +142,30 @@ try {
    * 달라붙었습니다. 눈에 보이는 틈이 같아야 합니다.
    * 여기 굴림대는 떠 있는 꼴이라 자리를 먹지 않으므로, gutter 로 흉내 냅니다.
    */
+  /*
+   * 글 위에 떠 있는 단추입니다. 아래에 무엇이 있는지 비쳐야 덜 답답한데, 통째로 흐리면
+   * (opacity) 읽어야 할 글자까지 흐려집니다. 바탕만 비치게 하고 뒤를 흐려 둡니다.
+   */
+  step('1-1. 떠 있는 단추는 바탕만 비친다')
+  const glass = await page.evaluate(() => {
+    const tool = document.querySelector('.doc-tool')
+    const look = getComputedStyle(tool)
+    return {
+      바탕: look.backgroundColor,
+      뒤흐림: look.backdropFilter,
+      글자: look.opacity,
+    }
+  })
+  console.log('  ' + JSON.stringify(glass))
+  /*
+   * 얼마나 비치는지. 브라우저가 color-mix 를 `color(srgb …/ 0.82)` 로도, `rgba(…, 0.82)` 로도
+   * 적어 오므로 마지막 숫자를 봅니다. 알파가 없으면 1(비치지 않음)입니다.
+   */
+  const alpha = Number((glass.바탕.match(/\/\s*([\d.]+)\s*\)$/) ?? glass.바탕.match(/,\s*([\d.]+)\s*\)$/) ?? [])[1] ?? 1)
+  expect('바탕이 비침', alpha > 0.6 && alpha < 0.95, `${glass.바탕} → ${alpha}`)
+  expect('뒤를 흐려 글자가 또렷함', glass.뒤흐림.includes('blur'), glass.뒤흐림)
+  expect('글자는 흐려지지 않음', glass.글자 === '1', glass.글자)
+
   step('2. 굴림대가 자리를 먹어도 틈은 그대로다')
   const gaps = () => page.evaluate(() => {
     const box = document.querySelector('.main .preview')

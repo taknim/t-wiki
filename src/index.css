@@ -1944,7 +1944,9 @@ button.info-caret:focus-visible { outline: 2px solid var(--accent); outline-offs
   padding: 7px 4px;
   border: 1px solid var(--border-strong);
   border-radius: 10px;
-  background: var(--bg-raised);
+  /* 배율 손잡이와 같은 결. 바탕만 비치게 하고 글자는 그대로 둡니다. */
+  background: color-mix(in srgb, var(--bg-raised) 82%, transparent);
+  backdrop-filter: blur(8px);
   color: var(--text-muted);
   cursor: pointer;
   font-size: 11px;
@@ -1953,7 +1955,12 @@ button.info-caret:focus-visible { outline: 2px solid var(--accent); outline-offs
   box-shadow: 0 2px 8px rgb(0 0 0 / 12%);
 }
 .doc-tool:hover { color: var(--text); border-color: var(--text-muted); }
-.doc-tool.is-open { background: var(--accent); border-color: var(--accent); color: #fff; }
+/* 펴 둔 단추. 켜진 것은 또렷해야 하므로 덜 비칩니다. */
+.doc-tool.is-open {
+  background: color-mix(in srgb, var(--accent) 90%, transparent);
+  border-color: var(--accent);
+  color: #fff;
+}
 .doc-tool-top { display: flex; align-items: center; gap: 3px; }
 .doc-tool-top .icon { width: 13px; height: 13px; }
 /* 셈은 이 단추에서 가장 굵게. 몇 개인지가 먼저 눈에 들어와야 합니다. */
@@ -2449,8 +2456,9 @@ button.info-caret:focus-visible { outline: 2px solid var(--accent); outline-offs
  */
 .zoom-control {
   position: absolute;
-  inset-inline-end: 16px;
-  inset-block-end: 16px;
+  /* 문서의 맨 위·맨 아래 단추와 같은 틈(24px). 가장자리에 바싹 붙으면 답답합니다. */
+  inset-inline-end: 24px;
+  inset-block-end: 24px;
   z-index: 6;
   display: flex;
   flex-direction: column;
@@ -2459,7 +2467,13 @@ button.info-caret:focus-visible { outline: 2px solid var(--accent); outline-offs
   padding: 4px;
   border: 1px solid var(--border-strong);
   border-radius: 10px;
-  background: var(--bg-raised);
+  /*
+   * 반투명하게 두어 아래에 무엇이 있는지 비칩니다. 대신 **바탕만** 비치게 하고 글자와
+   * 아이콘은 그대로 둡니다 — 통째로 흐리면(opacity) 읽어야 할 것까지 함께 흐려집니다.
+   * 뒤를 흐려 두면(blur) 82% 로도 글자가 또렷합니다. 흐림 없이는 90% 는 되어야 합니다.
+   */
+  background: color-mix(in srgb, var(--bg-raised) 82%, transparent);
+  backdrop-filter: blur(8px);
   /* 그림 위에 떠 있으므로 그림자로 층을 나눕니다. */
   box-shadow: 0 2px 8px rgb(0 0 0 / 18%);
 }
@@ -2477,7 +2491,7 @@ button.info-caret:focus-visible { outline: 2px solid var(--accent); outline-offs
   cursor: pointer;
 }
 .zoom-btn:hover { color: var(--text); background: var(--bg-sunken); }
-.zoom-btn.is-on { background: var(--accent); color: #fff; }
+.zoom-btn.is-on { background: color-mix(in srgb, var(--accent) 90%, transparent); color: #fff; }
 .zoom-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .zoom-now {
   padding: 2px 0;

@@ -59,6 +59,8 @@ export function ImageEditor({ root, path, onSave, onCancel }: ImageEditorProps) 
   const [quality, setQuality] = useState(90)
   const [name, setName] = useState(() => outputName(path, 'png'))
   const [zoom, setZoom] = useState(1)
+  /** 지금 칸에 꽉 차는 배율. 맞춤 단추를 켜 둘지 가리는 데 씁니다. */
+  const [fitZoom, setFitZoom] = useState<number | null>(null)
   /** 고른 자리를 통째로 옮기는 중. 잡은 자리와 그때의 자리를 들고 있습니다. */
   const moveFrom = useRef<{ x: number; y: number; crop: Crop } | null>(null)
   /** 손이 고른 자리 안에 있는지. 손 모양을 바꿔 옮길 수 있다고 알립니다. */
@@ -127,18 +129,33 @@ export function ImageEditor({ root, path, onSave, onCancel }: ImageEditorProps) 
   }
 
   /**
-   * 칸에 꽉 차는 배율로 맞춥니다.
+   * 칸에 꽉 차는 배율을 잽니다. 잴 수 없으면 null.
+   *
+   * 칸의 크기는 **굴림대를 뺀 안쪽(clientWidth)이 아니라 테두리까지(getBoundingClientRect)**
+   * 로 잽니다. 안쪽으로 재면 지금 굴림대가 서 있느냐에 따라 값이 달라져, 맞춤을 거듭 누를
+   * 때마다 46% 와 47% 사이를 오갔습니다. 맞추고 나면 넘치지 않아 굴림대가 없으므로,
+   * 굴림대가 없는 셈으로 재는 것이 맞습니다.
    *
    * 내림으로 셉니다. 반올림하면 한 픽셀 넘쳐 굴림대가 생기는데, 꽉 채우려다 굴림대를
    * 부르는 것은 얻는 것보다 잃는 것이 큽니다.
    * 배율은 사람이 적어 넣을 수 있는 자리 안에 둡니다(10 ~ 300%).
    */
-  const fitToStage = (size: Natural | null = natural) => {
+  const measureFit = (size: Natural | null): number | null => {
     const box = stage.current
-    if (!box || !size || size.width === 0 || size.height === 0) return
-    const room = { width: box.clientWidth - STAGE_PAD * 2, height: box.clientHeight - STAGE_PAD * 2 }
+    if (!box || !size || size.width === 0 || size.height === 0) return null
+    const view = box.getBoundingClientRect()
+    const room = { width: view.width - STAGE_PAD * 2, height: view.height - STAGE_PAD * 2 }
+    if (room.width <= 0 || room.height <= 0) return null
     const fit = Math.min(room.width / size.width, room.height / size.height)
-    setZoom(clampPercent(Math.floor(fit * 100)) / 100)
+    return clampPercent(Math.floor(fit * 100)) / 100
+  }
+
+  /** 칸에 꽉 차는 배율로 맞춥니다. */
+  const fitToStage = (size: Natural | null = natural) => {
+    const fit = measureFit(size)
+    if (fit === null) return
+    setFitZoom(fit)
+    setZoom(fit)
   }
 
   const changeFormat = (next: ImageFormat) => {
@@ -389,6 +406,21 @@ export function ImageEditor({ root, path, onSave, onCancel }: ImageEditorProps) 
   // 창을 떠날 때도 돌던 것을 세웁니다. 남겨 두면 없는 칸을 굴리려 듭니다.
   useEffect(() => stopRolling, [])
 
+  /*
+   * 칸이 커지고 작아지면 꽉 차는 배율도 달라집니다. 지켜보지 않으면 창을 늘린 뒤에도
+   * 맞춤 단추가 옛 값으로 켜진 채 남아, 맞지도 않는데 맞은 것처럼 보입니다.
+   * 보고 있는 배율은 건드리지 않습니다 — 사람이 정해 둔 값을 창 크기가 바꿀 까닭이 없습니다.
+   */
+  useEffect(() => {
+    const box = stage.current
+    if (!box || !natural) return
+    const watch = new ResizeObserver(() => setFitZoom(measureFit(natural)))
+    watch.observe(box)
+    return () => watch.disconnect()
+    // measureFit 은 렌더마다 새로 지어지지만 하는 일은 같습니다. 크기만 지켜보면 됩니다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [natural])
+
   const save = useCallback(async () => {
     if (!source || !natural) return
     setBusy(true)
@@ -463,8 +495,16 @@ export function ImageEditor({ root, path, onSave, onCancel }: ImageEditorProps) 
           </p>
           <div className="row" style={{ alignItems: 'center', gap: 6 }}>
             <span className="hint" style={{ margin: 0 }}>보기 배율</span>
-            {/* 화면 맞춤은 "지금 칸에 맞춰 다시 재라" 는 뜻입니다. 보기 모드와 달리 값으로 남습니다. */}
-            <ZoomControl scale={zoom} fitted={false} onZoom={(next) => (next === null ? fitToStage() : setZoom(next))} />
+            {/*
+              화면 맞춤은 "지금 칸에 맞춰 다시 재라" 는 뜻입니다. 보기 모드와 달리 값으로 남습니다.
+              지금 배율이 그 값과 같으면 원본 크기 단추처럼 켜 둡니다 — 무엇으로 보고 있는지가
+              단추에 드러나야 합니다.
+            */}
+            <ZoomControl
+              scale={zoom}
+              fitted={fitZoom !== null && Math.abs(zoom - fitZoom) < 0.005}
+              onZoom={(next) => (next === null ? fitToStage() : setZoom(next))}
+            />
           </div>
           <div className="row" style={{ alignItems: 'center' }}>
             {crop ? (

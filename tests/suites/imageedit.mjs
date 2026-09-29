@@ -39,9 +39,20 @@ await page.addInitScript(() => {
   const put = (name, blob) => root._children.set(name, Object.assign(
     Object.create(Object.getPrototypeOf(sample)),
     { kind: 'file', name, _data: blob, _lastModified: Date.now() }))
+  /*
+   * 맞춤 배율이 눈금 가장자리에 걸리는 그림. 칸 너비 416(여백 뺀 값)에서 41.6% 가 되어
+   * 내리면 41%, 굴림대(15px 남짓)가 서 있는 채로 재면 40% 가 됩니다. 굴림대를 빼고 재는지
+   * 가리는 데 씁니다.
+   */
+  const edge = document.createElement('canvas')
+  edge.width = 1000
+  edge.height = 600
+  edge.getContext('2d').fillStyle = 'rgb(120, 90, 160)'
+  edge.getContext('2d').fillRect(0, 0, 1000, 600)
   window.__seedImage = () => Promise.all([
     new Promise((done) => canvas.toBlob((blob) => { put('사진.png', blob); done() }, 'image/png')),
     new Promise((done) => big.toBlob((blob) => { put('큰 그림.png', blob); done() }, 'image/png')),
+    new Promise((done) => edge.toBlob((blob) => { put('가장자리.png', blob); done() }, 'image/png')),
   ])
 })
 
@@ -342,7 +353,67 @@ try {
   expect('수정 화면에도 화면 맞춤이 있음', (await page.locator('.image-edit .zoom-control button[aria-label="화면에 맞추기"]').count()) === 1)
   expect('누르면 다시 칸에 꽉 참', !refit.넘침 && refit.채움 >= 0.9 && refit.적힌 !== atFull,
     JSON.stringify({ atFull, refit }))
+  /*
+   * 맞춤 배율로 보고 있으면 단추가 켜져 있어야 합니다(원본 크기 단추처럼).
+   * 그리고 거듭 눌러도 같은 값이어야 합니다 — 칸을 굴림대 안쪽으로 재었더니 굴림대가
+   * 섰다 없어졌다 하며 46% 와 47% 사이를 오갔습니다.
+   */
+  const fitOn = () => page.evaluate(() =>
+    document.querySelector('.image-edit .zoom-control button[aria-label="화면에 맞추기"]')
+      .getAttribute('aria-pressed'))
+  expect('맞춤으로 보는 중이면 단추가 켜짐', (await fitOn()) === 'true', String(await fitOn()))
+  const again = []
+  for (let at = 0; at < 4; at += 1) {
+    await page.click('.image-edit .zoom-control button[aria-label="화면에 맞추기"]')
+    await page.waitForTimeout(250)
+    again.push(await page.evaluate(() => document.querySelector('.image-edit .zoom-now').textContent))
+  }
+  console.log('  거듭 누른 배율: ' + JSON.stringify(again))
+  expect('거듭 눌러도 같은 배율', new Set(again).size === 1 && again[0] === refit.적힌,
+    JSON.stringify({ refit: refit.적힌, again }))
+  // 배율을 바꾸면 다시 꺼집니다.
+  await page.click('.image-edit .zoom-control button[aria-label="확대"]')
+  await page.waitForTimeout(250)
+  expect('다른 배율로 가면 꺼짐', (await fitOn()) === 'false', String(await fitOn()))
 
+  await page.click('.image-edit button:has-text("취소")')
+  await page.waitForTimeout(400)
+
+  /*
+   * 맞춤을 거듭 눌러도, 크게 키워 둔 뒤에 눌러도 같은 값이어야 합니다.
+   *
+   * 칸을 굴림대 안쪽(clientWidth)으로 재면 굴림대가 섰느냐에 따라 한 눈금씩 달라져
+   * 46% 와 47% 를 오갑니다. 지금은 테두리까지(getBoundingClientRect) 재므로 굴림대와
+   * 상관이 없습니다. 이 시험대의 맥은 굴림대를 글 위에 띄워(자리를 먹지 않아) 그 오작동이
+   * 드러나지 않으므로, 여기서는 "거듭 눌러도 한 값" 만 지킵니다.
+   */
+  step('2-3. 맞춤은 거듭 눌러도 같은 배율이다')
+  await page.click('.tree-row:has-text("가장자리") .tree-name')
+  await page.waitForSelector('.asset-image', { timeout: 8000 })
+  await page.waitForTimeout(400)
+  await openEditor()
+  const fitLabel = () => page.evaluate(() => document.querySelector('.image-edit .zoom-now').textContent)
+  const opened2 = await fitLabel()
+  // 먼저 크게 키워 굴림대를 세워 둡니다.
+  await page.evaluate(() => { document.querySelector('.image-edit-stage').scrollTop = 0 })
+  for (let at = 0; at < 8; at += 1) {
+    await page.click('.image-edit .zoom-control button[aria-label="확대"]')
+    await page.waitForTimeout(120)
+  }
+  const rolls = await page.evaluate(() => {
+    const box = document.querySelector('.image-edit-stage')
+    return box.scrollWidth > box.clientWidth + 1 || box.scrollHeight > box.clientHeight + 1
+  })
+  expect('키워 두면 굴림대가 섬', rolls, String(rolls))
+  const pressed = []
+  for (let at = 0; at < 3; at += 1) {
+    await page.click('.image-edit .zoom-control button[aria-label="화면에 맞추기"]')
+    await page.waitForTimeout(250)
+    pressed.push(await fitLabel())
+  }
+  console.log('  열 때 ' + opened2 + ' · 거듭 누름 ' + JSON.stringify(pressed))
+  expect('거듭 눌러도 한 값', new Set(pressed).size === 1, JSON.stringify(pressed))
+  expect('열 때 잡은 값과도 같음', pressed[0] === opened2, `${opened2} vs ${pressed[0]}`)
   await page.click('.image-edit button:has-text("취소")')
   await page.waitForTimeout(400)
 
