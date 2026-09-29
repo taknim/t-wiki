@@ -551,6 +551,11 @@ export function ImageEditor({ root, path, onSave, onCancel }: ImageEditorProps) 
 
   return (
     <div className="image-edit">
+      {/*
+        배율 손잡이는 **굴러가는 칸 밖**의 이 틀에 붙입니다. 안에 두면 크게 키워 놓고 그림을
+        옮길 때 손잡이가 내용과 함께 밀려 나갑니다(보기 모드에서 이미 겪은 일입니다).
+      */}
+      <div className="image-edit-view">
       <div className="image-edit-stage" ref={stage}>
         {/*
           칸은 **돌린 뒤의** 크기를 지니고, 그 안에서 그림만 돌아갑니다. 칸째로 돌리면
@@ -597,6 +602,17 @@ export function ImageEditor({ root, path, onSave, onCancel }: ImageEditorProps) 
             </div>
           )}
         </div>
+      </div>
+      {/*
+        배율은 보기 모드와 **같은 자리에 같은 낯**으로 둡니다. 고칠 때만 판 안에 누워 있었더니
+        같은 일을 하는 손잡이를 두 군데서 다르게 찾아야 했습니다.
+        다만 화면 맞춤은 여기서 값으로 남습니다 — 잘라 낼 자리를 재려면 배율이 또렷해야 합니다.
+      */}
+      <ZoomControl
+        scale={zoom}
+        fitted={fitted}
+        onZoom={(next) => (next === null ? fitToStage() : setZoom(next))}
+      />
       </div>
 
       {/* 쪽지는 칸 밖으로도 나갈 수 있어야 해서 화면에 바로 붙입니다(fixed). */}
@@ -679,33 +695,50 @@ export function ImageEditor({ root, path, onSave, onCancel }: ImageEditorProps) 
         <section className="field">
           <h4 className="field-group-title">잘라내기</h4>
           <p className="hint" style={{ marginTop: 0 }}>
-            그림 위를 끌어 남길 자리를 고릅니다. 작은 그림은 키워 놓고 고르면 쉽습니다.
+            그림 위를 왼쪽 단추로 끌어 남길 자리를 고릅니다. 작은 그림은 키워 놓고 고르면 쉽습니다.
           </p>
-          <div className="row" style={{ alignItems: 'center', gap: 6 }}>
-            <span className="hint" style={{ margin: 0 }}>보기 배율</span>
-            {/*
-              화면 맞춤은 "지금 칸에 맞춰 다시 재라" 는 뜻입니다. 보기 모드와 달리 값으로 남습니다.
-              지금 배율이 그 값과 같으면 원본 크기 단추처럼 켜 둡니다 — 무엇으로 보고 있는지가
-              단추에 드러나야 합니다.
-            */}
-            <ZoomControl
-              scale={zoom}
-              fitted={fitted}
-              onZoom={(next) => (next === null ? fitToStage() : setZoom(next))}
-            />
-          </div>
+
           {/*
-            씌울 비율. 딱지의 글은 **고르면 나올 그대로**(세우면 16:9 가 9:16) 적습니다.
-            이름만 그대로 두고 속으로만 뒤집으면, 눌러 보기 전에는 어느 쪽이 길어지는지
-            알 수 없습니다. 좁은 칸이라 줄이 넘치면 접힙니다.
+            무엇을 다루는 자리인지 왼쪽에 이름을 세웁니다. 딱지만 늘어놓았더니 `4:3` 이
+            무엇을 하는 단추인지, `가로` 가 어디에 걸리는 말인지 눌러 보기 전에는
+            알 수 없었습니다.
           */}
-          <div className="row" style={{ alignItems: 'center', gap: 6 }}>
-            <span className="hint" style={{ margin: 0 }}>긴 쪽</span>
+          <div className="crop-line">
+            <span className="crop-label">비율 고정</span>
+            <div className="ratio-group" role="group" aria-label="잘라낼 비율">
+              <button
+                type="button"
+                className={shape === null ? 'btn btn-small is-active' : 'btn btn-small'}
+                aria-pressed={shape === null}
+                data-tip="비를 씌우지 않고 마음대로 고릅니다"
+                onClick={() => applyShape(null, lay)}
+              >
+                자유
+              </button>
+              {CROP_RATIOS.map((one) => (
+                <button
+                  key={one.id}
+                  type="button"
+                  className={shape === one.id ? 'btn btn-small is-active' : 'btn btn-small'}
+                  aria-pressed={shape === one.id}
+                  data-tip={`${lay === 'wide' ? `${one.long}:${one.short}` : `${one.short}:${one.long}`} 비로만 고릅니다`}
+                  onClick={() => applyShape(one.id, lay)}
+                >
+                  {lay === 'wide' ? `${one.long}:${one.short}` : `${one.short}:${one.long}`}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* 딱지의 글은 **고르면 나올 그대로**입니다(세우면 16:9 가 9:16). */}
+          <div className="crop-line">
+            <span className="crop-label">긴 쪽</span>
             <div className="segmented" role="group" aria-label="긴 쪽">
               <button
                 type="button"
                 className={lay === 'wide' ? 'is-active' : ''}
                 aria-pressed={lay === 'wide'}
+                data-tip="긴 쪽을 가로로 눕힙니다"
                 onClick={() => applyShape(shape, 'wide')}
               >
                 가로
@@ -714,39 +747,19 @@ export function ImageEditor({ root, path, onSave, onCancel }: ImageEditorProps) 
                 type="button"
                 className={lay === 'tall' ? 'is-active' : ''}
                 aria-pressed={lay === 'tall'}
+                data-tip="긴 쪽을 세로로 세웁니다"
                 onClick={() => applyShape(shape, 'tall')}
               >
                 세로
               </button>
             </div>
           </div>
-          <div className="ratio-group" role="group" aria-label="잘라낼 비율">
-            <button
-              type="button"
-              className={shape === null ? 'btn btn-small is-active' : 'btn btn-small'}
-              aria-pressed={shape === null}
-              data-tip="비율을 씌우지 않고 마음대로 고릅니다"
-              onClick={() => applyShape(null, lay)}
-            >
-              자유
-            </button>
-            {CROP_RATIOS.map((one) => (
-              <button
-                key={one.id}
-                type="button"
-                className={shape === one.id ? 'btn btn-small is-active' : 'btn btn-small'}
-                aria-pressed={shape === one.id}
-                onClick={() => applyShape(one.id, lay)}
-              >
-                {lay === 'wide' ? `${one.long}:${one.short}` : `${one.short}:${one.long}`}
-              </button>
-            ))}
-          </div>
 
-          <div className="row" style={{ alignItems: 'center' }}>
+          <div className="crop-line">
+            <span className="crop-label">고른 자리</span>
             {crop ? (
               <>
-                <span className="hint" style={{ margin: 0 }}>
+                <span className="crop-now">
                   {crop.x}, {crop.y} 에서 {crop.width} × {crop.height}
                 </span>
                 <button
@@ -760,8 +773,8 @@ export function ImageEditor({ root, path, onSave, onCancel }: ImageEditorProps) 
               </>
             ) : (
               <span className="hint" style={{ margin: 0 }}>
-                고른 자리가 없어 통째로 내놓습니다.
                 {/* 돌려 놓으면 가로세로가 바뀌므로 본디 크기가 아니라 지금 크기를 적습니다. */}
+                없음 · 그림 전체
                 {paperSize && ` ${paperSize.width} × ${paperSize.height}`}
                 {source && ` · ${formatBytes(source.size)}`}
               </span>

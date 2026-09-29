@@ -124,6 +124,15 @@ try {
   expect('배율 손잡이는 그림 위에 있음', (await page.locator('.asset-view > .zoom-control').count()) === 1)
   // 굴러가는 칸 안에 두면 그림을 옮길 때 함께 밀려납니다.
   expect('굴러가는 칸 밖에 있음', (await page.locator('.asset-canvas .zoom-control').count()) === 0)
+  /*
+   * 떠 있는 손잡이의 낯(자리·반투명·흐림)을 적어 둡니다. 고칠 때도 **똑같아야** 합니다 —
+   * 같은 일을 하는 손잡이를 두 군데서 다르게 찾게 할 까닭이 없습니다.
+   */
+  const floatLook = await page.evaluate(() => {
+    const box = getComputedStyle(document.querySelector('.asset-view > .zoom-control'))
+    return { 자리: box.position, 바탕: box.backgroundColor, 흐림: box.backdropFilter, 결: box.flexDirection }
+  })
+  console.log('  떠 있는 낯: ' + JSON.stringify(floatLook))
   // 오른쪽 위 정보에 형식도 적습니다. PNG 냐 JPG 냐에 따라 투명·품질이 갈립니다.
   await page.waitForSelector('.asset-size', { timeout: 5000 })
   const info = (await page.textContent('.asset-size')).replace(/\s+/g, ' ')
@@ -504,6 +513,19 @@ try {
   expect('제목 줄이 수정 모드라고 알림', (await page.textContent('.doc-head .pill')) === '수정 모드',
     await page.textContent('.doc-head .pill'))
   expect('수정 중에는 수정 단추가 빠짐', (await page.locator('.doc-head button:has-text("수정")').count()) === 0)
+  const editLook = await page.evaluate(() => {
+    const knob = document.querySelector('.image-edit-view > .zoom-control')
+    if (!knob) return null
+    const box = getComputedStyle(knob)
+    return { 자리: box.position, 바탕: box.backgroundColor, 흐림: box.backdropFilter, 결: box.flexDirection }
+  })
+  console.log('  고칠 때 낯: ' + JSON.stringify(editLook))
+  expect('배율 손잡이가 그림 위에 떠 있음', editLook !== null)
+  expect('보기 모드와 같은 낯', JSON.stringify(editLook) === JSON.stringify(floatLook),
+    JSON.stringify([floatLook, editLook]))
+  // 굴러가는 칸 안에 두면 그림을 옮길 때 손잡이가 함께 밀려 나갑니다.
+  expect('굴러가는 칸 밖에 있음', (await page.locator('.image-edit-stage .zoom-control').count()) === 0)
+  expect('손잡이 칸에는 없음', (await page.locator('.image-edit-panel .zoom-control').count()) === 0)
   await page.screenshot({ path: join(HERE, '..', 'shots', 'imageedit', '02-mode.png') })
   await page.click('.image-edit button:has-text("취소")')
   await page.waitForTimeout(400)
@@ -991,6 +1013,15 @@ try {
   await openEditor()
   await page.click('.image-edit .zoom-control button[aria-label="원본 크기"]')
   await page.waitForTimeout(300)
+  /*
+   * 딱지만 늘어놓았더니 `4:3` 이 무엇을 하는 단추인지, `가로` 가 어디에 걸리는 말인지
+   * 눌러 보기 전에는 알 수 없었습니다. 줄마다 왼쪽에 이름을 세웁니다.
+   */
+  const named = await page.$$eval('.image-edit .crop-label', (all) => all.map((one) => one.textContent.trim()))
+  console.log('  잘라내기 줄 이름: ' + JSON.stringify(named))
+  expect('줄마다 이름이 섬', JSON.stringify(named) === JSON.stringify(['비율 고정', '긴 쪽', '고른 자리']),
+    JSON.stringify(named))
+
   const sides = () => page.evaluate(() => ({
     width: Number(document.querySelector('#image-width').value),
     height: Number(document.querySelector('#image-height').value),
