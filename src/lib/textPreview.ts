@@ -1,13 +1,21 @@
 import { CODE_EXTENSIONS, extensionOf } from './attachments'
 
 /** 글자 파일을 어떤 방식으로 보여 줄지. null 이면 보여 줄 것이 없어 편집기만 씁니다. */
-export type TextPreviewKind = 'table' | 'code' | 'html' | null
+export type TextPreviewKind = 'table' | 'code' | null
 
+/*
+ * HTML 도 **그리지 않고 글로** 보여 줍니다.
+ *
+ * 전에는 sandbox 를 건 틀 안에서 실제로 그렸습니다. 그런데 스크립트로 화면을 짓는 문서나
+ * 폼·숨은 칸이 대부분인 문서는 스크립트가 막힌 채 그려져 **빈 쪽처럼** 보입니다.
+ * 무엇이 들었는지 알려면 차라리 코드를 보는 편이 낫습니다. 그릴 것이 필요하면 브라우저로
+ * 파일을 열면 되고, 앱 안에서 그려 주는 것이 그 자리를 대신하지는 못합니다.
+ */
 export function textPreviewKind(path: string): TextPreviewKind {
   const extension = extensionOf(path)
   if (extension === 'csv' || extension === 'tsv') return 'table'
-  if (['json', 'yaml', 'yml', 'xml'].includes(extension) || CODE_EXTENSIONS.includes(extension)) return 'code'
-  if (extension === 'html' || extension === 'htm') return 'html'
+  if (['json', 'yaml', 'yml', 'xml', 'html', 'htm'].includes(extension)
+    || CODE_EXTENSIONS.includes(extension)) return 'code'
   return null
 }
 

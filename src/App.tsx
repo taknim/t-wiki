@@ -1123,7 +1123,7 @@ export default function App() {
       const typing = event.target instanceof HTMLElement
         && (event.target.closest('input, textarea, [contenteditable]') !== null)
       const zoomHit = !typing && shortcutRefs.current.image !== null && shortcutRefs.current.canZoom
-        ? SHORTCUTS.find((one) => one.scope === '그림 볼 때' && matches(event, one.keys))
+        ? SHORTCUTS.find((one) => one.scope === '그림 볼 때·고칠 때' && matches(event, one.keys))
         : undefined
       if (zoomHit) {
         event.preventDefault()

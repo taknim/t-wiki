@@ -417,6 +417,54 @@ try {
   await page.click('.image-edit button:has-text("취소")')
   await page.waitForTimeout(400)
 
+  /*
+   * 볼 때 쓰던 글쇠가 고칠 때 듣지 않으면 손이 멈칫합니다. 같은 그림을 같은 자리에서
+   * 보고 있는데 글쇠만 달라질 까닭이 없습니다.
+   */
+  step('2-4. 고치는 중에도 글쇠로 배율을 다루고 저장·취소한다')
+  await openEditor()
+  const shown = () => page.evaluate(() => document.querySelector('.image-edit .zoom-now').textContent)
+  const openedAt = await shown()
+  await page.click('.image-edit-stage')
+  await page.keyboard.press('Digit1')
+  await page.waitForTimeout(250)
+  expect('1 은 원본 크기', (await shown()) === '100%', String(await shown()))
+  await page.keyboard.press('Equal')
+  await page.waitForTimeout(250)
+  expect('= 는 확대', (await shown()) === '125%', String(await shown()))
+  await page.keyboard.press('Minus')
+  await page.waitForTimeout(250)
+  expect('− 는 축소', (await shown()) === '100%', String(await shown()))
+  await page.keyboard.press('Digit0')
+  await page.waitForTimeout(250)
+  expect('0 은 화면 맞춤', (await shown()) === openedAt, `${openedAt} vs ${await shown()}`)
+  await page.keyboard.press('KeyZ')
+  await page.waitForSelector('.dialog-field input', { timeout: 4000 })
+  await page.fill('.dialog-field input', '150')
+  await page.keyboard.press('Enter')
+  await page.waitForTimeout(400)
+  expect('Z 로 적어 넣기', (await shown()) === '150%', String(await shown()))
+  // 글을 치는 자리에서는 가로채지 않습니다. 너비 칸에 0 을 친다고 배율이 바뀌면 안 됩니다.
+  await page.click('#image-width')
+  await page.keyboard.press('Digit0')
+  await page.waitForTimeout(250)
+  expect('칸에 친 글쇠는 배율을 건드리지 않음', (await shown()) === '150%', String(await shown()))
+  // Esc 로 그만둡니다. 아무것도 만들지 않습니다.
+  const madeBefore = (await names()).length
+  await page.click('.image-edit-stage')
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(400)
+  expect('Esc 로 그만둠', (await page.locator('.image-edit').count()) === 0)
+  expect('만들어진 것이 없음', (await names()).length === madeBefore, JSON.stringify(await names()))
+  // ⌘S 로 저장합니다.
+  await openEditor()
+  await page.fill('.image-edit input[aria-label="파일 이름"]', '사진_글쇠.png')
+  await page.click('.image-edit-stage')
+  await page.keyboard.press(process.platform === 'darwin' ? 'Meta+KeyS' : 'Control+KeyS')
+  await page.waitForTimeout(1500)
+  expect('⌘S 로 저장됨', (await names()).includes('사진_글쇠.png'), JSON.stringify(await names()))
+  expect('저장하면 수정 화면이 닫힘', (await page.locator('.image-edit').count()) === 0)
+
   step('3. 수정은 덮개 창이 아니라 본문 자리에서 열린다')
   await page.click('.tree-row:has-text("사진.png") .tree-name')
   await page.waitForSelector('.doc-head', { timeout: 8000 })

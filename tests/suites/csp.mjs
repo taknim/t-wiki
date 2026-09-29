@@ -169,12 +169,22 @@ try {
   // 글로 적은 것이라 수식으로 그려지지도 않습니다.
   expect('글 속의 $$ 는 수식이 아님', parsed.math === 0, JSON.stringify(parsed))
 
-  step('5. HTML 첨부 미리보기도 그려진다')
+  /*
+   * HTML 은 그리지 않고 글로 보여 줍니다. 스크립트로 화면을 짓는 문서나 폼·숨은 칸이
+   * 대부분인 문서는 그려 봐야 빈 쪽처럼 보입니다. 무엇이 들었는지는 코드가 말합니다.
+   */
+  step('5. HTML 첨부는 그리지 않고 코드로 보여 준다')
   await page.click('.tree-row:has-text("쪽.html")')
   await page.waitForTimeout(1200)
-  const framed = await page.frameLocator('.html-frame').locator('#here').textContent()
-  console.log('  틀 안: ' + String(framed))
-  expect('틀 안이 그려짐', framed === '여기', String(framed))
+  const asCode = await page.evaluate(() => ({
+    틀: document.querySelectorAll('iframe').length,
+    글: document.querySelector('.code-preview')?.textContent ?? null,
+    강조: document.querySelectorAll('.code-preview .hljs-tag, .code-preview .hljs-name').length,
+  }))
+  console.log('  ' + JSON.stringify({ ...asCode, 글: asCode.글?.slice(0, 40) }))
+  expect('틀 안에서 그리지 않음', asCode.틀 === 0, JSON.stringify(asCode))
+  expect('원문이 그대로 보임', (asCode.글 ?? '').includes('<h1>안녕</h1>'), String(asCode.글))
+  expect('문법 강조가 걸림', asCode.강조 > 0, String(asCode.강조))
 
   /*
    * 동기화는 이 앱의 본일입니다. connect-src 를 잘못 좁히면 여기서만 막히는데,

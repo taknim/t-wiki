@@ -44,6 +44,32 @@ try {
   await page.click('button:has-text("폴더 열기")')
   await page.waitForSelector('.tree', { timeout: 10000 })
 
+  /*
+   * 코드는 본문 글줄 폭에 묶지 않고 칸 전체를 씁니다. 묶어 두었더니 마크다운 문서의
+   * 한 문단처럼 보여, 파일을 보고 있다는 느낌이 들지 않았습니다.
+   */
+  step('0. 코드 칸은 쪽 전체를 쓴다')
+  await page.click('.tree-row:has-text("질의.sql") .tree-name')
+  await page.waitForSelector('.main .editor, .main .preview', { timeout: 8000 })
+  await page.click('.mode-switch button[aria-label="미리보기"]')
+  await page.waitForTimeout(900)
+  const wide = await page.evaluate(() => {
+    const pre = document.querySelector('.code-preview')
+    const pane = document.querySelector('.main')
+    const look = getComputedStyle(pre)
+    return {
+      코드: Math.round(pre.getBoundingClientRect().width),
+      칸: Math.round(pane.getBoundingClientRect().width),
+      테두리: look.borderTopWidth,
+    }
+  })
+  console.log('  ' + JSON.stringify(wide))
+  expect('칸 전체를 씀', wide.코드 === wide.칸, JSON.stringify(wide))
+  expect('테두리로 가두지 않음', wide.테두리 === '0px', wide.테두리)
+  // 아래 걸음들은 편집 화면에서 시작합니다. 보기 모드를 되돌려 놓습니다.
+  await page.click('.mode-switch button[aria-label="편집"]')
+  await page.waitForTimeout(400)
+
   step('1. SQL 이 트리에 보이고, 편집기와 문법 강조 미리보기가 나란히 선다')
   expect('트리에 있음', (await page.locator('.tree-row:has-text("질의.sql")').count()) === 1)
   await page.click('.tree-row:has-text("질의.sql") .tree-name')

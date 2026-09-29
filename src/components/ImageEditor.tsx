@@ -6,9 +6,11 @@ import {
   clampCrop, clampSide, FORMATS, keepRatio, MAX_SIDE, MIN_SIDE, outputName, renderImage,
   type Crop, type ImageFormat,
 } from '../lib/imageEdit'
-import { clampPercent } from '../lib/zoom'
+import { askZoomPercent, clampPercent, stepZoom } from '../lib/zoom'
 import { ZoomControl } from './ZoomControl'
 import { useSpacePan } from '../hooks/useSpacePan'
+import { useEscapeClose } from '../hooks/useEscapeClose'
+import { useDialogs } from './dialogContext'
 
 interface ImageEditorProps {
   root: FileSystemDirectoryHandle
@@ -45,6 +47,7 @@ const EDGE_SPEED = 18
  * 어느 파일을 만지고 있는지 알 수 있고, 창이 작을 때 고칠 자리가 덮개에 갇히지 않습니다.
  */
 export function ImageEditor({ root, path, onSave, onCancel }: ImageEditorProps) {
+  const dialogs = useDialogs()
   const [url, setUrl] = useState<string | null>(null)
   const [source, setSource] = useState<Blob | null>(null)
   const [natural, setNatural] = useState<Natural | null>(null)
@@ -405,6 +408,50 @@ export function ImageEditor({ root, path, onSave, onCancel }: ImageEditorProps) 
 
   // 창을 떠날 때도 돌던 것을 세웁니다. 남겨 두면 없는 칸을 굴리려 듭니다.
   useEffect(() => stopRolling, [])
+
+  /*
+   * 고치는 동안 쓰는 글쇠.
+   *
+   * 배율은 그림을 볼 때와 같고(+ - 0 1 Z), 저장은 ⌘S, 그만두기는 Esc 입니다.
+   * 볼 때 쓰던 글쇠가 고칠 때 듣지 않으면 손이 멈칫합니다 — 같은 그림을 같은 자리에서
+   * 보고 있는데 글쇠만 달라질 까닭이 없습니다.
+   *
+   * 글을 치는 자리(크기·이름 칸)에서는 가로채지 않습니다. 거기서는 숫자와 글자입니다.
+   * Esc 는 겹쳐 뜬 창의 차례(useEscapeClose)를 따릅니다 — 물음 창이 떠 있으면 그쪽이 먼저입니다.
+   */
+  useEscapeClose(onCancel)
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      const typing = event.target instanceof HTMLElement
+        && event.target.closest('input, textarea, [contenteditable]') !== null
+      if (typing) return
+
+      const mod = /Mac|iPhone|iPad/.test(navigator.platform) ? event.metaKey : event.ctrlKey
+      if (mod && event.key.toLowerCase() === 's') {
+        // 브라우저의 "페이지 저장"이 뜨지 않게 막습니다.
+        event.preventDefault()
+        void save()
+        return
+      }
+      if (event.metaKey || event.ctrlKey || event.altKey) return
+
+      const step = (delta: number) => {
+        event.preventDefault()
+        setZoom(stepZoom(zoom, delta))
+      }
+      if (event.code === 'Equal' || event.code === 'NumpadAdd' || event.key === '+') step(1)
+      else if (event.code === 'Minus' || event.code === 'NumpadSubtract') step(-1)
+      else if (event.code === 'Digit0') fitToStage()
+      else if (event.code === 'Digit1') setZoom(1)
+      else if (event.code === 'KeyZ') {
+        event.preventDefault()
+        void askZoomPercent(dialogs.numbers, zoom).then((next) => next !== null && setZoom(next))
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  })
 
   /*
    * 칸이 커지고 작아지면 꽉 차는 배율도 달라집니다. 지켜보지 않으면 창을 늘린 뒤에도

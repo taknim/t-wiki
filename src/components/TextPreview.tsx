@@ -1,4 +1,3 @@
-import DOMPurify from 'dompurify'
 import { useEffect, useState } from 'react'
 import { highlightCode } from '../lib/markdown'
 import {
@@ -16,7 +15,6 @@ const MAX_ROWS = 500
 
 export function TextPreview({ kind, path, text }: TextPreviewProps) {
   if (kind === 'table') return <TablePreview path={path} text={text} />
-  if (kind === 'html') return <HtmlPreview text={text} />
   return <CodePreview path={path} text={text} />
 }
 
@@ -83,7 +81,11 @@ function CodePreview({ path, text }: { path: string; text: string }) {
   }, [path, shown])
 
   return (
-    <div className="preview text-preview">
+    /*
+     * 코드는 본문 글줄 폭에 묶지 않고 **칸 전체**를 씁니다. 묶어 두었더니 마크다운 문서의
+     * 한 문단처럼 보여, 파일을 보고 있다는 느낌이 들지 않았습니다.
+     */
+    <div className="preview text-preview is-code">
       <pre className="code-preview">
         <code className="hljs" dangerouslySetInnerHTML={{ __html: html }} />
       </pre>
@@ -91,19 +93,4 @@ function CodePreview({ path, text }: { path: string; text: string }) {
   )
 }
 
-/**
- * HTML 은 그려 봐야 뜻이 있는 형식이라 실제로 렌더합니다.
- *
- * 다만 문서 내용이 곧 코드가 되므로 두 겹으로 막습니다.
- * 먼저 스크립트와 이벤트 속성을 걷어내고, 그 결과를 sandbox 를 건 iframe 안에서 그립니다.
- * sandbox 에 아무 권한도 주지 않아 스크립트 실행과 폼 전송, 상위 창 접근이 모두 막힙니다.
- */
-function HtmlPreview({ text }: { text: string }) {
-  const safe = DOMPurify.sanitize(text, { WHOLE_DOCUMENT: true, ADD_TAGS: ['style'] })
 
-  return (
-    <div className="preview text-preview">
-      <iframe className="html-frame" title="HTML 미리보기" sandbox="" srcDoc={safe} />
-    </div>
-  )
-}

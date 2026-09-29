@@ -1945,8 +1945,8 @@ button.info-caret:focus-visible { outline: 2px solid var(--accent); outline-offs
   border: 1px solid var(--border-strong);
   border-radius: 10px;
   /* 배율 손잡이와 같은 결. 바탕만 비치게 하고 글자는 그대로 둡니다. */
-  background: color-mix(in srgb, var(--bg-raised) 82%, transparent);
-  backdrop-filter: blur(8px);
+  background: color-mix(in srgb, var(--bg-raised) 66%, transparent);
+  backdrop-filter: blur(12px);
   color: var(--text-muted);
   cursor: pointer;
   font-size: 11px;
@@ -2102,6 +2102,16 @@ button.info-caret:focus-visible { outline: 2px solid var(--accent); outline-offs
  * 한때 여기만 창 끝까지 늘여 두었는데, 같은 설정을 두고 화면마다 다르게 보였습니다.
  */
 .text-preview { padding: 16px 20px; }
+/* 코드만 보는 칸. 쪽 전체를 쓰고 테두리도 두르지 않습니다 — 칸 자체가 그 파일입니다. */
+.text-preview.is-code { padding: 0; }
+.text-preview.is-code > .code-preview {
+  max-width: none;
+  min-height: 100%;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  padding: 16px 20px;
+}
 
 .table-wrap {
   overflow: auto;
@@ -2171,14 +2181,6 @@ button.info-caret:focus-visible { outline: 2px solid var(--accent); outline-offs
   overflow: auto;
 }
 
-.html-frame {
-  width: 100%;
-  height: 100%;
-  min-height: 420px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: #fff;
-}
 
 /* ---------- 자동 동기화 남은 시간 ---------- */
 
@@ -2472,8 +2474,8 @@ button.info-caret:focus-visible { outline: 2px solid var(--accent); outline-offs
    * 아이콘은 그대로 둡니다 — 통째로 흐리면(opacity) 읽어야 할 것까지 함께 흐려집니다.
    * 뒤를 흐려 두면(blur) 82% 로도 글자가 또렷합니다. 흐림 없이는 90% 는 되어야 합니다.
    */
-  background: color-mix(in srgb, var(--bg-raised) 82%, transparent);
-  backdrop-filter: blur(8px);
+  background: color-mix(in srgb, var(--bg-raised) 66%, transparent);
+  backdrop-filter: blur(12px);
   /* 그림 위에 떠 있으므로 그림자로 층을 나눕니다. */
   box-shadow: 0 2px 8px rgb(0 0 0 / 18%);
 }
@@ -2487,7 +2489,11 @@ button.info-caret:focus-visible { outline: 2px solid var(--accent); outline-offs
   border: 0;
   border-radius: 6px;
   background: none;
-  color: var(--text-muted);
+  /*
+   * 바탕이 비치는 만큼 글씨는 또렷해야 합니다. 흐린 글씨(--text-muted)로 두었더니
+   * 어두운 그림 위에서 아이콘이 함께 묻혔습니다.
+   */
+  color: var(--text);
   cursor: pointer;
 }
 .zoom-btn:hover { color: var(--text); background: var(--bg-sunken); }
@@ -2502,7 +2508,8 @@ button.info-caret:focus-visible { outline: 2px solid var(--accent); outline-offs
   font-family: inherit;
   font-size: 11px;
   font-variant-numeric: tabular-nums;
-  color: var(--text-muted);
+  color: var(--text);
+  font-weight: 600;
   cursor: pointer;
 }
 .zoom-now:hover { color: var(--text); background: var(--bg-sunken); }

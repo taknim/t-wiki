@@ -366,12 +366,18 @@ try {
     const code = document.querySelector('.code-preview')
     return {
       width: Math.round(code.getBoundingClientRect().width),
+      pane: Math.round(document.querySelector('.main').getBoundingClientRect().width),
       size: getComputedStyle(code).fontSize,
       leading: getComputedStyle(code).lineHeight,
     }
   })
   console.log('  코드: ' + JSON.stringify(json))
-  expect('코드도 본문 너비에 섬', json.width === 1000, JSON.stringify(json))
+  /*
+   * 코드만 보는 칸은 본문 글줄 폭에 묶지 않고 쪽 전체를 씁니다. 묶어 두었더니 마크다운
+   * 문서의 한 문단처럼 보여, 파일을 보고 있다는 느낌이 들지 않았습니다.
+   * 글꼴 설정(크기·줄 높이)은 그대로 따릅니다 — 따르지 않을 까닭이 없습니다.
+   */
+  expect('코드는 쪽 전체를 씀', json.width === json.pane, JSON.stringify(json))
   expect('글자 크기도 본문을 따름', json.size === '13.5px', String(json.size))
 
   // 크기를 키우면 첨부 미리보기의 글씨도 함께 커져야 합니다.
