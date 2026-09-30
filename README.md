@@ -1405,7 +1405,7 @@ GitHub → **Settings → Developer settings → Personal access tokens → Fine
 커밋 메시지는 자동으로 만들어집니다.
 
 ```
-mdwiki: 문서 3건, 삭제 1건
+t-WiKi: 문서 3건, 삭제 1건
 
 + 회사/온보딩.md
 + 개발 환경.md

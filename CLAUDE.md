@@ -1,7 +1,7 @@
 # t-WiKi 작업 규칙
 
 이 저장소에서 Claude Code 가 일할 때 지키는 것들입니다. 어느 컴퓨터에서 열든 같습니다.
-새 세션은 "지난번에 하던 mdwiki 작업 이어서" 정도로 시작하면 됩니다. 무엇을 만들었는지는
+새 세션은 "지난번에 하던 t-WiKi 작업 이어서" 정도로 시작하면 됩니다. 무엇을 만들었는지는
 `README.md`, 무엇을 어떻게 시험하는지는 `tests/README.md` 에 다 적혀 있습니다.
 
 ## 무엇인가
@@ -9,6 +9,12 @@
 브라우저 안에서만 도는 정적 마크다운 위키. 서버가 없고, File System Access API 로 로컬
 폴더를 열어 쓰며, GitHub 액세스 토큰으로 저장소와 동기화합니다.
 Vite + React + TypeScript, oxlint. 시험은 Playwright 로 **진짜 크롬**을 띄워 돌립니다.
+
+저장소는 `git@github.com:taknim/t-wiki.git` 입니다. 2026-09-30 에 `mdwiki` 에서 이름을
+바꿨습니다 — 옛 주소로도 닿지만 GitHub 이 넘겨 주는 것일 뿐이니 새 주소를 씁니다.
+작업 폴더도 `~/work/mino/t-wiki`, 문서 사본도 `문서정리/t-wiki/` 로 함께 옮겼습니다.
+다만 앱이 브라우저에 쓰는 열쇠말(`mdwiki:…`)만은 **그대로 둡니다.** 그 이름을 바꾸면 이미
+쓰고 있는 사람의 설정과 동기화 기록, 봉해 둔 토큰을 읽을 열쇠가 사라집니다.
 
 ```bash
 npm install && npm run dev        # http://localhost:5173
