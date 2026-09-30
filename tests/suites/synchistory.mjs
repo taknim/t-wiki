@@ -447,6 +447,59 @@ try {
   await page.screenshot({ path: join(HERE, '..', 'shots', 'synchistory', '05-appfile.png'),
     clip: { x: 430, y: 60, width: 970, height: 120 } })
 
+  /*
+   * 오류 줄의 까닭은 한 문장짜리 영어 글입니다. 격자에서 까닭 칸이 제 내용만큼 먼저
+   * 자리를 차지하는 바람에, 경로 칸이 0 까지 밀려 경로가 **한 글자씩 세로로 쌓였습니다.**
+   */
+  step('13-1. 오류 까닭이 길어도 경로 칸이 무너지지 않는다')
+  await seedRun({
+    at: Date.now(),
+    trigger: 'manual',
+    commitSha: null,
+    error: null,
+    cut: 0,
+    log: [{
+      path: '회사/자료/분기보고/2026/상태 보고서.md',
+      action: 'upload-new',
+      status: 'error',
+      detail: 'A requested file or directory could not be found at the time an operation was processed.',
+    }],
+  })
+  await closeVault()
+  await openVault('first')
+  await openSync()
+  await openHistory()
+  await page.click('.run:first-child .run-open')
+  await page.waitForTimeout(400)
+  const broken = await page.evaluate(() => {
+    const row = document.querySelector('.run .plan li.plan-error')
+    if (!row) return null
+    const path = row.querySelector('.plan-path')
+    const why = row.querySelector('.plan-reason')
+    const line = Number.parseFloat(getComputedStyle(row).fontSize) * 1.6
+    return {
+      경로너비: Math.round(path.getBoundingClientRect().width),
+      경로높이: Math.round(path.getBoundingClientRect().height),
+      까닭너비: Math.round(why.getBoundingClientRect().width),
+      줄높이: Math.round(line),
+      // 까닭이 경로보다 아래에 있어야 합니다(아랫줄로 내려간 것).
+      아랫줄: why.getBoundingClientRect().top >= path.getBoundingClientRect().bottom - 1,
+    }
+  })
+  console.log('  ' + JSON.stringify(broken))
+  expect('오류 줄을 찾음', broken !== null)
+  // 무너지면 경로 칸이 한 글자 너비(20px 안팎)까지 줄고 높이는 열 줄을 넘깁니다.
+  expect('경로 칸이 넉넉함', broken.경로너비 >= 150, JSON.stringify(broken))
+  expect('경로가 세로로 쌓이지 않음', broken.경로높이 <= broken.줄높이 * 2 + 4, JSON.stringify(broken))
+  expect('까닭은 아랫줄에서 폭을 다 씀', broken.아랫줄 && broken.까닭너비 >= 150, JSON.stringify(broken))
+  // 창이 화면 가운데 뜨므로 잘라 담지 않고 통째로 찍습니다.
+  await page.locator('[aria-label="지난 동기화 결과"]')
+    .screenshot({ path: join(HERE, '..', 'shots', 'synchistory', '06-error-row.png') })
+  // 창과 설정을 열어 둔 채 넘기면 다음 걸음의 누르기를 덮개가 가로챕니다.
+  await closeSheet()
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(400)
+
   step('14. 폴더가 다르면 기록도 남남이다')
   await closeVault()
   await openVault('other')

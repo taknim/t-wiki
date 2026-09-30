@@ -1016,11 +1016,30 @@ mark { background: var(--mark); color: inherit; border-radius: 2px; }
  */
 .plan li {
   display: grid;
-  grid-template-columns: 96px minmax(0, 1fr) minmax(0, auto);
+  /*
+   * 경로 칸에 **바닥을 둡니다**(12ch). 0 까지 줄어들 수 있게 두었더니, 까닭이 길 때
+   * 까닭 칸이 제 내용만큼 먼저 자리를 차지하고 경로가 한 글자씩 세로로 쌓였습니다.
+   */
+  grid-template-columns: 96px minmax(12ch, 1fr) minmax(0, auto);
   gap: 4px 10px;
   padding: 6px 8px;
   border-bottom: 1px solid var(--border);
 }
+/*
+ * 오류 까닭만은 아랫줄로 내려 폭을 통째로 씁니다. 이것은 한 문장짜리 글이라
+ * (`A requested file or directory could not be found…`) 옆에 두면 바닥을 둔 뒤에도
+ * 경로와 까닭이 둘 다 좁아져 양쪽이 잘게 접힙니다. 오류는 드물게 나므로 그 줄만
+ * 두 줄이 되는 것은 값이 쌉니다 — 그 밖의 줄은 까닭이 짧아 한 줄에 그대로 둡니다.
+ */
+
+/*
+ * 오류 까닭만은 아랫줄로 내려 폭을 통째로 씁니다. 이것은 한 문장짜리 글이라
+ * (`A requested file or directory could not be found…`) 옆에 두면 바닥을 둔 뒤에도
+ * 경로와 까닭이 둘 다 좁아져 양쪽이 잘게 접힙니다. 오류는 드물게 나므로 그 줄만
+ * 두 줄이 되는 것은 값이 쌉니다 — 그 밖의 줄은 까닭이 짧아 한 줄에 그대로 둡니다.
+ */
+.plan-error { grid-template-columns: 96px minmax(0, 1fr); }
+.plan-error .plan-reason { grid-column: 2; text-align: start; }
 /*
  * 마지막 줄의 밑줄은 지웁니다. 펼친 회차에서는 이 줄 바로 아래에 회차를 가르는
  * 줄이 또 있어, 밑줄 두 개가 나란히 그어집니다.
