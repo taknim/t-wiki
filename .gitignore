@@ -160,3 +160,6 @@ dist-ssr
 # 시험이 남기는 화면 갈무리와 내려받은 파일
 tests/shots/
 tests/downloads/
+
+# 아이콘 시안처럼 저장소에 둘 까닭이 없는 한 번 쓰고 마는 파일
+/gear-preview.html

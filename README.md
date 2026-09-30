@@ -26,7 +26,11 @@
 
 ## 개발
 
+소스는 <https://github.com/taknim/t-wiki> 에 있습니다. 내려받아 그대로 띄우면 됩니다.
+
 ```bash
+git clone https://github.com/taknim/t-wiki.git
+cd t-wiki
 npm install
 npm run dev      # http://localhost:5173
 npm run build    # dist/ 에 정적 결과물 생성
