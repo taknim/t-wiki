@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import type { TrashItem, TrashPeek } from '../lib/trash'
 import { formatBytes } from '../lib/attachments'
 import { displayPath, fileNameOf } from '../lib/paths'
+import { readTrashPolicy } from '../lib/saveOptions'
+import { trashNote } from '../lib/trashAge'
 import { DocIcon, FolderIcon, TrashIcon } from './icons'
 
 interface TrashViewProps {
@@ -106,13 +108,39 @@ function TrashPeekView({ item, onPeek }: { item: TrashItem; onPeek: (item: Trash
  */
 export function TrashView({ items, onRestore, onPurge, onEmpty, onPeek }: TrashViewProps) {
   const [opened, setOpened] = useState<string | null>(null)
+  /*
+   * 저절로 비우기 설정은 **그릴 때마다** 읽습니다. 처음 한 번만 읽어 두면 설정 창에서
+   * 방금 켠 값이 이 화면에 늦게 닿습니다(설정은 덮개로 떠 있어 이 칸이 그대로 살아 있습니다).
+   */
+  const policy = readTrashPolicy()
+  /*
+   * 셈의 잣대가 되는 "지금".
+   *
+   * 들어올 때 한 번 잡되, 목록에 **그보다 나중에 버린 것**이 있으면 그 때를 씁니다.
+   * 한 번 잡아 두기만 했더니, 이 칸을 열어 둔 채 다른 곳에서 파일을 지웠을 때 갓 버린 것이
+   * "31일 뒤" 로 적혔습니다 — 잡아 둔 때보다 나중에 버려져 남은 날이 서른 날을 넘어선 것입니다.
+   * 그릴 때마다 시계를 읽으면 같은 화면이 두 번 다르게 그려지고(oxlint react(purity)),
+   * effect 로 고쳐 넣으면 그릴 때마다 한 번 더 그리게 됩니다(react(set-state-in-effect)).
+   * 목록에서 끌어내면 셈이 늘 같은 값으로 떨어지고, 버리는 일마다 저절로 따라옵니다.
+   */
+  const entered = useState(() => Date.now())[0]
+  const now = items.reduce<number>((latest, one) => Math.max(latest, one.trashedAt), entered)
 
   return (
     <div className="trash-view">
       <div className="trash-head">
         <p className="hint" style={{ margin: 0 }}>
           여기 있는 것은 <strong>휴지통 비우기</strong>나 <strong>완전 삭제</strong>를 눌러야 없어집니다.
-          휴지통은 동기화되지 않습니다.
+          휴지통은 동기화되지 않습니다.{' '}
+          {/*
+            저절로 비우기는 **동기화가 돌 때** 일어납니다. "며칠 뒤 사라집니다" 라고만 적으면
+            동기화를 쓰지 않는 사람에게는 오지 않을 약속이 됩니다.
+          */}
+          {policy.autoPurge ? (
+            <>옮긴 지 <strong>{policy.days}일</strong>이 지난 것은 동기화할 때 저절로 비웁니다.</>
+          ) : (
+            <>저절로 비우지는 않습니다 — 설정 → 일반 → 휴지통에서 켤 수 있습니다.</>
+          )}
         </p>
         <button
           type="button"
@@ -147,6 +175,15 @@ export function TrashView({ items, onRestore, onPurge, onEmpty, onPeek }: TrashV
                         year: 'numeric', month: '2-digit', day: '2-digit',
                         hour: '2-digit', minute: '2-digit',
                       })}
+                    </span>
+                    {' '}
+                    <span
+                      className="trash-when"
+                      data-tip={policy.autoPurge
+                        ? `옮긴 지 ${policy.days}일이 지나면 동기화할 때 없앱니다`
+                        : '저절로 없어지지 않습니다. 직접 비워야 합니다'}
+                    >
+                      ({trashNote(item.trashedAt, now, policy)})
                     </span>
                   </span>
                 </div>

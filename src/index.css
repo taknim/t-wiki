@@ -2267,6 +2267,8 @@ button.info-caret:focus-visible { outline: 2px solid var(--accent); outline-offs
 .trash-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .trash-name { font-weight: 600; overflow-wrap: anywhere; }
 .trash-meta { font-size: 12px; color: var(--text-muted); overflow-wrap: anywhere; }
+/* 언제까지 남아 있을지 적은 한 마디. 한 덩어리로 읽혀야 하므로 가운데서 접지 않습니다. */
+.trash-when { white-space: nowrap; }
 .trash-tools { display: flex; gap: 6px; flex-shrink: 0; }
 /*
  * 엿보기 칸. 되돌릴지 없앨지 정하려고 잠깐 들여다보는 자리라, 글은 앞부분만 싣고

@@ -16,9 +16,18 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(HERE, '..')
 const URL = process.env.APP_URL ?? 'http://localhost:5173'
 
+/*
+ * 그 자리에 **우리 앱이** 떠 있는지 봅니다.
+ *
+ * 응답이 왔다는 것만으로는 모자랍니다. 이 컴퓨터에서는 다른 프로젝트의 vite 가 같은
+ * 포트대를 쓰는데, 그 서버를 우리 것으로 알고 붙었더니 모든 묶음이 첫 누르기에서
+ * 30초씩 기다리다 멈췄습니다. 제목 한 줄로 우리 앱인지 가립니다.
+ */
 const alive = async () => {
   try {
-    return (await fetch(URL, { signal: AbortSignal.timeout(1500) })).ok
+    const answer = await fetch(URL, { signal: AbortSignal.timeout(1500) })
+    if (!answer.ok) return false
+    return (await answer.text()).includes('<title>t-WiKi</title>')
   } catch {
     return false
   }
@@ -31,7 +40,12 @@ async function startApp() {
   }
 
   console.log('앱을 띄우는 중…')
-  const server = spawn('npm', ['run', 'dev', '--', '--port', new global.URL(URL).port], {
+  /*
+   * `--strictPort` 를 붙입니다. 그 포트가 이미 남의 것이면 vite 는 조용히 옆 포트로
+   * 옮겨 가는데, 그러면 우리가 보는 자리에는 남의 앱이 남아 있게 됩니다. 옮겨 가느니
+   * 못 뜨고 멈추는 편이 낫습니다.
+   */
+  const server = spawn('npm', ['run', 'dev', '--', '--port', new global.URL(URL).port, '--strictPort'], {
     cwd: ROOT,
     stdio: 'ignore',
     detached: true,
@@ -46,7 +60,7 @@ async function startApp() {
   }
 
   try { process.kill(-server.pid) } catch { /* 이미 죽었으면 그만입니다 */ }
-  throw new Error(`앱이 뜨지 않았습니다: ${URL}`)
+  throw new Error(`앱이 뜨지 않았습니다: ${URL} (그 포트를 다른 프로그램이 쓰고 있는지 보세요)`)
 }
 
 const run = (file) =>

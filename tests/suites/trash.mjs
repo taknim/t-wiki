@@ -113,6 +113,17 @@ try {
   expect('지운 것이 보임', shown.length === 1 && shown[0].name === '온보딩.md', JSON.stringify(shown))
   expect('원래 폴더가 적힘', shown[0].meta.includes('/회사'), shown[0].meta)
   expect('때가 적힘', /\d{4}\. \d{2}\. \d{2}\./.test(shown[0].meta), shown[0].meta)
+  /*
+   * 날짜만으로는 "이게 오래된 건가" 를 머릿속에서 빼 봐야 압니다. 얼마나 되었는지를
+   * 옆에 적되, **저절로 비우기가 꺼져 있으면 지난 날**을 적습니다 — 오지 않을 날을
+   * 약속할 수는 없습니다.
+   */
+  expect('얼마나 되었는지도 적힘', shown[0].meta.includes('(오늘 버림)'), shown[0].meta)
+  const guide = () => page.evaluate(() => document.querySelector('.trash-head .hint').textContent.replace(/\s+/g, ' '))
+  const guideOff = await guide()
+  console.log('  안내: ' + guideOff)
+  expect('저절로 비우지 않는다고 알림', guideOff.includes('저절로 비우지는 않습니다'), guideOff)
+  expect('켜는 자리까지 알려 줌', guideOff.includes('설정 → 일반 → 휴지통'), guideOff)
   await page.screenshot({ path: join(HERE, '..', 'shots', 'trash', '01-view.png'),
     clip: { x: 0, y: 40, width: 1300, height: 420 } })
 
@@ -273,8 +284,10 @@ try {
     JSON.stringify(await rows()))
 
   step('10. 휴지통은 동기화되지 않고, 설정을 켜면 오래된 것만 비운다')
-  // 하나는 31일 전에 옮긴 것으로 꾸밉니다.
-  await remove('개발 환경', '휴지통으로 이동')
+  /*
+   * 하나는 31일 전에 옮긴 것으로 꾸밉니다. **꾸민 뒤에 하나를 더 버립니다** — 버리는 일이
+   * 휴지통 목록을 다시 읽어 와, 꾸며 넣은 때가 화면에도 닿습니다.
+   */
   await page.evaluate(async () => {
     const file = window.__mockRoot._children.get('_t-wiki.trash')._children.get('_index.json')
     const items = JSON.parse(await (await file.getFile()).text())
@@ -282,6 +295,11 @@ try {
     file._data = JSON.stringify(items)
     file._lastModified = Date.now()
   })
+  await remove('개발 환경', '휴지통으로 이동')
+  const aged = await listed()
+  console.log('  ' + JSON.stringify(aged.map((one) => one.meta.slice(-22))))
+  expect('오래된 것은 지난 날이 적힘', aged.some((one) => one.meta.includes('(버린 지 31일)')),
+    JSON.stringify(aged))
   // 저장소를 맞추되, 아직 저절로 비우기는 끕니다.
   await page.click('button[aria-label="설정"]')
   await page.waitForSelector('.settings-nav')
@@ -308,6 +326,20 @@ try {
   const days = await page.inputValue('#trash-days')
   expect('기본은 30일', days === '30', days)
   await page.click('.sheet-close')
+  /*
+   * 켜고 나면 같은 자리에 **남은 날**이 적혀야 합니다. 언제 사라지는지를 알아야
+   * 복원할지 말지 정할 수 있습니다. 31일 전에 옮긴 것은 이미 날이 지났습니다.
+   */
+  await page.waitForTimeout(300)
+  const guideOn = await guide()
+  console.log('  켠 뒤 안내: ' + guideOn)
+  expect('며칠 뒤 비우는지 알림', guideOn.includes('30일') && guideOn.includes('동기화할 때 저절로 비웁니다'), guideOn)
+  const marked = await listed()
+  console.log('  ' + JSON.stringify(marked.map((one) => one.meta.slice(-24))))
+  expect('갓 버린 것은 남은 날', marked.some((one) => one.meta.includes('(30일 뒤 자동 삭제)')),
+    JSON.stringify(marked))
+  expect('날이 지난 것은 다음 동기화 때', marked.some((one) => one.meta.includes('(다음 동기화 때 삭제)')),
+    JSON.stringify(marked))
   await page.click('.topbar button:has-text("GitHub 동기화")')
   await page.waitForFunction(() => !document.querySelector('.topbar button[disabled]'), undefined, { timeout: 30000 })
   await page.waitForTimeout(600)
