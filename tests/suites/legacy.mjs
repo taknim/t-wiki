@@ -59,7 +59,7 @@ const tokenInSettings = async () => {
 }
 
 try {
-  await page.goto('http://localhost:5173', { waitUntil: 'domcontentloaded' })
+  await page.goto(process.env.APP_URL ?? 'http://localhost:5173', { waitUntil: 'domcontentloaded' })
 
   step('1. 폴더별로 가르기 전 상태를 만든다')
   // 첫 폴더를 한 번 열어 손잡이를 남기고, 옛 모양의 한 벌짜리 설정을 심습니다.

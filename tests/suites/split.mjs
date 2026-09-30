@@ -54,7 +54,7 @@ const dragBy = async (dx) => {
 }
 
 try {
-  await page.goto('http://localhost:5173', { waitUntil: 'domcontentloaded' })
+  await page.goto(process.env.APP_URL ?? 'http://localhost:5173', { waitUntil: 'domcontentloaded' })
   await openVault()
   await openDoc('개발 환경')
 

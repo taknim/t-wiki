@@ -86,7 +86,7 @@ const line = () => page.evaluate(() => {
 })
 
 try {
-  await page.goto('http://localhost:5173', { waitUntil: 'domcontentloaded' })
+  await page.goto(process.env.APP_URL ?? 'http://localhost:5173', { waitUntil: 'domcontentloaded' })
 
   step('1. 동기화하기 전에는 커밋 이름이 없다')
   await openVault('first')

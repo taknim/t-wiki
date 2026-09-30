@@ -55,7 +55,7 @@ const MESSY_JSON = '{"a":[1,\n2]}   \n\n\n'
 const MESSY_YAML = '가:\n\t나: 1  \n'
 
 try {
-  await page.goto('http://localhost:5173', { waitUntil: 'domcontentloaded' })
+  await page.goto(process.env.APP_URL ?? 'http://localhost:5173', { waitUntil: 'domcontentloaded' })
   await page.click('button:has-text("폴더 열기")')
   await page.waitForSelector('.tree')
 

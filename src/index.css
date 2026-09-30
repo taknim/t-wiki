@@ -2597,6 +2597,18 @@ button.info-caret:focus-visible { outline: 2px solid var(--accent); outline-offs
 }
 /* 고른 자리의 수. 설명글보다 또렷해야 합니다 — 읽으라고 적은 값입니다. */
 .crop-now { padding-block-start: 5px; font-size: 12px; font-variant-numeric: tabular-nums; }
+/* 몇 할로 줄일지 고르는 단추들. 한 줄에 다 서지 못하면 접힙니다. */
+.scale-group { display: flex; flex-wrap: wrap; gap: 4px; }
+/*
+ * 너비·높이 칸은 **여섯 글자**면 넉넉합니다(가장 큰 값이 10000). 92px 로 두었더니 칸이
+ * 값보다 훨씬 넓어, 옆에 설 자리가 모자라면서도 안은 비어 보였습니다.
+ */
+.image-edit-panel .field .interval-input { width: 6.5em; }
+/*
+ * 너비·높이 칸은 **여섯 글자**면 넉넉합니다(가장 큰 값이 10000). 92px 로 두었더니 칸이
+ * 값보다 훨씬 넓어, 옆에 설 자리가 모자라면서도 안은 비어 보였습니다.
+ */
+
 .crop-line > .hint { padding-block-start: 5px; }
 /*
  * 돌리기·뒤집기 단추. 네 개를 붙여 세워 한 묶음으로 읽히게 합니다.

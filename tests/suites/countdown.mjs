@@ -58,7 +58,7 @@ const configure = async (minutes) => {
 }
 
 try {
-  await page.goto('http://localhost:5173', { waitUntil: 'domcontentloaded' })
+  await page.goto(process.env.APP_URL ?? 'http://localhost:5173', { waitUntil: 'domcontentloaded' })
 
   step('1. 켜면 정해진 간격에서 시작한다')
   await openVault('first')

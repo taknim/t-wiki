@@ -86,7 +86,7 @@ const idle = () =>
   page.waitForFunction(() => !document.querySelector('.topbar button[disabled]'), { timeout: 30000 })
 
 try {
-  await page.goto('http://localhost:5173', { waitUntil: 'domcontentloaded' })
+  await page.goto(process.env.APP_URL ?? 'http://localhost:5173', { waitUntil: 'domcontentloaded' })
 
   step('1. 첫 폴더를 저장소에 맞추고 올린다')
   await openVault('first')

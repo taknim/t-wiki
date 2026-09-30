@@ -101,7 +101,7 @@ const exportTo = async (withToken) => {
 }
 
 try {
-  await page.goto('http://localhost:5173', { waitUntil: 'domcontentloaded' })
+  await page.goto(process.env.APP_URL ?? 'http://localhost:5173', { waitUntil: 'domcontentloaded' })
 
   step('1. 설정을 갖춰 둔다')
   await openVault('first')

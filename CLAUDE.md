@@ -119,6 +119,9 @@ git status --short      # 뜻하지 않게 붙는 파일이 없는지
 ## 시험을 쓸 때
 
 - 묶음 하나가 한 주제입니다. 걸음(`step`) 이름은 무엇을 지키는지 한 문장으로.
+- 앱 주소는 **`process.env.APP_URL ?? 'http://localhost:5173'`** 로 받습니다. 5173 을 박아
+  두면 사람 자리에 서버가 떠 있을 때만 통하고, 제 포트로 돌릴 때 소리 없이 멈춥니다
+  (그렇게 열세 묶음이 한꺼번에 넘어졌습니다).
 - 가짜 폴더는 `tests/mock-fs.js`, 가짜 GitHub 은 `tests/github-mock.mjs`, 브라우저 저장소를
   들여다보는 손은 `tests/peek.js`. 오피스 시험 파일은 `tests/office-fixtures.mjs` 가 짓습니다.
 - 부드럽게 굴러가는 것은 `settled()` 처럼 멎을 때까지 기다렸다가 잽니다.

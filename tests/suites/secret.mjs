@@ -56,7 +56,7 @@ const reload = async () => {
 }
 
 try {
-  await page.goto('http://localhost:5173', { waitUntil: 'domcontentloaded' })
+  await page.goto(process.env.APP_URL ?? 'http://localhost:5173', { waitUntil: 'domcontentloaded' })
   await page.click('button:has-text("폴더 열기")')
   await page.waitForSelector('.tree', { timeout: 10000 })
   await page.waitForTimeout(400)

@@ -31,6 +31,12 @@ type Natural = { width: number; height: number }
 const GRIPS = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'] as const
 type Grip = (typeof GRIPS)[number]
 
+/**
+ * 한 번에 고를 수 있는 배. 원본 대비입니다.
+ * 키우는 쪽은 둘만 둡니다 — 없는 점을 지어내는 일이라 많이 키울수록 뭉개집니다.
+ */
+const SCALES = [2, 1.5, 0.5, 0.25]
+
 /** 그림 칸의 안쪽 여백(CSS 와 같은 값). 꽉 차게 맞출 때 이만큼 빼고 잽니다. */
 const STAGE_PAD = 16
 
@@ -190,6 +196,13 @@ export function ImageEditor({ root, path, onSave, onCancel }: ImageEditorProps) 
     const next = clampSide(value)
     setHeight(next)
     if (ratio && base) setWidth(keepRatio(next, base.height, base.width))
+  }
+
+  /** 원본(고른 자리)의 몇 할로 내놓을지. 두 축을 함께 재므로 비율은 저절로 지켜집니다. */
+  const scaleTo = (at: number) => {
+    if (!base) return
+    setWidth(clampSide(base.width * at))
+    setHeight(clampSide(base.height * at))
   }
 
   /** 잘라 낸 자리가 바뀌면 내놓을 크기도 그 크기로 되돌립니다. 앞서 정한 수는 뜻이 달라집니다. */
@@ -783,7 +796,7 @@ export function ImageEditor({ root, path, onSave, onCancel }: ImageEditorProps) 
         </section>
 
         <section className="field">
-          <h4 className="field-group-title">크기</h4>
+          <h4 className="field-group-title">사이즈(리사이징)</h4>
           <div className="row" style={{ alignItems: 'center', gap: 8 }}>
             <label htmlFor="image-width">너비</label>
             <input
@@ -807,16 +820,38 @@ export function ImageEditor({ root, path, onSave, onCancel }: ImageEditorProps) 
               value={height}
               onChange={(event) => changeHeight(Number(event.target.value))}
             />
-            {base && (
-              <button
-                type="button"
-                className="btn btn-small"
-                onClick={() => { setWidth(base.width); setHeight(base.height) }}
-              >
-                원래 크기
-              </button>
-            )}
           </div>
+          {/*
+            몇 할로 줄일지는 **원본(고른 자리) 대비**입니다. 지금 적힌 수의 몇 할로 두면
+            두 번 누를 때마다 값이 겹쳐 줄어, 50% 를 두 번 누른 사람이 25% 를 기대하기
+            어렵습니다. 원래 크기가 곧 100% 자리입니다.
+          */}
+          {base && (
+            <div className="crop-line">
+              <span className="crop-label">원본 대비</span>
+              <div className="scale-group">
+                <button
+                  type="button"
+                  className="btn btn-small"
+                  data-tip={`${base.width} × ${base.height} 로 되돌립니다`}
+                  onClick={() => scaleTo(1)}
+                >
+                  원래 크기
+                </button>
+                {SCALES.map((one) => (
+                  <button
+                    key={one}
+                    type="button"
+                    className="btn btn-small"
+                    data-tip={`${clampSide(base.width * one)} × ${clampSide(base.height * one)} 로`}
+                    onClick={() => scaleTo(one)}
+                  >
+                    {Math.round(one * 100)}%
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           <label className="checkbox">
             <input type="checkbox" checked={ratio} onChange={(event) => setRatio(event.target.checked)} />
             가로세로 비율 지키기

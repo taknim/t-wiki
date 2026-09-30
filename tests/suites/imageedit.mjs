@@ -543,6 +543,37 @@ try {
   // 비율을 지키므로 높이는 저절로 따라옵니다.
   expect('높이가 비율대로 따라옴', (await page.inputValue('#image-height')) === '100',
     await page.inputValue('#image-height'))
+  /*
+   * 반으로 줄이는 일이 잦은데 그때마다 두 칸에 손으로 적어야 했습니다. 몇 할인지는
+   * **원본 대비**입니다 — 지금 적힌 수의 몇 할로 두면 두 번 누를 때마다 값이 겹쳐 줄어
+   * 50% 를 두 번 누른 사람이 25% 를 기대하기 어렵습니다.
+   */
+  const bothSides = () => page.evaluate(() => [
+    document.querySelector('#image-width').value, document.querySelector('#image-height').value,
+  ].join('x'))
+  await page.click('.image-edit .scale-group button:text-is("50%")')
+  await page.waitForTimeout(200)
+  expect('50% 는 절반', (await bothSides()) === '150x100', await bothSides())
+  await page.click('.image-edit .scale-group button:text-is("50%")')
+  await page.waitForTimeout(200)
+  expect('다시 눌러도 원본의 절반', (await bothSides()) === '150x100', await bothSides())
+  await page.click('.image-edit .scale-group button:text-is("200%")')
+  await page.waitForTimeout(200)
+  expect('200% 는 두 배', (await bothSides()) === '600x400', await bothSides())
+  await page.click('.image-edit .scale-group button:text-is("25%")')
+  await page.waitForTimeout(200)
+  expect('25% 는 사분의 일', (await bothSides()) === '75x50', await bothSides())
+  await page.click('.image-edit .scale-group button:text-is("원래 크기")')
+  await page.waitForTimeout(200)
+  expect('원래 크기로 돌아옴', (await bothSides()) === '300x200', await bothSides())
+  // 칸은 여섯 글자면 넉넉합니다(가장 큰 값이 10000). 넓게 두면 옆에 설 자리가 모자랍니다.
+  const boxWidth = await page.evaluate(() =>
+    Math.round(document.querySelector('#image-width').getBoundingClientRect().width))
+  console.log('  너비 칸: ' + boxWidth + 'px')
+  expect('너비 칸이 값에 맞게 좁음', boxWidth <= 90 && boxWidth >= 50, String(boxWidth))
+  await page.fill('#image-width', '150')
+  await page.waitForTimeout(200)
+
   await page.screenshot({ path: join(HERE, '..', 'shots', 'imageedit', '01-edit.png') })
   await saveEdit()
   const smaller = await madeFile('사진_modified.png')
@@ -1019,7 +1050,8 @@ try {
    */
   const named = await page.$$eval('.image-edit .crop-label', (all) => all.map((one) => one.textContent.trim()))
   console.log('  잘라내기 줄 이름: ' + JSON.stringify(named))
-  expect('줄마다 이름이 섬', JSON.stringify(named) === JSON.stringify(['비율 고정', '긴 쪽', '고른 자리']),
+  expect('줄마다 이름이 섬',
+    JSON.stringify(named) === JSON.stringify(['비율 고정', '긴 쪽', '고른 자리', '원본 대비']),
     JSON.stringify(named))
 
   /*

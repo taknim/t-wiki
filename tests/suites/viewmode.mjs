@@ -78,7 +78,7 @@ const pick = async (label) => {
 }
 
 try {
-  await page.goto('http://localhost:5173', { waitUntil: 'domcontentloaded' })
+  await page.goto(process.env.APP_URL ?? 'http://localhost:5173', { waitUntil: 'domcontentloaded' })
 
   step('1. 고른 모드가 화면에 적용된다')
   await openVault('first')

@@ -120,7 +120,7 @@ const shown = () => page.evaluate(() => {
 })
 
 try {
-  await page.goto('http://localhost:5173', { waitUntil: 'domcontentloaded' })
+  await page.goto(process.env.APP_URL ?? 'http://localhost:5173', { waitUntil: 'domcontentloaded' })
   await openVault()
 
   step('1. 기본은 켜짐이라 고른 이미지가 그려진다')
