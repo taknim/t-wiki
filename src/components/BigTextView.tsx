@@ -34,8 +34,8 @@ export function BigTextView({ text, bytes }: { text: string; bytes: number }) {
         {told && (
           <div className="bigtext-told">
             <p className="bigtext-told-head">
-              {formatBytes(bytes)} · {formatBytes(MAX_ATTACHMENT_BYTES)} 또는 {BIG_TEXT_LINES.toLocaleString()}줄을
-              넘는 글입니다.
+              파일 크기 : {formatBytes(bytes)}{' '}
+              ({formatBytes(MAX_ATTACHMENT_BYTES)} 또는 {BIG_TEXT_LINES.toLocaleString()}줄 초과 파일)
             </p>
             <ul>
               <li><strong>고칠 수 없습니다.</strong> 보기만 합니다 — 고치려면 다른 편집기로 여세요.</li>
@@ -43,10 +43,11 @@ export function BigTextView({ text, bytes }: { text: string; bytes: number }) {
               <li><strong>줄 번호를 세우지 않습니다.</strong></li>
               <li><strong>커서 위치를 적지 않습니다.</strong></li>
             </ul>
-            <p className="bigtext-told-why">
-              글이 크면 글상자에서 커서를 한 칸 옮기는 데만도 0.2초가 넘게 듭니다.
-              브라우저가 글 전체를 다시 재기 때문이라 앱에서 줄일 수 있는 값이 아닙니다.
-            </p>
+            {/*
+              까닭은 한 줄이면 넉넉합니다. 왜 느린지(브라우저가 글 전체를 다시 재는 값)는
+              쓰는 사람이 알 까닭이 없고, 길게 적었더니 쪽지의 반을 설명이 먹었습니다.
+            */}
+            <p className="bigtext-told-why">글이 커서 느려지는 것을 막으려는 것입니다.</p>
           </div>
         )}
       </div>
