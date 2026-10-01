@@ -1132,6 +1132,21 @@ mark { background: var(--mark); color: inherit; border-radius: 2px; }
 .bigtext-told ul { margin: 0; padding-inline-start: 18px; display: grid; gap: 3px; }
 .bigtext-told-why { margin: 8px 0 0; color: var(--text-muted); }
 
+/*
+ * 압축 안엣것 목록. 풀지 않고 목차만 읽은 것이라, 표 하나와 머리말 한 줄이면 넉넉합니다.
+ */
+.archive-view { display: flex; flex-direction: column; min-height: 0; flex: 1; padding: 16px; gap: 10px; }
+/* 합계는 목록 아래에 한 줄. unzip 의 끝줄과 같은 자리입니다. */
+.archive-sum { margin: 0; font-size: 12px; color: var(--text-muted); }
+.archive-view .table-wrap { overflow: auto; min-height: 0; }
+.archive-table { font-size: 12px; }
+/* 이름은 길어도 접지 않고 제 폭을 씁니다. 가운데서 접히면 경로를 읽기 어렵습니다. */
+.archive-name { font-family: var(--mono); white-space: nowrap; }
+/* 숫자는 오른쪽으로 모아 자릿수를 견주기 쉽게 합니다. */
+.archive-size { text-align: end; font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* 폴더 자리는 크기가 없습니다. 흐리게 두어 파일과 갈라 보입니다. */
+.archive-dir .archive-name { color: var(--text-muted); }
+
 /* ---------- 지난 동기화 결과 ---------- */
 
 /*

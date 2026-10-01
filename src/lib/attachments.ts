@@ -20,9 +20,17 @@ export const CODE_EXTENSIONS = [
   'diff', 'patch', 'graphql', 'gql', 'makefile',
 ]
 
+/**
+ * 압축 파일. **풀지는 않고 안엣것의 목록만** 보여 줍니다.
+ * zip 만 둡니다 — 7z·rar 는 목차를 읽는 데 따로 라이브러리가 필요하고, zip 은 규격이
+ * 단순해 끝자락 몇 킬로바이트만 읽으면 됩니다.
+ */
+export const ARCHIVE_EXTENSIONS = ['zip']
+
 export const DOCUMENT_EXTENSIONS = [
   'pdf', 'txt', 'csv', 'tsv', 'json', 'yaml', 'yml', 'xml', 'html', 'htm',
   'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'hwp', 'hwpx',
+  ...ARCHIVE_EXTENSIONS,
   ...CODE_EXTENSIONS,
 ]
 
@@ -48,7 +56,7 @@ export const ACCEPT_ATTRIBUTE = ['md', ...IMAGE_EXTENSIONS, ...DOCUMENT_EXTENSIO
   .map((extension) => `.${extension}`)
   .join(',')
 
-export type AttachmentKind = 'image' | 'pdf' | 'text' | 'sheet' | 'word' | 'binary'
+export type AttachmentKind = 'image' | 'pdf' | 'text' | 'sheet' | 'word' | 'archive' | 'binary'
 
 export function extensionOf(path: string): string {
   const name = path.split('/').pop() ?? path
@@ -88,6 +96,11 @@ export function attachmentKind(path: string): AttachmentKind {
   if (TEXT_EXTENSIONS.includes(extension)) return 'text'
   if (SHEET_EXTENSIONS.includes(extension)) return 'sheet'
   if (WORD_EXTENSIONS.includes(extension)) return 'word'
+  /*
+   * docx·xlsx·pptx 도 속은 zip 이지만 그쪽은 글과 표로 풀어 보여 줍니다. 여기까지 내려온
+   * zip 만 목록으로 봅니다.
+   */
+  if (ARCHIVE_EXTENSIONS.includes(extension)) return 'archive'
   return 'binary'
 }
 

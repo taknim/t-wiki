@@ -74,14 +74,25 @@ try {
   const twice = await page.locator('.tree-row:has-text("밖에서 온 문서")').count()
   expect('줄이 둘로 늘어남', twice === 2, String(twice))
 
+  /*
+   * zip 은 받지만 7z·rar 는 받지 않습니다 — 목차를 읽는 데 라이브러리가 따로 필요합니다.
+   * (받는 형식의 보기로 zip 을 쓰고 있었는데, zip 을 받게 되면서 이 걸음이 무너졌습니다.)
+   */
   step('6. 모르는 형식은 여전히 물리친다')
-  await drop('꾸러미.zip', 'PK')
+  await drop('꾸러미.7z', '7z\xbc\xaf')
   const third = await toast()
   console.log('  안내: ' + third)
   expect('지원하지 않는다고 알림', third.includes('지원하지 않는 형식'), third)
   await page.waitForTimeout(400)
-  const zip = await page.locator('.tree-row:has-text("꾸러미")').count()
-  expect('트리에 들이지 않음', zip === 0, String(zip))
+  const other = await page.locator('.tree-row:has-text("꾸러미")').count()
+  expect('트리에 들이지 않음', other === 0, String(other))
+
+  step('6-1. 압축(zip)은 받는다')
+  await drop('자료 묶음.zip', 'PK\x05\x06')
+  await toast()
+  await page.waitForTimeout(500)
+  const zip = await page.locator('.tree-row:has-text("자료 묶음")').count()
+  expect('트리에 들어옴', zip === 1, String(zip))
 } catch (cause) {
   fail('묶음이 도중에 멈춤', cause instanceof Error ? (cause.stack ?? cause.message) : String(cause))
 } finally {

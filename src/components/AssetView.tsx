@@ -7,6 +7,7 @@ import { imageFormatName } from '../lib/imageEdit'
 import { ZoomControl } from './ZoomControl'
 import { useSpacePan } from '../hooks/useSpacePan'
 import { SheetPreview, WordPreview } from './OfficePreview'
+import { ArchiveView } from './ArchiveView'
 import type { ImageBackdrop } from '../types'
 
 interface AssetViewProps {
@@ -139,7 +140,7 @@ export function AssetView({
   const tooBig = isAttachment(path) && size > MAX_ATTACHMENT_BYTES
 
   // 그림은 바탕을 칸 끝까지, 오피스 미리보기는 제 여백을 지고 옵니다. 둘 다 바깥 여백을 걷습니다.
-  const filling = (kind === 'image' && !skipped) || (office && !officeOff)
+  const filling = (kind === 'image' && !skipped) || (office && !officeOff) || kind === 'archive'
 
   return (
     // 그림은 바탕을 칸 끝까지 깔아야 합니다. 여백이 남으면 거기만 테마 색이라 어수선합니다.
@@ -245,6 +246,8 @@ export function AssetView({
         </p>
       )}
 
+      {/* 압축은 풀지 않고 목록만 읽습니다. 오피스 미리보기 설정과는 따로 둡니다 — 읽는 양이 몇 킬로바이트뿐입니다. */}
+      {kind === 'archive' && <ArchiveView root={root} path={path} />}
       {kind === 'sheet' && !officeOff && <SheetPreview root={root} path={path} />}
 
       {kind === 'word' && !officeOff && <WordPreview root={root} path={path} />}
