@@ -1,3 +1,4 @@
+import type { SyncFailure } from '../lib/github/failure'
 import type { SyncAction, SyncLogLine } from '../types'
 
 /** 갈래마다 사람이 읽을 이름. 결과 창과 지난 기록이 같은 말을 씁니다. */
@@ -50,4 +51,21 @@ export function splitCommitSha(
   return text.endsWith(tail)
     ? { text: text.slice(0, -tail.length), sha: commitSha }
     : { text, sha: null }
+}
+
+/**
+ * 멈춘 까닭 옆에 덧붙일 사실들.
+ *
+ * 글만 적어 두면 "Failed to fetch" 처럼 짧은 말에서는 손쓸 데를 못 찾습니다. 받아 온 것이
+ * 있으면(응답 코드·어떤 요청이었는지·GitHub 요청 번호) 괄호 안에 모아 적습니다.
+ * 없는 것은 적지 않습니다 — 답이 아예 오지 않은 때까지 숫자를 지어내지는 않습니다.
+ */
+export function failureFacts(failure?: SyncFailure): string {
+  if (!failure) return ''
+  const facts = [
+    failure.status === undefined ? '' : `${failure.status}${failure.statusText ? ` ${failure.statusText}` : ''}`,
+    failure.request ?? '',
+    failure.requestId ?? '',
+  ].filter(Boolean)
+  return facts.length > 0 ? `(${facts.join(' · ')})` : ''
 }

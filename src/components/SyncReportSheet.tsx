@@ -2,9 +2,8 @@ import type { GitHubConfig } from '../types'
 import type { SyncReport } from '../hooks/useGitHubSync'
 import { displayPath } from '../lib/paths'
 import { useEscapeClose } from '../hooks/useEscapeClose'
-import { FailureNote } from './FailureNote'
 import { LogRows } from './LogRows'
-import { ACTION_LABEL } from './syncLabels'
+import { ACTION_LABEL, failureFacts } from './syncLabels'
 
 interface SyncReportSheetProps {
   report: SyncReport
@@ -61,7 +60,12 @@ export function SyncReportSheet({
             {report.commitSha && ` · 커밋 ${report.commitSha.slice(0, 7)}`}
           </p>
 
-          {report.error && <FailureNote failure={report.failure} message={report.error} />}
+          {report.error && (
+            <p className="status status-error">
+              {report.error}
+              {failureFacts(report.failure) && <span className="stopped-facts"> {failureFacts(report.failure)}</span>}
+            </p>
+          )}
 
           {report.needsConfirm && (
             <div className="callout callout-warning" style={{ marginBottom: 16 }}>

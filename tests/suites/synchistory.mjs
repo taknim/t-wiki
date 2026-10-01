@@ -501,12 +501,60 @@ try {
   await page.waitForTimeout(400)
 
   /*
-   * 멈춘 회차를 펴면 "오간 것 없이 멈췄습니다" 한 줄이 흐린 글씨로 있었습니다. 멈춘 것인지
-   * 할 일이 없었던 것인지 가릴 수 없었고, 무엇을 해야 할지도 알 수 없었습니다.
+   * 실패한 줄의 까닭이 성공한 줄의 `로컬에서 수정` 과 똑같이 흐린 색이라, 무엇이 왜
+   * 실패했는지가 눈에 들어오지 않았습니다. 멈춘 회차도 까닭이 한 줄 안에 묻혀 있었습니다.
    */
-  step('13-2. 멈춘 회차는 까닭과 받아 온 숫자를 눈에 띄게 적는다')
+  step('13-2. 실패한 줄의 까닭은 붉게, 멈춘 까닭도 그 자리에 적는다')
   await seedRun({
     at: Date.now(),
+    trigger: 'manual',
+    commitSha: 'abc1234',
+    error: null,
+    cut: 0,
+    log: [
+      { path: '회사/온보딩.md', action: 'upload-update', status: 'ok', detail: '로컬에서 수정' },
+      {
+        path: '회사/자료/상태.md',
+        action: 'upload-new',
+        status: 'error',
+        detail: 'A requested file or directory could not be found at the time an operation was processed. (404 Not Found)',
+      },
+    ],
+  })
+  await closeVault()
+  await openVault('first')
+  await openSync()
+  await openHistory()
+  await page.click('.run:first-child .run-open')
+  await page.waitForTimeout(400)
+  const toned = await page.evaluate(() => {
+    const rows = [...document.querySelectorAll('.run .plan li')]
+    const colorOf = (one) => getComputedStyle(one.querySelector('.plan-reason')).color.match(/\d+/g).map(Number)
+    const bad = rows.find((one) => one.classList.contains('plan-error'))
+    const good = rows.find((one) => !one.classList.contains('plan-error'))
+    return {
+      실패색: colorOf(bad),
+      성공색: colorOf(good),
+      실패글: bad.querySelector('.plan-reason').textContent,
+    }
+  })
+  console.log('  ' + JSON.stringify(toned))
+  expect('실패한 줄의 까닭이 붉음',
+    toned.실패색[0] > toned.실패색[1] + 40 && toned.실패색[0] > toned.실패색[2] + 40, JSON.stringify(toned.실패색))
+  expect('성공한 줄과 색이 다름', JSON.stringify(toned.실패색) !== JSON.stringify(toned.성공색), JSON.stringify(toned))
+  expect('응답 코드까지 적힘', toned.실패글.includes('404 Not Found'), toned.실패글)
+  await page.locator('[aria-label="지난 동기화 결과"]')
+    .screenshot({ path: join(HERE, '..', 'shots', 'synchistory', '07-failure.png') })
+
+  /*
+   * 아예 멈춘 회차는 오간 줄이 없습니다. 그 자리에 까닭을 함께 적되, 받아 온 숫자가
+   * 있으면 괄호로 덧붙입니다.
+   */
+  await closeSheet()
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(400)
+  await seedRun({
+    at: Date.now() + 1,
     trigger: 'auto',
     commitSha: null,
     error: 'GitHub: Not Found',
@@ -516,7 +564,6 @@ try {
       statusText: 'Not Found',
       request: 'GET /repos/a/b/git/ref/heads/main',
       requestId: 'A1:B2',
-      hint: '그 자리를 찾지 못했습니다. 계정·저장소 이름과 브랜치를 보세요.',
     },
     cut: 0,
     log: [],
@@ -528,56 +575,17 @@ try {
   await page.click('.run:first-child .run-open')
   await page.waitForTimeout(400)
   const stopped = await page.evaluate(() => {
-    const box = document.querySelector('.run .failure')
-    if (!box) return null
-    const tone = getComputedStyle(box.querySelector('.failure-head')).color.match(/\d+/g).map(Number)
-    const facts = [...box.querySelectorAll('.failure-facts dt')].map((one) => one.textContent)
-    return {
-      까닭: box.querySelector('.failure-why').textContent,
-      힌트: box.querySelector('.failure-hint')?.textContent ?? null,
-      항목: facts,
-      적힌것: box.querySelector('.failure-facts').textContent.replace(/\s+/g, ' '),
-      붉은색: tone[0] > tone[1] + 40 && tone[0] > tone[2] + 40,
-      옛문구: document.body.textContent.includes('오간 것 없이 멈췄습니다'),
-    }
+    const box = document.querySelector('.run .panel-empty')
+    const why = box.querySelector('.stopped-why')
+    const tone = getComputedStyle(why).color.match(/\d+/g).map(Number)
+    return { 글: box.textContent.replace(/\s+/g, ' '), 붉은색: tone[0] > tone[1] + 40 && tone[0] > tone[2] + 40 }
   })
   console.log('  ' + JSON.stringify(stopped))
-  expect('멈춘 까닭이 따로 섬', stopped !== null)
-  expect('까닭이 그대로 적힘', stopped.까닭 === 'GitHub: Not Found', String(stopped.까닭))
-  expect('무엇을 보라는 말이 붙음', (stopped.힌트 ?? '').includes('저장소 이름'), String(stopped.힌트))
-  expect('붉은 낯', stopped.붉은색, JSON.stringify(stopped))
-  expect('응답 코드·요청·요청 번호를 적음',
-    JSON.stringify(stopped.항목) === JSON.stringify(['응답 코드', '요청', '요청 번호']), JSON.stringify(stopped.항목))
-  expect('받아 온 숫자가 그대로', stopped.적힌것.includes('404 Not Found')
-    && stopped.적힌것.includes('GET /repos/a/b/git/ref/heads/main') && stopped.적힌것.includes('A1:B2'),
-    stopped.적힌것)
-  expect('멈춘 것을 "오간 것 없음" 으로 적지 않음', stopped.옛문구 === false, String(stopped.옛문구))
-  await page.locator('[aria-label="지난 동기화 결과"]')
-    .screenshot({ path: join(HERE, '..', 'shots', 'synchistory', '07-failure.png') })
-
-  /*
-   * 예전에 쌓인 회차에는 숫자가 없습니다. 그래도 멈췄다는 것과 그 한 줄은 보여야 합니다.
-   */
-  await closeSheet()
-  // 설정까지 닫아야 다음 누르기를 덮개가 가로채지 않습니다.
-  await page.keyboard.press('Escape')
-  await page.waitForTimeout(400)
-  await seedRun({
-    at: Date.now() + 1, trigger: 'manual', commitSha: null, error: 'Failed to fetch', cut: 0, log: [],
-  })
-  await closeVault()
-  await openVault('first')
-  await openSync()
-  await openHistory()
-  await page.click('.run:first-child .run-open')
-  await page.waitForTimeout(400)
-  const old = await page.evaluate(() => {
-    const box = document.querySelector('.run .failure')
-    return box ? { 까닭: box.querySelector('.failure-why').textContent, 숫자: box.querySelector('.failure-facts') !== null } : null
-  })
-  console.log('  옛 기록: ' + JSON.stringify(old))
-  expect('숫자가 없던 옛 회차도 까닭은 보임', old?.까닭 === 'Failed to fetch', JSON.stringify(old))
-  expect('없는 숫자를 지어내지 않음', old?.숫자 === false, JSON.stringify(old))
+  expect('멈췄다는 말과 까닭이 함께', stopped.글.includes('오간 것 없이 멈췄습니다. GitHub: Not Found'), stopped.글)
+  expect('받아 온 숫자가 괄호로 붙음',
+    stopped.글.includes('404 Not Found') && stopped.글.includes('GET /repos/a/b/git/ref/heads/main')
+    && stopped.글.includes('A1:B2'), stopped.글)
+  expect('까닭이 붉음', stopped.붉은색, JSON.stringify(stopped))
   await closeSheet()
   await page.keyboard.press('Escape')
   await page.waitForTimeout(400)

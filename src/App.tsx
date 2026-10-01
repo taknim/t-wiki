@@ -18,6 +18,7 @@ import {
 import { TextPreview } from './components/TextPreview'
 import { SettingsPanel } from './components/SettingsPanel'
 import { SplitResizer } from './components/SplitResizer'
+import { BigTextView } from './components/BigTextView'
 import { BackdropSwitch } from './components/BackdropSwitch'
 import { ImageEditor } from './components/ImageEditor'
 import { SyncReportSheet } from './components/SyncReportSheet'
@@ -46,6 +47,7 @@ import type { TrashItem } from './lib/trash'
 import { entryKind, readFile } from './lib/fsAccess'
 import { DEFAULT_VIEW_MODE, loadSession, saveSession } from './lib/session'
 import { formatTidyFor, textPreviewKind, trimWhitespace } from './lib/textPreview'
+import { isBigText } from './lib/bigText'
 import {
   clampSidebarWidth, DEFAULT_SIDEBAR_WIDTH, maxSidebarWidth, MIN_SIDEBAR_WIDTH,
   isNarrow, NARROW_QUERY,
@@ -918,8 +920,14 @@ export default function App() {
   // 마크다운은 아니지만 글자로 되어 있어 고쳐 쓸 수 있는 첨부인지.
   const editableText =
     selection !== null && selection.kind !== 'dir' && isEditableText(selection.path)
-  // 표나 코드처럼 그려서 보여 줄 것이 있는 형식인지.
-  const textPreview = editableText && selection ? textPreviewKind(selection.path) : null
+  /*
+   * 아주 큰 글인지. 크기(5MB)나 줄 수(4,000줄) 가운데 하나만 넘어도 그렇습니다.
+   * 그때는 고치는 자리가 아니라 **보는 자리**로 엽니다 — 글상자에 그만한 글을 담으면
+   * 커서를 한 칸 옮기는 데만도 0.2초가 넘게 들고, 그것은 앱이 줄일 수 있는 값이 아닙니다.
+   */
+  const bigText = editableText && selection !== null && isBigText(selection.size, draft)
+  // 표나 코드처럼 그려서 보여 줄 것이 있는 형식인지. 큰 글은 그리지 않습니다.
+  const textPreview = editableText && selection && !bigText ? textPreviewKind(selection.path) : null
 
   const { fields, body } = useMemo(() => parseFrontmatter(draft), [draft])
   /*
@@ -1911,7 +1919,9 @@ export default function App() {
                 )}
               </div>
 
-              {editableText ? (
+              {editableText && bigText ? (
+                <BigTextView text={draft} bytes={selection.size} />
+              ) : editableText ? (
                 // 보여 줄 것이 있으면 마크다운처럼 나란히 놓고, 없으면 편집기만 넓게 씁니다.
                 <div
                   className={`doc-body mode-${textPreview ? viewMode : 'edit'}`}

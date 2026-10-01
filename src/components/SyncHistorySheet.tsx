@@ -3,9 +3,8 @@ import type { GitHubConfig, SyncRun } from '../types'
 import { commitsUrl } from '../lib/github/links'
 import { MAX_SYNC_HISTORY } from '../lib/store'
 import { useEscapeClose } from '../hooks/useEscapeClose'
-import { FailureNote } from './FailureNote'
 import { LogRows } from './LogRows'
-import { summarizeLog } from './syncLabels'
+import { failureFacts, summarizeLog } from './syncLabels'
 
 interface SyncHistorySheetProps {
   runs: SyncRun[]
@@ -108,21 +107,18 @@ export function SyncHistorySheet({
                     </button>
 
                     {open && (
-                      run.error ? (
-                        <>
-                          <FailureNote failure={run.failure} message={run.error} />
-                          {run.log.length > 0 && (
-                            <LogRows
-                              lines={run.log}
-                              commitSha={run.commitSha}
-                              config={config}
-                              onOpen={onOpen}
-                              onOpenDir={onOpenDir}
-                            />
-                          )}
-                        </>
-                      ) : run.log.length === 0 ? (
-                        <p className="panel-empty">양쪽이 이미 같아 아무것도 하지 않았습니다.</p>
+                      run.log.length === 0 ? (
+                        <p className="panel-empty">
+                          {run.error ? (
+                            <>
+                              오간 것 없이 멈췄습니다.{' '}
+                              <span className="stopped-why">{run.error}</span>
+                              {failureFacts(run.failure) && (
+                                <span className="stopped-facts"> {failureFacts(run.failure)}</span>
+                              )}
+                            </>
+                          ) : '양쪽이 이미 같아 아무것도 하지 않았습니다.'}
+                        </p>
                       ) : (
                         <>
                           <LogRows

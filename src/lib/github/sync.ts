@@ -1,3 +1,4 @@
+import { describeFailure } from './failure'
 import type { AssetIndex, DocIndex, GitHubConfig, SyncLogLine, SyncPlanItem, SyncState } from '../../types'
 import { isAttachment, isMarkdown } from '../attachments'
 import * as fs from '../fsAccess'
@@ -392,11 +393,18 @@ export async function applyPlan(options: ApplyOptions): Promise<ApplyResult> {
       }
       log.push({ path: item.path, action: item.action, status: 'ok', detail: item.reason })
     } catch (cause) {
+      /*
+       * 줄마다의 실패에도 받아 온 것을 함께 적습니다. 글만 남기면 "A requested file or
+       * directory could not be found…" 처럼 긴 말만 남아, 그것이 404 인지 권한 문제인지
+       * 가릴 수 없습니다. 숫자가 없는 때(답이 오지 않은 때)는 글만 남습니다.
+       */
+      const failure = describeFailure(cause)
+      const facts = failure.status === undefined ? '' : ` (${failure.status}${failure.statusText ? ` ${failure.statusText}` : ''})`
       log.push({
         path: item.path,
         action: item.action,
         status: 'error',
-        detail: cause instanceof Error ? cause.message : String(cause),
+        detail: `${failure.message}${facts}`,
       })
     }
     done += 1
