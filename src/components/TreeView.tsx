@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { VaultNode } from '../types'
 import {
-  ChevronIcon, ClipIcon, DocIcon, DocPlusIcon, FolderCloseIcon, FolderIcon, FolderPlusIcon,
+  ArchiveIcon, ChevronIcon, ClipIcon, DocIcon, DocPlusIcon, FolderCloseIcon, FolderIcon, FolderPlusIcon,
   ImageIcon, MoveIcon, PencilIcon, RefreshIcon, StarIcon, TrashIcon,
 } from './icons'
 import { attachmentKind } from '../lib/attachments'
@@ -158,10 +158,13 @@ interface TreeRowProps extends TreeActions {
 }
 
 /** 이름 앞 아이콘의 색을 가릅니다. 상태 표시줄의 종류 이름과 같은 갈래입니다. */
-function kindOf(node: VaultNode): 'dir' | 'markdown' | 'image' | 'file' {
+function kindOf(node: VaultNode): 'dir' | 'markdown' | 'image' | 'archive' | 'file' {
   if (node.kind === 'dir') return 'dir'
   if (isMarkdown(node.name)) return 'markdown'
-  return attachmentKind(node.name) === 'image' ? 'image' : 'file'
+  const kind = attachmentKind(node.name)
+  if (kind === 'image') return 'image'
+  // 압축은 문서와 다른 아이콘을 씁니다. 같은 모양이면 목록에서 가릴 수 없습니다.
+  return kind === 'archive' ? 'archive' : 'file'
 }
 
 function TreeRow({ node, depth, selectedPath, expanded, onToggle, ...actions }: TreeRowProps) {
@@ -262,7 +265,10 @@ function TreeRow({ node, depth, selectedPath, expanded, onToggle, ...actions }: 
           <span className="tree-caret" />
         )}
         <span className={`tree-icon is-${kindOf(node)}`}>
-          {isDir ? <FolderIcon /> : kindOf(node) === 'image' ? <ImageIcon /> : <DocIcon />}
+          {isDir ? <FolderIcon />
+            : kindOf(node) === 'image' ? <ImageIcon />
+            : kindOf(node) === 'archive' ? <ArchiveIcon />
+            : <DocIcon />}
         </span>
         <span className="tree-name">
           {node.name}

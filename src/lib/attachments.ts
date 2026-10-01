@@ -25,7 +25,34 @@ export const CODE_EXTENSIONS = [
  * zip 만 둡니다 — 7z·rar 는 목차를 읽는 데 따로 라이브러리가 필요하고, zip 은 규격이
  * 단순해 끝자락 몇 킬로바이트만 읽으면 됩니다.
  */
-export const ARCHIVE_EXTENSIONS = ['zip']
+export const ARCHIVE_EXTENSIONS = ['zip', 'rar', '7z', 'alz']
+
+/**
+ * 나눠 담은 조각(`자료.zip.001`, `자료.r01`, `자료.a01`, `자료.z01`).
+ *
+ * 조각 하나하나는 그 자체로 압축이 아니지만 **함께 두어야 쓸모가 있습니다.** 받지 않으면
+ * 한 벌 가운데 첫 장만 들어오고 나머지는 못 넣는 꼴이 됩니다.
+ */
+const PART_PATTERN = /^(\d{3}|r\d{2}|z\d{2}|a\d{2})$/
+
+export function isArchivePart(path: string): boolean {
+  return PART_PATTERN.test(extensionOf(path))
+}
+
+/**
+ * 조각의 바탕 이름과 차례. 같은 바탕을 가진 조각끼리 모아 하나처럼 읽습니다.
+ * `자료.zip.001` → 바탕 `자료.zip`, 차례 1.
+ */
+export function archivePart(path: string): { base: string; order: number } | null {
+  const name = path.split('/').pop() ?? path
+  const at = name.lastIndexOf('.')
+  if (at === -1) return null
+  const tail = name.slice(at + 1).toLowerCase()
+  if (!PART_PATTERN.test(tail)) return null
+  // r00·z01·a01 은 앞 글자를 떼고 셉니다. 세 자리 숫자는 그대로입니다.
+  const order = Number(/^\d{3}$/.test(tail) ? tail : tail.slice(1))
+  return { base: name.slice(0, at), order }
+}
 
 export const DOCUMENT_EXTENSIONS = [
   'pdf', 'txt', 'csv', 'tsv', 'json', 'yaml', 'yml', 'xml', 'html', 'htm',
@@ -52,7 +79,15 @@ export const MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024
  * 파일 고르기 창에서 미리 걸러 주는 목록.
  * 마크다운을 빼면 이 위키가 다루는 본래 형식을 정작 넣을 수 없습니다.
  */
-export const ACCEPT_ATTRIBUTE = ['md', ...IMAGE_EXTENSIONS, ...DOCUMENT_EXTENSIONS]
+/*
+ * 나눠 담은 조각은 수가 끝이 없어(001 ~ 999) 흔한 앞자리만 적습니다. 그 밖의 조각은
+ * 끌어다 놓거나 폴더에 그대로 두면 들어옵니다 — 이 목록은 고르기 창의 거름일 뿐입니다.
+ */
+const COMMON_PARTS = Array.from({ length: 9 }, (_, at) => [
+  `00${at + 1}`, `r0${at}`, `z0${at + 1}`, `a0${at + 1}`,
+]).flat()
+
+export const ACCEPT_ATTRIBUTE = ['md', ...IMAGE_EXTENSIONS, ...DOCUMENT_EXTENSIONS, ...COMMON_PARTS]
   .map((extension) => `.${extension}`)
   .join(',')
 
@@ -69,7 +104,7 @@ export function isMarkdown(path: string): boolean {
 }
 
 export function isAttachment(path: string): boolean {
-  return ATTACHMENT_EXTENSIONS.has(extensionOf(path))
+  return ATTACHMENT_EXTENSIONS.has(extensionOf(path)) || isArchivePart(path)
 }
 
 /** 밖에서 끌어다 넣을 수 있는 형식인지. 마크다운과 첨부가 모두 들어옵니다. */
@@ -100,7 +135,7 @@ export function attachmentKind(path: string): AttachmentKind {
    * docx·xlsx·pptx 도 속은 zip 이지만 그쪽은 글과 표로 풀어 보여 줍니다. 여기까지 내려온
    * zip 만 목록으로 봅니다.
    */
-  if (ARCHIVE_EXTENSIONS.includes(extension)) return 'archive'
+  if (ARCHIVE_EXTENSIONS.includes(extension) || isArchivePart(path)) return 'archive'
   return 'binary'
 }
 

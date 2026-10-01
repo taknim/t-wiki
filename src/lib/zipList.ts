@@ -204,3 +204,14 @@ export async function listZip(blob: Blob, limit = MAX_ZIP_ENTRIES): Promise<ZipL
   const directory = new Uint8Array(await blob.slice(found.offset, found.offset + found.size).arrayBuffer())
   return readEntries(directory, found.count, limit)
 }
+
+/**
+ * 나눠 담은 조각을 차례로 이어 하나처럼 봅니다.
+ *
+ * `new Blob([...])` 은 바이트를 모아 두지 않고 **가리키기만** 합니다. 이어 붙인 것을
+ * 잘라 읽으면 그 자리의 조각만 읽히므로, 4GB 를 나눠 담았어도 메모리로 들어오는 것은
+ * 목차 몇 킬로바이트뿐입니다.
+ */
+export function joinParts(parts: Blob[]): Blob {
+  return new Blob(parts)
+}

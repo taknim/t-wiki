@@ -75,16 +75,16 @@ try {
   expect('줄이 둘로 늘어남', twice === 2, String(twice))
 
   /*
-   * zip 은 받지만 7z·rar 는 받지 않습니다 — 목차를 읽는 데 라이브러리가 따로 필요합니다.
-   * (받는 형식의 보기로 zip 을 쓰고 있었는데, zip 을 받게 되면서 이 걸음이 무너졌습니다.)
+   * 받지 않을 형식으로 가립니다. 실행 파일은 문서에 곁들일 것이 아니라 앞으로도 받지
+   * 않습니다 — 압축(zip·7z)을 보기로 썼다가 그것들을 받게 되면서 이 걸음이 두 번 무너졌습니다.
    */
   step('6. 모르는 형식은 여전히 물리친다')
-  await drop('꾸러미.7z', '7z\xbc\xaf')
+  await drop('프로그램.exe', 'MZ')
   const third = await toast()
   console.log('  안내: ' + third)
   expect('지원하지 않는다고 알림', third.includes('지원하지 않는 형식'), third)
   await page.waitForTimeout(400)
-  const other = await page.locator('.tree-row:has-text("꾸러미")').count()
+  const other = await page.locator('.tree-row:has-text("프로그램")').count()
   expect('트리에 들이지 않음', other === 0, String(other))
 
   step('6-1. 압축(zip)은 받는다')

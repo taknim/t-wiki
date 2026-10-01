@@ -28,7 +28,7 @@ const zip = makeZip([
 const stamped = makeZip([
   { name: '보고서.txt', text: 'x'.repeat(100), ntfs: { modified: new Date(2026, 5, 6, 7, 8), created: new Date(2026, 0, 2, 3, 4) } },
 ])
-await page.addInitScript(({ bytes, stamped, junk }) => {
+await page.addInitScript(({ bytes, stamped, junk, first, second }) => {
   window.__installMockFs()
   const root = window.__mockRoot
   const sample = root._children.get('개발 환경.md')
@@ -38,10 +38,18 @@ await page.addInitScript(({ bytes, stamped, junk }) => {
   put('자료 묶음.zip', bytes)
   put('도장 찍힌.zip', stamped)
   put('깨진 것.zip', junk)
+  // 나눠 담은 조각. 하나만 읽으면 목차가 없어 실패하고, 이어야 읽힙니다.
+  put('나눈 것.zip.001', first)
+  put('나눈 것.zip.002', second)
+  // 목록을 읽을 수 없는 압축들. 파일 자체는 그대로 보관합니다.
+  put('모르는 것.7z', junk)
+  put('옛 것.rar', junk)
 }, {
   bytes: [...zip],
   stamped: [...stamped],
   junk: [...new TextEncoder().encode('이건 압축이 아닙니다')],
+  first: [...zip.slice(0, Math.floor(zip.length / 2))],
+  second: [...zip.slice(Math.floor(zip.length / 2))],
 })
 
 try {
@@ -56,7 +64,22 @@ try {
   // ＋파일 창이 zip 을 걸러 내지 않아야 합니다.
   const accept = await page.evaluate(() =>
     document.querySelector('input[type="file"]')?.getAttribute('accept') ?? '')
-  expect('파일 고르기에서 zip 을 받음', accept.includes('.zip'), accept)
+  expect('파일 고르기에서 압축을 받음',
+    ['.zip', '.rar', '.7z', '.alz', '.001'].every((one) => accept.includes(one)), accept)
+  // 압축은 문서와 다른 아이콘을 씁니다. 같은 모양이면 목록에서 가릴 수 없습니다.
+  const icons = await page.evaluate(() => ({
+    압축: document.querySelector('.tree-row:has(.tree-name) .tree-icon.is-archive') !== null,
+    같은모양: (() => {
+      const rows = [...document.querySelectorAll('.tree-row')]
+      const zipRow = rows.find((one) => one.textContent.includes('자료 묶음.zip'))
+      const docRow = rows.find((one) => one.textContent.includes('개발 환경'))
+      return zipRow?.querySelector('.tree-icon svg path')?.getAttribute('d')
+        === docRow?.querySelector('.tree-icon svg path')?.getAttribute('d')
+    })(),
+  }))
+  console.log('  아이콘: ' + JSON.stringify(icons))
+  expect('압축에 제 아이콘이 섬', icons.압축, JSON.stringify(icons))
+  expect('문서와 다른 모양', icons.같은모양 === false, JSON.stringify(icons))
 
   step('2. 압축을 고르면 안엣것 목록이 나온다')
   await page.click('.tree-row:has-text("자료 묶음.zip") .tree-name')
@@ -104,6 +127,34 @@ try {
     JSON.stringify(stampedRow.줄))
   await page.screenshot({ path: join(HERE, '..', 'shots', 'archive', '01-list.png'),
     clip: { x: 430, y: 40, width: 870, height: 360 } })
+
+  step('2-2. 나눠 담은 조각은 이어서 읽는다')
+  await page.click('.tree-row:has-text("나눈 것.zip.001") .tree-name')
+  await page.waitForSelector('.archive-table', { timeout: 8000 })
+  const split = await page.evaluate(() => ({
+    이름: [...document.querySelectorAll('.archive-table .archive-name')].map((one) => one.textContent),
+    합계: document.querySelector('.archive-sum').textContent.replace(/\s+/g, ' '),
+  }))
+  console.log('  ' + JSON.stringify(split))
+  expect('조각을 이어 목록을 읽음',
+    JSON.stringify(split.이름) === JSON.stringify(['읽어보기.txt', '자료/', '자료/표.csv']), JSON.stringify(split.이름))
+  expect('몇 조각을 이었는지 알림', split.합계.includes('조각 2개를 이어서 읽음'), split.합계)
+  // 뒤 조각을 골라도 같은 목록이어야 합니다. 조각마다 다르게 보이면 헷갈립니다.
+  await page.click('.tree-row:has-text("나눈 것.zip.002") .tree-name')
+  await page.waitForSelector('.archive-table', { timeout: 8000 })
+  const tail = await page.evaluate(() =>
+    [...document.querySelectorAll('.archive-table .archive-name')].map((one) => one.textContent))
+  expect('뒤 조각에서도 같은 목록', JSON.stringify(tail) === JSON.stringify(split.이름), JSON.stringify(tail))
+
+  step('2-3. 목록을 읽을 수 없는 압축은 까닭을 밝힌다')
+  for (const [name, word] of [['모르는 것.7z', '눌려 있어'], ['옛 것.rar', '공개돼 있지 않아']]) {
+    await page.click(`.tree-row:has-text("${name}") .tree-name`)
+    await page.waitForSelector('.status-error', { timeout: 8000 })
+    const said = await page.textContent('.status-error')
+    console.log('  ' + name + ': ' + said)
+    expect(`${name} — 까닭을 밝힘`, said.includes(word), said)
+    expect(`${name} — 보관한다고 알림`, said.includes('그대로 보관'), said)
+  }
 
   step('3. 읽을 수 없는 압축은 까닭을 알린다')
   await page.click('.tree-row:has-text("깨진 것.zip") .tree-name')

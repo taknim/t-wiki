@@ -214,6 +214,20 @@ export function DocIcon(props: IconProps) {
   )
 }
 
+/**
+ * 압축 파일. 문서와 같은 아이콘을 쓰면 목록에서 가릴 수 없습니다.
+ * 뚜껑과 몸통, 가운데 잠금쇠로 "담아 묶은 것" 을 그립니다.
+ */
+export function ArchiveIcon(props: IconProps) {
+  return (
+    <TintedSvg {...props}>
+      <path d="M2.4 2.3h11.2v2.9H2.4z" />
+      <path d="M3.3 5.2h9.4v7.7a.8.8 0 0 1-.8.8H4.1a.8.8 0 0 1-.8-.8z" />
+      <path d="M6.7 7.3h2.6v2.6H6.7z" fill="none" />
+    </TintedSvg>
+  )
+}
+
 export function ImageIcon(props: IconProps) {
   return (
     <TintedSvg {...props}>

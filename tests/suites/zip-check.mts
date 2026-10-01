@@ -1,5 +1,6 @@
 import { makeZip } from '../zip-fixture.mjs'
-import { decodeName, dosTime, findTail, isZip64, readEntries } from '../../src/lib/zipList'
+import { decodeName, dosTime, findTail, isZip64, joinParts, listZip, readEntries } from '../../src/lib/zipList'
+import { archivePart, isArchivePart } from '../../src/lib/attachments'
 
 /*
  * 압축 목차를 읽는 셈만 따로 잽니다.
@@ -88,6 +89,27 @@ const locator = new Uint8Array(20)
 new DataView(locator.buffer).setUint32(0, 0x07064b50, true)
 expect('zip64 를 가림', isZip64(locator))
 expect('보통 압축은 zip64 가 아님', !isZip64(plain))
+
+console.log('\n>>> 6. 나눠 담은 조각은 바탕 이름과 차례로 모은다')
+same('세 자리 숫자', archivePart('자료.zip.001'), { base: '자료.zip', order: 1 })
+same('rar 의 옛 조각', archivePart('자료.r01'), { base: '자료', order: 1 })
+same('alz 의 조각', archivePart('자료.a02'), { base: '자료', order: 2 })
+same('zip 의 조각', archivePart('자료.z09'), { base: '자료', order: 9 })
+same('조각이 아니면 없음', archivePart('자료.zip'), null)
+expect('조각으로 가림', isArchivePart('자료.zip.002'))
+expect('압축 자체는 조각이 아님', !isArchivePart('자료.7z'))
+
+console.log('\n>>> 7. 이어 붙인 것도 하나처럼 읽는다')
+/*
+ * 조각 하나만 읽으면 목차가 마지막 조각에만 있어 늘 실패합니다. 이어 붙여야 읽힙니다.
+ * `new Blob` 은 바이트를 모아 두지 않고 가리키기만 하므로 읽는 양은 그대로입니다.
+ */
+const whole = makeZip([{ name: '가.txt', text: '하나' }, { name: '나.txt', text: '둘' }])
+const half = Math.floor(whole.length / 2)
+const joined = joinParts([new Blob([whole.slice(0, half)]), new Blob([whole.slice(half)])])
+const fromParts = await listZip(joined)
+same('이어 붙이면 그대로', fromParts.entries.map((one) => one.path), ['가.txt', '나.txt'])
+same('크기도 그대로', fromParts.total, 2)
 
 console.log('\n' + (problems ? `FAIL ${problems}건` : '모두 통과'))
 if (problems) process.exitCode = 1
