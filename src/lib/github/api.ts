@@ -1,3 +1,4 @@
+import { GitHubRequestError } from './failure'
 import type { GitHubConfig } from '../../types'
 
 const API = 'https://api.github.com'
@@ -33,6 +34,47 @@ interface GitHubError {
   errors?: { message?: string }[]
 }
 
+/**
+ * 한 번의 요청. 답이 아예 오지 않는 때를 가려내려고 따로 둡니다.
+ *
+ * 연결이 끊기거나 확장 프로그램이 막으면 `fetch` 는 `TypeError: Failed to fetch` 를 던집니다.
+ * 그 글에는 어디에 걸었는지조차 없어, 기록에 "Failed to fetch" 한 줄만 남았습니다.
+ * 요청한 자리를 달아 두면 적어도 어느 걸음에서 멈췄는지는 압니다.
+ */
+async function send(
+  url: string,
+  init: RequestInit,
+  token: string,
+  accept: string,
+  path: string,
+): Promise<Response> {
+  try {
+    return await fetch(url, {
+      ...init,
+      /*
+       * GitHub 은 인증된 응답에도 `cache-control: private, max-age=60` 을 붙입니다.
+       * 그대로 두면 브랜치 위치를 최대 1분간 캐시에서 읽어, 방금 우리가 옮겨 놓은
+       * 커밋을 못 보고 낡은 부모 위에 쌓다가 non-fast-forward 로 거절당합니다.
+       * 재시도해도 캐시가 그대로라 계속 실패합니다.
+       */
+      cache: 'no-store',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: accept,
+        'X-GitHub-Api-Version': '2022-11-28',
+        ...(init.headers ?? {}),
+      },
+    })
+  } catch (cause) {
+    throw new GitHubRequestError(cause instanceof Error ? cause.message : String(cause), {
+      status: 0,
+      statusText: '',
+      request: `${init.method ?? 'GET'} ${path}`,
+      requestId: null,
+    })
+  }
+}
+
 /** 오류 처리를 공유하면서 응답 객체 자체가 필요할 때 씁니다(첨부 내려받기). */
 async function rawRequest(
   token: string,
@@ -40,22 +82,7 @@ async function rawRequest(
   init: RequestInit = {},
   accept = 'application/vnd.github+json',
 ): Promise<Response> {
-  const response = await fetch(`${API}${path}`, {
-    ...init,
-    /*
-     * GitHub 은 인증된 응답에도 `cache-control: private, max-age=60` 을 붙입니다.
-     * 그대로 두면 브랜치 위치를 최대 1분간 캐시에서 읽어, 방금 우리가 옮겨 놓은
-     * 커밋을 못 보고 낡은 부모 위에 쌓다가 non-fast-forward 로 거절당합니다.
-     * 재시도해도 캐시가 그대로라 계속 실패합니다.
-     */
-    cache: 'no-store',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: accept,
-      'X-GitHub-Api-Version': '2022-11-28',
-      ...(init.headers ?? {}),
-    },
-  })
+  const response = await send(`${API}${path}`, init, token, accept, path)
 
   if (!response.ok) {
     let detail = `${response.status} ${response.statusText}`
@@ -70,7 +97,17 @@ async function rawRequest(
     if (response.status === 403 && response.headers.get('x-ratelimit-remaining') === '0') {
       detail = 'GitHub 요청 한도를 모두 썼습니다. 한 시간 뒤에 다시 시도해 주세요.'
     }
-    throw new Error(`GitHub: ${detail}`)
+    /*
+     * 글만 던지면 상태 코드가 그 글 속으로 녹아 사라집니다(GitHub 이 message 를 주면
+     * 숫자가 지워집니다). 숫자와 어디에 건 요청인지를 곁에 달아, 화면에서 그대로 적을 수
+     * 있게 합니다.
+     */
+    throw new GitHubRequestError(`GitHub: ${detail}`, {
+      status: response.status,
+      statusText: response.statusText,
+      request: `${init.method ?? 'GET'} ${path}`,
+      requestId: response.headers.get('x-github-request-id'),
+    })
   }
 
   return response

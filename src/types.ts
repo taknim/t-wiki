@@ -1,3 +1,4 @@
+import type { SyncFailure } from './lib/github/failure'
 export type NodeKind = 'file' | 'dir'
 
 /** 볼트(로컬 폴더) 안의 파일 또는 폴더 한 개. path 는 볼트 루트 기준 상대경로이고 구분자는 항상 '/'. */
@@ -105,6 +106,11 @@ export interface SyncRun {
   trigger: 'manual' | 'auto'
   commitSha: string | null
   error: string | null
+  /**
+   * 멈춘 까닭을 더 적어 둔 것(상태 코드·요청한 자리·힌트).
+   * 예전에 쌓인 회차에는 없으므로 없을 수 있습니다.
+   */
+  failure?: SyncFailure
   log: SyncLogLine[]
   /** 너무 길어 잘라낸 줄 수. 0 이면 그대로 남겼습니다. */
   cut: number

@@ -3,6 +3,7 @@ import type {
   AssetIndex, DocIndex, GitHubConfig, LastCommit, SyncAction, SyncLogLine, SyncPlanItem, SyncRun,
 } from '../types'
 import { applyPlan, buildPlan, localShas, scanRemote } from '../lib/github/sync'
+import { describeFailure, type SyncFailure } from '../lib/github/failure'
 import { vaultKeyFor } from '../lib/vaultKey'
 import {
   appendSyncRun,
@@ -60,6 +61,8 @@ export interface SyncReport {
   log: SyncLogLine[]
   commitSha: string | null
   error: string | null
+  /** 멈췄다면 그 까닭을 더 적은 것. */
+  failure?: SyncFailure
   /**
    * 동기화 대상이 바뀌어 아직 적용하지 않은 계획.
    * 사용자가 보고 진행 여부를 정해야 합니다.
@@ -281,6 +284,7 @@ export function useGitHubSync({ root, ready, docs, assets, onBeforeSync, onLocal
         trigger: run.trigger,
         commitSha: run.commitSha,
         error: run.error,
+        failure: run.failure,
         log: run.log,
       }))
     } catch {
@@ -406,10 +410,11 @@ export function useGitHubSync({ root, ready, docs, assets, onBeforeSync, onLocal
           at, trigger, plan, log: result.log, commitSha: result.commitSha, error: null,
         })
       } catch (cause) {
-        const message = cause instanceof Error ? cause.message : String(cause)
-        setStatus({ phase: 'error', message, progress: null })
+        // 던져진 것에서 적을 수 있는 것을 모두 추려 둡니다. 한 줄 글만으로는 손쓸 데를 못 찾습니다.
+        const failure = describeFailure(cause)
+        setStatus({ phase: 'error', message: failure.message, progress: null })
         await finish(key, {
-          at: Date.now(), trigger, plan: [], log: [], commitSha: null, error: message,
+          at: Date.now(), trigger, plan: [], log: [], commitSha: null, error: failure.message, failure,
         })
       }
       return false
