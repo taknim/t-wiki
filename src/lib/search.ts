@@ -1,5 +1,6 @@
 import type { DocIndex, SearchHit, VaultNode } from '../types'
 import { fileNameOf } from './paths'
+import type { IndexedText } from './textIndex'
 
 const CONTEXT = 40
 
@@ -63,8 +64,8 @@ export function nameMatches(query: string, path: string): boolean {
 export interface SearchSource {
   /** 마크다운 본문. 폴더를 열 때 이미 읽어 둡니다. */
   docs: DocIndex
-  /** 텍스트 첨부 본문. 검색을 시작할 때 읽어 채웁니다. 아직 없으면 빈 표입니다. */
-  texts: Map<string, string>
+  /** 텍스트 첨부 본문. 검색을 시작할 때 읽어 채웁니다. 큰 파일은 앞부분만 들어 있습니다. */
+  texts: Map<string, IndexedText>
   /** 트리에 보이는 모든 줄. 폴더와 첨부는 여기서만 찾습니다. */
   tree: VaultNode | null
 }
@@ -98,7 +99,7 @@ export function searchVault(query: string, source: SearchSource, limit = 50): Se
 
   const hits = new Map<string, SearchHit>()
 
-  const addBody = (path: string, content: string) => {
+  const addBody = (path: string, content: string, cut = false) => {
     const positions = findAll(content, needle)
     const name = byName.get(path)
     if (positions.length === 0 && !name) return
@@ -110,13 +111,14 @@ export function searchVault(query: string, source: SearchSource, limit = 50): Se
       // 제목 일치를 본문보다 훨씬 크게 봅니다. 위키에서는 보통 문서 이름으로 찾으니까요.
       score: (name?.count ?? 0) * 100 + positions.length,
       snippet: positions.length > 0
-        ? buildSnippet(content, positions[0], needle.length)
+        // 앞부분만 읽은 파일은 **그렇다고 밝힙니다.** 뒤에 더 있을지는 알 수 없습니다.
+        ? [...buildSnippet(content, positions[0], needle.length), ...(cut ? [{ text: ' · 앞부분에서', hit: false }] : [])]
         : [{ text: '이름에서 일치', hit: false }],
     })
   }
 
   for (const entry of source.docs.values()) addBody(entry.path, entry.content)
-  for (const [path, content] of source.texts) addBody(path, content)
+  for (const [path, text] of source.texts) addBody(path, text.content, text.cut)
 
   // 본문을 못 읽는 것들(폴더·그림·큰 파일)은 이름만 가지고 담습니다.
   for (const [path, name] of byName) {

@@ -16,7 +16,22 @@ const page = await browser.newPage({ viewport: { width: 1400, height: 920 } })
 const errors = []
 page.on('pageerror', (e) => errors.push('pageerror: ' + e.message))
 await page.addInitScript(readFileSync(join(HERE, '..', 'mock-fs.js'), 'utf8'))
-await page.addInitScript(() => window.__installMockFs())
+await page.addInitScript(() => {
+  window.__installMockFs()
+  /*
+   * 본문을 읽기에도, 동기화하기에도 너무 큰 텍스트(6MB). **이름으로는 찾혀야 합니다** — 이름 검색은 트리를
+   * 훑는 일이라 크기와 상관이 없습니다.
+   */
+  const root = window.__mockRoot
+  const sample = root._children.get('개발 환경.md')
+  const line = '2026-09-30 12:00:00 INFO  처리 완료 id=1234567\n'
+  const filler = line.repeat(Math.ceil(2 * 1024 * 1024 / line.length))
+  // 앞머리와 꼬리에 서로 다른 말을 심어, 어디까지 읽는지 가릴 수 있게 합니다.
+  const body = `머리표지 들어 있음\n${filler}꼬리표지 들어 있음\n`
+  root._children.set('커다란 기록.txt', Object.assign(
+    Object.create(Object.getPrototypeOf(sample)),
+    { kind: 'file', name: '커다란 기록.txt', _data: new Blob([body]), _lastModified: Date.now() }))
+})
 
 const showTab = async (name) => {
   await page.click(`.sidebar-tablist button:has-text("${name}")`)
@@ -107,6 +122,29 @@ try {
   expect('이름이 맞는 쪽이 먼저', both[0]?.title === '온보딩.md', JSON.stringify(titles(both)))
   expect('본문에서 가리키는 문서도 나옴',
     titles(both).includes('개발 환경.md'), JSON.stringify(titles(both)))
+
+  /*
+   * 본문을 읽지 않는 큰 파일이라도 **이름으로는 찾혀야** 합니다. 이름 검색은 트리를
+   * 훑는 일이라 크기와 상관이 없습니다.
+   */
+  step('6-1. 큰 파일은 앞부분까지 본문으로 찾고, 이름은 늘 찾는다')
+  const big = await find('커다란')
+  console.log('  ' + JSON.stringify(big))
+  expect('이름으로 잡힘', big.some((one) => one.title === '커다란 기록.txt'), JSON.stringify(big))
+  /*
+   * 큰 파일을 통째로 빼면 이름으로만 찾게 됩니다. 로그는 앞머리에 무엇이 든 파일인지
+   * 적혀 있는 일이 많아, 앞에서부터 1MB 까지는 읽어 둡니다.
+   */
+  const head = await find('머리표지')
+  console.log('  앞부분: ' + JSON.stringify(head))
+  expect('앞부분은 본문으로 찾힘', head.some((one) => one.title === '커다란 기록.txt'), JSON.stringify(head))
+  expect('앞부분만 봤다고 밝힘',
+    (head.find((one) => one.title === '커다란 기록.txt')?.snippet ?? '').includes('앞부분에서'),
+    JSON.stringify(head))
+  // 자른 뒤쪽은 찾히지 않습니다. 못 찾는 것을 찾은 척하지 않습니다.
+  const tail = await find('꼬리표지')
+  console.log('  뒷부분: ' + JSON.stringify(tail))
+  expect('자른 뒤쪽은 찾히지 않음', !tail.some((one) => one.title === '커다란 기록.txt'), JSON.stringify(tail))
 
   step('7. 없는 말은 없다고 한다')
   await page.fill('.search-input', '없는말없는말')

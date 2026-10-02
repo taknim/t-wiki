@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import type { AssetIndex } from '../types'
-import { readTextIndex } from '../lib/textIndex'
+import { readTextIndex, type IndexedText } from '../lib/textIndex'
 
 /** 아직 읽지 않았음을 가리키는 빈 표. 같은 것인지로 읽었는지를 가립니다. */
-const EMPTY = new Map<string, string>()
+const EMPTY = new Map<string, IndexedText>()
 
 /**
  * 텍스트 첨부의 본문을 검색이 필요할 때만 읽어 옵니다.
@@ -16,7 +16,7 @@ export function useTextIndex(
   root: FileSystemDirectoryHandle | null,
   assets: AssetIndex,
   enabled: boolean,
-): { texts: Map<string, string>; loading: boolean } {
+): { texts: Map<string, IndexedText>; loading: boolean } {
   const [texts, setTexts] = useState(EMPTY)
 
   // 폴더가 바뀌면 앞 폴더의 본문을 들고 있지 않습니다. 렌더 중에 비웁니다.
