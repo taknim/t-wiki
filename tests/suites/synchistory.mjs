@@ -94,9 +94,13 @@ const firstLine = () => page.evaluate(() => {
     href: link?.getAttribute('href') ?? null,
     target: link?.getAttribute('target') ?? null,
     rel: link?.getAttribute('rel') ?? null,
-    // 경로와 까닭의 윗변이 같으면 한 줄에 나란히 선 것입니다.
-    sameLine: path && reason
-      ? Math.abs(path.getBoundingClientRect().top - reason.getBoundingClientRect().top) < 4
+    // 까닭은 경로 **아래**에 섭니다. 윗변이 더 아래면 줄이 내려간 것입니다.
+    belowPath: path && reason
+      ? reason.getBoundingClientRect().top >= path.getBoundingClientRect().bottom - 1
+      : false,
+    // 갈래 딱지와 경로는 같은 줄입니다.
+    sameLine: path && row.querySelector('.plan-action')
+      ? Math.abs(path.getBoundingClientRect().top - row.querySelector('.plan-action').getBoundingClientRect().top) < 4
       : false,
   }
 })
@@ -190,7 +194,13 @@ try {
   const line = await firstLine()
   console.log('  첫 줄: ' + JSON.stringify(line))
   expect('경로가 적혀 있음', line.path.includes('.md'), line.path)
-  expect('까닭이 경로와 한 줄에 섬', line.sameLine, JSON.stringify(line))
+  /*
+   * 셋을 한 줄에 두었더니 경로가 길 때 제 칸 안에서 여러 줄로 접혀, 줄마다 높이가
+   * 들쑥날쑥하고 어디까지가 한 항목인지 눈으로 끊기 어려웠습니다. 한 항목을 늘 두 줄로
+   * 둡니다 — 갈래·경로가 윗줄, 까닭·커밋이 아랫줄.
+   */
+  expect('갈래와 경로가 한 줄에 섬', line.sameLine, JSON.stringify(line))
+  expect('까닭은 그 아랫줄에 섬', line.belowPath, JSON.stringify(line))
   /* 펼친 줄의 밑줄과 회차를 가르는 줄이 겹쳐 두 줄로 그어지면 안 됩니다. */
   const edges = await page.evaluate(() => {
     const last = [...document.querySelectorAll('.run .plan li')].pop()
