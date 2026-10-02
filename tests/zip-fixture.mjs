@@ -40,7 +40,22 @@ function ntfsExtra(modified, created) {
 }
 
 /**
- * @param {{name: Uint8Array|string, text?: string, utf8?: boolean, at?: Date, ntfs?: {modified: Date, created: Date}}[]} items
+ * 압축기가 제 나라 글자 꼴로 적으면서 **원래 이름을 UTF-8 로 한 번 더** 적어 두는 칸
+ * (Info-ZIP Unicode Path, 0x7075). 버전 1 + 본디 이름의 검사값 + UTF-8 이름.
+ */
+function unicodePathExtra(name) {
+  const body = new TextEncoder().encode(name)
+  const out = new Uint8Array(4 + 5 + body.length)
+  const view = new DataView(out.buffer)
+  view.setUint16(0, 0x7075, true)
+  view.setUint16(2, 5 + body.length, true)
+  view.setUint8(4, 1)
+  out.set(body, 9)
+  return out
+}
+
+/**
+ * @param {{name: Uint8Array|string, text?: string, utf8?: boolean, at?: Date, ntfs?: {modified: Date, created: Date}, unicodePath?: string}[]} items
  * @returns {Uint8Array}
  */
 export function makeZip(items) {
@@ -71,7 +86,11 @@ export function makeZip(items) {
     local.setUint16(28, 0, true)
     chunks.push(new Uint8Array(local.buffer), name, body)
 
-    const extra = item.ntfs ? ntfsExtra(item.ntfs.modified, item.ntfs.created) : new Uint8Array(0)
+    const stamps = item.ntfs ? ntfsExtra(item.ntfs.modified, item.ntfs.created) : new Uint8Array(0)
+    const told = item.unicodePath ? unicodePathExtra(item.unicodePath) : new Uint8Array(0)
+    const extra = new Uint8Array(stamps.length + told.length)
+    extra.set(stamps, 0)
+    extra.set(told, stamps.length)
     const record = new DataView(new ArrayBuffer(46))
     record.setUint32(0, 0x02014b50, true)
     record.setUint16(4, 20, true)

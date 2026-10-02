@@ -1,5 +1,7 @@
 import { makeZip } from '../zip-fixture.mjs'
-import { decodeName, dosTime, findTail, isZip64, joinParts, listZip, readEntries } from '../../src/lib/zipList'
+import {
+  dosTime, findTail, guessEncoding, isZip64, joinParts, listZip, nameScore, readEntries, unicodePath,
+} from '../../src/lib/zipList'
 import { archivePart, isArchivePart } from '../../src/lib/attachments'
 
 /*
@@ -42,17 +44,54 @@ expect('적어 둔 때를 읽음', listed.entries[0].at !== null, String(listed.
 same('자르지 않음', listed.cut, false)
 
 console.log('\n>>> 2. 이름의 글자 꼴을 가린다')
-// 깃발이 서 있으면 UTF-8.
-same('UTF-8 깃발', decodeName(new TextEncoder().encode('한글.txt'), true), '한글.txt')
-// 깃발이 없고 ASCII 뿐이면 그대로.
-same('ASCII 는 그대로', decodeName(new TextEncoder().encode('readme.txt'), false), 'readme.txt')
 /*
- * 깃발이 없는데 ASCII 를 벗어났으면 우리나라에서 만든 압축으로 보고 EUC-KR 로 읽습니다.
- * 규격의 CP437 로 읽으면 한글 이름이 모두 깨집니다.
+ * 규격은 "깃발이 서 있으면 UTF-8, 아니면 CP437" 이라지만 실제로는 깃발 없이 UTF-8 로
+ * 적는 압축기가 흔합니다(맥). 깃발만 믿었더니 맥에서 만든 압축의 한글 이름이 모두
+ * 깨졌습니다 — UTF-8 바이트를 EUC-KR 로 읽은 꼴이었습니다.
  */
-same('깃발이 없으면 EUC-KR', decodeName(new Uint8Array([0xc7, 0xd1, 0xb1, 0xdb]), false), '한글')
-const cp949 = makeZip([{ name: new Uint8Array([0xc7, 0xd1, 0xb1, 0xdb, 0x2e, 0x74, 0x78, 0x74]), utf8: false, text: 'x' }])
-same('지은 압축에서도 그대로', listOf(cp949).entries[0].path, '한글.txt')
+const utf8 = (text: string) => new TextEncoder().encode(text)
+/** CP949(EUC-KR) 로 적은 "한글.txt". 윈도 압축기가 이렇게 적습니다. */
+const cp949 = new Uint8Array([0xc7, 0xd1, 0xb1, 0xdb, 0x2e, 0x74, 0x78, 0x74])
+/** Shift_JIS 로 적은 "日本.txt". */
+const sjis = new Uint8Array([0x93, 0xfa, 0x96, 0x7b, 0x2e, 0x74, 0x78, 0x74])
+
+same('깃발이 없어도 UTF-8 이면 UTF-8', guessEncoding([utf8('보고서 모음.txt'), utf8('자료/표.csv')]), 'utf-8')
+same('CP949 로 적힌 것은 EUC-KR', guessEncoding([cp949]), 'euc-kr')
+same('일본어는 Shift_JIS', guessEncoding([sjis]), 'shift_jis')
+
+/*
+ * 점수는 **같은 바이트를 두 꼴로 읽어** 견줍니다. 바르게 읽으면 한글과 ASCII 가 고르게
+ * 나오고, 잘못 읽으면 쓰이지 않는 기호가 섞여 점수가 깎입니다.
+ */
+const sample = utf8('보고서 모음 자료.txt')
+const right = nameScore(new TextDecoder('utf-8').decode(sample))
+const wrong = nameScore(new TextDecoder('euc-kr').decode(sample))
+expect('바르게 읽은 쪽이 높은 점수', right > wrong, `${right} vs ${wrong}`)
+// 제어 문자가 섞이면 이름일 수 없습니다.
+same('제어 문자가 섞이면 탈락', nameScore('a\u0001b'), Number.NEGATIVE_INFINITY)
+
+console.log('\n>>> 2-1. 압축 하나에는 한 꼴로 읽는다')
+// 맥에서 만든 꼴: 깃발 없이 UTF-8.
+const mac = makeZip([
+  { name: utf8('보고서 모음.txt'), utf8: false, text: 'x' },
+  { name: utf8('자료/표.csv'), utf8: false, text: 'y' },
+])
+same('맥 압축의 한글 이름', listOf(mac).entries.map((one) => one.path), ['보고서 모음.txt', '자료/표.csv'])
+// 윈도에서 만든 꼴: 깃발 없이 CP949.
+const win = makeZip([{ name: cp949, utf8: false, text: 'x' }])
+same('윈도 압축의 한글 이름', listOf(win).entries[0].path, '한글.txt')
+// 깃발이 선 것은 그대로 UTF-8 입니다.
+same('깃발이 선 것은 그대로', listOf(makeZip([{ name: '한글.txt', text: 'x' }])).entries[0].path, '한글.txt')
+
+console.log('\n>>> 2-2. 압축기가 적어 둔 이름이 있으면 추측하지 않는다')
+/*
+ * 제 나라 글자 꼴로 적으면서 원래 이름을 UTF-8 로 한 번 더 적어 두는 압축기가 있습니다
+ * (Info-ZIP Unicode Path). 적어 둔 것이 가장 미덥습니다.
+ */
+const both = makeZip([{ name: cp949, utf8: false, unicodePath: '한글 이름.txt', text: 'x' }])
+same('적어 둔 이름을 씀', listOf(both).entries[0].path, '한글 이름.txt')
+same('칸만 따로 읽어도 같음',
+  unicodePath(new Uint8Array([0x75, 0x70, 0x08, 0x00, 0x01, 0, 0, 0, 0, 0xea, 0xb0, 0x80])), '가')
 
 console.log('\n>>> 3. 적어 둔 때는 MS-DOS 꼴로 들어 있다')
 // 1980년을 기준으로 하고 2초 단위입니다. 0 은 "적지 않음" 입니다.

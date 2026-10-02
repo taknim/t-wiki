@@ -93,20 +93,94 @@ export function dosTime(date: number, time: number): number | null {
 }
 
 /**
- * 이름을 글자로 옮깁니다.
+ * 이름에 쓰였을 만한 글자 꼴.
  *
- * 규격은 UTF-8 깃발이 섰을 때만 UTF-8 이고 그 밖에는 CP437 이라고 하지만, 우리나라에서
- * 만든 압축은 대개 CP949(EUC-KR) 로 적혀 있습니다. 깃발이 없고 ASCII 를 벗어난 바이트가
- * 있으면 EUC-KR 로 읽습니다 — CP437 로 읽으면 한글 이름이 모두 깨집니다.
+ * zip 규격은 "깃발이 서 있으면 UTF-8, 아니면 CP437" 이라고만 말합니다. 그러나 실제로는
+ * **깃발 없이 UTF-8 로 적는 압축기가 흔하고**(맥의 압축이 그렇습니다), 윈도 압축기는
+ * 저마다 제 나라 글자 꼴로 적습니다. 그래서 깃발만 믿으면 이름이 깨집니다.
+ * 읽어 보고 **가장 그럴듯한 것**을 고릅니다.
  */
-export function decodeName(raw: Uint8Array, utf8: boolean): string {
-  if (utf8) return new TextDecoder('utf-8').decode(raw)
-  if (raw.every((byte) => byte < 0x80)) return new TextDecoder('utf-8').decode(raw)
-  try {
-    return new TextDecoder('euc-kr').decode(raw)
-  } catch {
-    return new TextDecoder('utf-8').decode(raw)
+const CANDIDATES = ['utf-8', 'euc-kr', 'shift_jis', 'gbk', 'big5']
+
+/**
+ * 옮긴 글이 이름답게 생겼는지 점수를 냅니다.
+ *
+ * 깨진 글자(U+FFFD)나 제어 문자가 있으면 이름일 수 없습니다. 한글·가나·한자는 이름에
+ * 흔히 쓰이므로 높게 치고, 쓰이지 않는 기호가 늘어서면 깎습니다. 같은 바이트라도
+ * 엉뚱한 꼴로 읽으면 이 기호들이 쏟아지므로, 그것으로 옳은 꼴을 가립니다.
+ */
+export function nameScore(text: string): number {
+  let total = 0
+  for (const letter of text) {
+    const code = letter.codePointAt(0) ?? 0
+    if (code === 0xfffd) return Number.NEGATIVE_INFINITY
+    if (code < 0x20) return Number.NEGATIVE_INFINITY
+    else if (code < 0x80) total += 1
+    else if (code >= 0xac00 && code <= 0xd7a3) total += 3
+    else if (code >= 0x3040 && code <= 0x30ff) total += 3
+    else if (code >= 0x4e00 && code <= 0x9fff) total += 3
+    else if (code >= 0x3131 && code <= 0x318e) total += 2
+    else if (code >= 0xe000 && code <= 0xf8ff) total -= 5
+    else total -= 1
   }
+  return total
+}
+
+/**
+ * 이름 바이트들을 보고 글자 꼴 하나를 고릅니다.
+ *
+ * **압축 하나에는 한 가지 꼴**로 적혀 있으므로, 이름을 모두 모아 함께 재서 한 번만
+ * 정합니다. 이름 하나하나로 정하면 짧은 이름에서 갈팡질팡합니다.
+ * 읽다가 막히는 꼴(fatal)은 그 자리에서 떨어뜨립니다.
+ */
+export function guessEncoding(samples: Uint8Array[]): string {
+  let best = 'utf-8'
+  let bestScore = Number.NEGATIVE_INFINITY
+
+  for (const label of CANDIDATES) {
+    let decoder: TextDecoder
+    try {
+      decoder = new TextDecoder(label, { fatal: true })
+    } catch {
+      continue
+    }
+    let total = 0
+    for (const raw of samples) {
+      try {
+        total += nameScore(decoder.decode(raw))
+      } catch {
+        total = Number.NEGATIVE_INFINITY
+        break
+      }
+      if (total === Number.NEGATIVE_INFINITY) break
+    }
+    if (total > bestScore) {
+      best = label
+      bestScore = total
+    }
+  }
+  return best
+}
+
+/**
+ * 압축기가 따로 적어 둔 UTF-8 이름(Info-ZIP Unicode Path, 0x7075).
+ *
+ * 제 나라 글자 꼴로 적으면서 **원래 이름을 UTF-8 로 한 번 더** 적어 두는 압축기가 있습니다.
+ * 있으면 추측할 까닭이 없습니다 — 적어 둔 것이 가장 미덥습니다.
+ */
+export function unicodePath(extra: Uint8Array): string | null {
+  const view = new DataView(extra.buffer, extra.byteOffset, extra.byteLength)
+  let at = 0
+  while (at + 4 <= extra.byteLength) {
+    const tag = view.getUint16(at, true)
+    const size = view.getUint16(at + 2, true)
+    const body = at + 4
+    if (body + size > extra.byteLength) break
+    // 1바이트 버전 + 4바이트 본디 이름의 검사값 뒤부터가 UTF-8 이름입니다.
+    if (tag === 0x7075 && size > 5) return new TextDecoder('utf-8').decode(extra.subarray(body + 5, body + size))
+    at = body + size
+  }
+  return null
 }
 
 /**
@@ -153,10 +227,24 @@ export function readExtra(extra: Uint8Array): { at: number | null; created: numb
   return { at: modified, created }
 }
 
-/** 목차를 읽어 항목을 늘어놓습니다. */
+/**
+ * 목차를 읽어 항목을 늘어놓습니다.
+ *
+ * 두 번 훑습니다. 먼저 자리와 이름 바이트만 모아 **글자 꼴을 한 번 정하고**, 그다음 그
+ * 꼴로 이름을 옮깁니다. 이름 하나하나로 정하면 같은 압축 안에서 어떤 이름은 한글로,
+ * 어떤 이름은 한자로 읽히는 일이 생깁니다.
+ */
 export function readEntries(directory: Uint8Array, count: number, limit = MAX_ZIP_ENTRIES): ZipListing {
   const view = new DataView(directory.buffer, directory.byteOffset, directory.byteLength)
-  const entries: ZipEntry[] = []
+  const found: {
+    raw: Uint8Array
+    utf8: boolean
+    told: string | null
+    bytes: number
+    packed: number
+    at: number | null
+    created: number | null
+  }[] = []
   let at = 0
   let seen = 0
 
@@ -169,22 +257,36 @@ export function readEntries(directory: Uint8Array, count: number, limit = MAX_ZI
     const nameLength = view.getUint16(at + 28, true)
     const extraLength = view.getUint16(at + 30, true)
     const commentLength = view.getUint16(at + 32, true)
-    const name = decodeName(directory.subarray(at + 46, at + 46 + nameLength), (flags & 0x800) !== 0)
-    const extra = readExtra(directory.subarray(at + 46 + nameLength, at + 46 + nameLength + extraLength))
+    const raw = directory.subarray(at + 46, at + 46 + nameLength)
+    const extra = directory.subarray(at + 46 + nameLength, at + 46 + nameLength + extraLength)
+    const stamps = readExtra(extra)
     seen += 1
-    if (entries.length < limit) {
-      entries.push({
-        path: name,
+    if (found.length < limit) {
+      found.push({
+        raw,
+        utf8: (flags & 0x800) !== 0,
+        told: unicodePath(extra),
         bytes,
         packed,
         // 덧붙은 칸이 더 촘촘합니다(MS-DOS 꼴은 2초 단위). 있으면 그쪽을 씁니다.
-        at: extra.at ?? dosTime(date, time),
-        created: extra.created,
-        dir: name.endsWith('/'),
+        at: stamps.at ?? dosTime(date, time),
+        created: stamps.created,
       })
     }
     at += 46 + nameLength + extraLength + commentLength
   }
+
+  /*
+   * 글자 꼴은 **적어 두지도 깃발을 세우지도 않은 이름들만** 보고 정합니다.
+   * 이미 UTF-8 이라고 밝힌 이름까지 섞으면 그쪽으로 쏠려 가려낼 수가 없습니다.
+   */
+  const guessing = found.filter((one) => !one.utf8 && one.told === null).map((one) => one.raw)
+  const label = guessing.length > 0 ? guessEncoding(guessing) : 'utf-8'
+  const decoder = new TextDecoder(label)
+  const entries: ZipEntry[] = found.map((one) => {
+    const path = one.told ?? (one.utf8 ? new TextDecoder('utf-8').decode(one.raw) : decoder.decode(one.raw))
+    return { path, bytes: one.bytes, packed: one.packed, at: one.at, created: one.created, dir: path.endsWith('/') }
+  })
 
   return { entries, total: Math.max(count, seen), cut: seen > entries.length }
 }

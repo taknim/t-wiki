@@ -24,11 +24,23 @@ const zip = makeZip([
   { name: '자료/', text: '' },
   { name: '자료/표.csv', text: 'id,name\n1,하나\n2,둘\n' },
 ])
+/*
+ * 맥에서 만든 꼴: **깃발을 세우지 않고 UTF-8** 로 적습니다. 깃발만 믿으면 한글 이름이
+ * 모두 깨집니다(UTF-8 바이트를 EUC-KR 로 읽은 꼴).
+ */
+const mac = makeZip([
+  { name: new TextEncoder().encode('본인확인 모듈 설명서.txt'), utf8: false, text: 'x' },
+  { name: new TextEncoder().encode('자료/분기 보고.pdf'), utf8: false, text: 'y' },
+])
+/* 윈도에서 만든 꼴: 깃발 없이 CP949. */
+const win = makeZip([
+  { name: new Uint8Array([0xc7, 0xd1, 0xb1, 0xdb, 0x2e, 0x74, 0x78, 0x74]), utf8: false, text: 'x' },
+])
 /* 윈도가 덧붙이는 칸이 든 압축. 지은 때 칸이 그때만 서는지 봅니다. */
 const stamped = makeZip([
   { name: '보고서.txt', text: 'x'.repeat(100), ntfs: { modified: new Date(2026, 5, 6, 7, 8), created: new Date(2026, 0, 2, 3, 4) } },
 ])
-await page.addInitScript(({ bytes, stamped, junk, first, second }) => {
+await page.addInitScript(({ bytes, stamped, junk, first, second, mac, win }) => {
   window.__installMockFs()
   const root = window.__mockRoot
   const sample = root._children.get('개발 환경.md')
@@ -44,12 +56,16 @@ await page.addInitScript(({ bytes, stamped, junk, first, second }) => {
   // 목록을 읽을 수 없는 압축들. 파일 자체는 그대로 보관합니다.
   put('모르는 것.7z', junk)
   put('옛 것.rar', junk)
+  put('맥에서 만든.zip', mac)
+  put('윈도에서 만든.zip', win)
 }, {
   bytes: [...zip],
   stamped: [...stamped],
   junk: [...new TextEncoder().encode('이건 압축이 아닙니다')],
   first: [...zip.slice(0, Math.floor(zip.length / 2))],
   second: [...zip.slice(Math.floor(zip.length / 2))],
+  mac: [...mac],
+  win: [...win],
 })
 
 try {
@@ -127,6 +143,23 @@ try {
     JSON.stringify(stampedRow.줄))
   await page.screenshot({ path: join(HERE, '..', 'shots', 'archive', '01-list.png'),
     clip: { x: 430, y: 40, width: 870, height: 360 } })
+
+  /*
+   * 규격은 "깃발이 서 있으면 UTF-8" 이라지만 맥의 압축은 깃발 없이 UTF-8 로 적습니다.
+   * 깃발만 믿었더니 한글 이름이 통째로 깨져 나왔습니다.
+   */
+  step('2-1-2. 깃발이 없어도 한글 이름이 깨지지 않는다')
+  for (const [file, want] of [
+    ['맥에서 만든.zip', ['본인확인 모듈 설명서.txt', '자료/분기 보고.pdf']],
+    ['윈도에서 만든.zip', ['한글.txt']],
+  ]) {
+    await page.click(`.tree-row:has-text("${file}") .tree-name`)
+    await page.waitForSelector('.archive-table', { timeout: 8000 })
+    const names = await page.evaluate(() =>
+      [...document.querySelectorAll('.archive-table .archive-name')].map((one) => one.textContent))
+    console.log('  ' + file + ': ' + JSON.stringify(names))
+    expect(`${file} — 이름이 그대로`, JSON.stringify(names) === JSON.stringify(want), JSON.stringify(names))
+  }
 
   step('2-2. 나눠 담은 조각은 이어서 읽는다')
   await page.click('.tree-row:has-text("나눈 것.zip.001") .tree-name')
