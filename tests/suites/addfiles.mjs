@@ -97,8 +97,23 @@ try {
    * 받는 형식을 한 문단으로 이어 적었더니 문서·압축·개발 소스가 한 덩어리로 흘러,
    * 어디까지가 어느 갈래인지 알 수 없었습니다. 갈래를 갈라 세웁니다.
    */
-  step('7. 받는 형식을 갈래별로 보여 준다')
+  step('7. 받는 형식은 접어 두고, 눌러서 갈래별로 편다')
   await page.click('.tree-row:has-text("회사") .tree-name')
+  await page.waitForSelector('.folder-types', { timeout: 5000 })
+  /*
+   * 목록을 놓는 자리 안에 펼쳐 두었더니 칸을 가득 메워, 정작 파일을 놓을 자리가 눈에
+   * 들어오지 않았습니다. 밖으로 빼고 접어 둡니다.
+   */
+  const folded = await page.evaluate(() => ({
+    펴짐: document.querySelector('.folder-drop-types') !== null,
+    단추: document.querySelector('.folder-types button')?.textContent.trim() ?? null,
+    놓는자리안: document.querySelector('.folder-drop .folder-drop-types') !== null,
+  }))
+  console.log('  ' + JSON.stringify(folded))
+  expect('처음에는 접혀 있음', folded.펴짐 === false, JSON.stringify(folded))
+  expect('여는 단추가 있음', folded.단추 === '첨부 가능 파일 목록', String(folded.단추))
+  expect('놓는 자리 밖에 있음', folded.놓는자리안 === false, JSON.stringify(folded))
+  await page.click('.folder-types button')
   await page.waitForSelector('.folder-drop-types', { timeout: 5000 })
   const groups = await page.evaluate(() => {
     const box = document.querySelector('.folder-drop-types')
@@ -129,7 +144,11 @@ try {
   })
   expect('문서에 압축·개발 소스가 섞이지 않음', !mixed.zip && !mixed.code, JSON.stringify(mixed))
   await page.screenshot({ path: join(HERE, '..', 'shots', 'addfiles', '01-types.png'),
-    clip: { x: 430, y: 40, width: 870, height: 330 } })
+    clip: { x: 430, y: 40, width: 870, height: 400 } })
+  // 다시 누르면 접힙니다.
+  await page.click('.folder-types button')
+  await page.waitForTimeout(200)
+  expect('다시 누르면 접힘', (await page.locator('.folder-drop-types').count()) === 0)
 
 } catch (cause) {
   fail('묶음이 도중에 멈춤', cause instanceof Error ? (cause.stack ?? cause.message) : String(cause))

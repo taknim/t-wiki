@@ -1,5 +1,6 @@
 import { useState, type DragEvent } from 'react'
 import { ATTACHMENT_GROUPS } from '../lib/attachments'
+import { ChevronIcon } from './icons'
 
 interface FolderViewProps {
   onDropFiles: (files: File[]) => void
@@ -13,6 +14,8 @@ interface FolderViewProps {
  */
 export function FolderView({ onDropFiles, onPickFiles }: FolderViewProps) {
   const [over, setOver] = useState(false)
+  /** 받는 형식 목록을 폈는지. 처음에는 접어 둡니다 — 놓는 자리가 먼저 보여야 합니다. */
+  const [listed, setListed] = useState(false)
 
   const stop = (event: DragEvent) => {
     event.preventDefault()
@@ -47,10 +50,27 @@ export function FolderView({ onDropFiles, onPickFiles }: FolderViewProps) {
             골라서 넣기
           </button>
         </p>
+      </div>
+
+      {/*
+        받는 형식은 **놓는 자리 밖으로** 빼고 접어 둡니다. 안에 펼쳐 두었더니 목록이 칸을
+        가득 메워, 정작 파일을 놓을 자리가 눈에 들어오지 않았습니다. 궁금할 때만 폅니다.
+      */}
+      <div className="folder-types">
+        <button
+          type="button"
+          className="btn btn-small"
+          aria-expanded={listed}
+          onClick={() => setListed((now) => !now)}
+        >
+          첨부 가능 파일 목록
+          <ChevronIcon className={listed ? 'is-open' : undefined} />
+        </button>
         {/*
           갈래는 `attachments.ts` 에서 정한 것을 그대로 그립니다. 여기서 묶었더니 형식이
           늘 때마다 엉뚱한 갈래로 흘러들어 갔습니다.
         */}
+        {listed && (
         <dl className="folder-drop-types">
           <dt>위키 문서</dt>
           <dd>
@@ -69,6 +89,7 @@ export function FolderView({ onDropFiles, onPickFiles }: FolderViewProps) {
             </ul>
           </dd>
         </dl>
+        )}
       </div>
     </div>
   )

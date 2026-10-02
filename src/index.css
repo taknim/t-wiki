@@ -2178,8 +2178,17 @@ button.info-caret:focus-visible { outline: 2px solid var(--accent); outline-offs
  * 한 문단으로 이어 적었더니 문서·압축·개발 소스가 한 덩어리로 흘러 어디까지가 어느
  * 갈래인지 알 수 없었습니다.
  */
+/*
+ * 받는 형식을 여는 단추와 그 목록. 놓는 자리(점선 칸) **밖**입니다.
+ * 안에 두었더니 목록이 칸을 메워 정작 파일 놓을 자리가 눈에 들어오지 않았습니다.
+ */
+.folder-types { margin-block-start: 10px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+/* 펴면 꺾쇠가 아래를 봅니다. 접힌 것과 펴진 것을 한눈에 가립니다. */
+.folder-types .icon { transition: transform 0.15s ease; }
+.folder-types .icon.is-open { transform: rotate(90deg); }
+
 .folder-drop-types {
-  margin: 10px 0 0;
+  margin: 0;
   max-width: 52em;
   font-size: 12px;
   line-height: 1.6;
