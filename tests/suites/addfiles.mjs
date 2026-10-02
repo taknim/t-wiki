@@ -113,6 +113,16 @@ try {
   expect('처음에는 접혀 있음', folded.펴짐 === false, JSON.stringify(folded))
   expect('여는 단추가 있음', folded.단추 === '첨부 가능 파일 목록', String(folded.단추))
   expect('놓는 자리 밖에 있음', folded.놓는자리안 === false, JSON.stringify(folded))
+  /*
+   * 꺾쇠는 **다음에 누르면 일어날 일**을 가리킵니다 — 접혀 있으면 아래, 펴져 있으면 위.
+   * 돌린 각으로 잽니다(90도 = 아래, -90도 = 위).
+   */
+  const spin = () => page.evaluate(() =>
+    getComputedStyle(document.querySelector('.folder-types .icon')).transform)
+  const closed = await spin()
+  console.log('  접힘: ' + closed)
+  // rotate(90deg) 은 matrix(0, 1, -1, 0, …) 로 잽니다.
+  expect('접혀 있으면 아래를 가리킴', closed.startsWith('matrix(0, 1, -1, 0'), closed)
   await page.click('.folder-types button')
   await page.waitForSelector('.folder-drop-types', { timeout: 5000 })
   const groups = await page.evaluate(() => {
@@ -145,6 +155,11 @@ try {
   expect('문서에 압축·개발 소스가 섞이지 않음', !mixed.zip && !mixed.code, JSON.stringify(mixed))
   await page.screenshot({ path: join(HERE, '..', 'shots', 'addfiles', '01-types.png'),
     clip: { x: 430, y: 40, width: 870, height: 400 } })
+  // 꺾쇠는 부드럽게 돕니다. 도는 중에 재면 중간 각이 잡힙니다.
+  await page.waitForTimeout(300)
+  const opened = await spin()
+  console.log('  펴짐: ' + opened)
+  expect('펴지면 위를 가리킴', opened.startsWith('matrix(0, -1, 1, 0'), opened)
   // 다시 누르면 접힙니다.
   await page.click('.folder-types button')
   await page.waitForTimeout(200)
