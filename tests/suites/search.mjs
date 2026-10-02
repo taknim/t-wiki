@@ -31,6 +31,14 @@ await page.addInitScript(() => {
   root._children.set('커다란 기록.txt', Object.assign(
     Object.create(Object.getPrototypeOf(sample)),
     { kind: 'file', name: '커다란 기록.txt', _data: new Blob([body]), _lastModified: Date.now() }))
+  /*
+   * 밖에서 들어온 파일. 맥은 이름을 **자모가 분리된 꼴(NFD)** 로 적어 두므로, 치는 글자
+   * (NFC)와 글자는 같아 보여도 바이트가 다릅니다. 고르지 않으면 영영 안 찾힙니다.
+   */
+  const outside = '밖에서 온 기록.log'.normalize('NFD')
+  root._children.set(outside, Object.assign(
+    Object.create(Object.getPrototypeOf(sample)),
+    { kind: 'file', name: outside, _data: new Blob(['바깥표지 들어 있음\n']), _lastModified: Date.now() }))
 })
 
 const showTab = async (name) => {
@@ -145,6 +153,21 @@ try {
   const tail = await find('꼬리표지')
   console.log('  뒷부분: ' + JSON.stringify(tail))
   expect('자른 뒤쪽은 찾히지 않음', !tail.some((one) => one.title === '커다란 기록.txt'), JSON.stringify(tail))
+
+  /*
+   * 맥이 적은 이름은 자모가 분리돼 있습니다. 글자는 같아 보여도 바이트가 달라, 고르지
+   * 않으면 "분명히 있는데 안 찾히는" 일이 생깁니다.
+   */
+  step('6-2. 자모가 분리된 이름도 찾힌다')
+  const apart = await find('밖에서 온')
+  console.log('  ' + JSON.stringify(apart))
+  // 화면에 적히는 이름은 파일에 적힌 그대로(NFD)입니다. 견줄 때 한 꼴로 폅니다.
+  const same = (title) => title.normalize('NFC').includes('밖에서 온')
+  expect('이름으로 찾힘', apart.some((one) => same(one.title)), JSON.stringify(apart))
+  // .log 도 글자 파일이라 본문까지 봅니다(txt 와 같은 갈래).
+  const logBody = await find('바깥표지')
+  console.log('  ' + JSON.stringify(logBody))
+  expect('log 도 본문을 봄', logBody.some((one) => same(one.title)), JSON.stringify(logBody))
 
   step('7. 없는 말은 없다고 한다')
   await page.fill('.search-input', '없는말없는말')

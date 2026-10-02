@@ -4,10 +4,19 @@ import type { IndexedText } from './textIndex'
 
 const CONTEXT = 40
 
+/**
+ * 글자를 고르게 폅니다.
+ *
+ * 맥은 파일 이름을 **자모가 분리된 꼴(NFD)** 로 적어 둡니다. 치는 글자는 모아진 꼴(NFC)이라
+ * 눈에는 똑같은데 바이트가 달라, "분명히 있는데 안 찾히는" 일이 생깁니다.
+ * 찾기 전에 양쪽을 한 꼴로 폅니다.
+ */
+const flatten = (text: string) => text.normalize('NFC').toLowerCase()
+
 function findAll(haystack: string, needle: string): number[] {
   const positions: number[] = []
-  const lowerHaystack = haystack.toLowerCase()
-  const lowerNeedle = needle.toLowerCase()
+  const lowerHaystack = flatten(haystack)
+  const lowerNeedle = flatten(needle)
   let from = 0
   while (true) {
     const at = lowerHaystack.indexOf(lowerNeedle, from)
@@ -58,7 +67,8 @@ export function highlight(text: string, query: string): SearchHit['snippet'] {
 export function nameMatches(query: string, path: string): boolean {
   const needle = query.trim()
   if (needle.length === 0) return true
-  return fileNameOf(path).toLowerCase().includes(needle.toLowerCase())
+  // 즐겨찾기 거르기도 같은 잣대입니다. 자모가 분리된 이름을 여기서만 놓치면 안 됩니다.
+  return flatten(fileNameOf(path)).includes(flatten(needle))
 }
 
 export interface SearchSource {

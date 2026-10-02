@@ -325,7 +325,7 @@ tags: [회사, 신입]
 | --- | --- |
 | **위키 문서** | `md` — 크기 제한 없이 동기화되고 링크·검색·목차가 모두 됩니다 |
 | 이미지 | `png` `jpg` `jpeg` `gif` `webp` `svg` `avif` `bmp` `ico` |
-| 문서 | `pdf` `txt` `csv` `tsv` `json` `yaml` `yml` `xml` `html` `htm` `doc` `docx` `xls` `xlsx` `ppt` `pptx` `hwp` `hwpx` |
+| 문서 | `pdf` `txt` `log` `out` `csv` `tsv` `json` `yaml` `yml` `xml` `html` `htm` `doc` `docx` `xls` `xlsx` `ppt` `pptx` `hwp` `hwpx` |
 | 개발 소스 | `sql` `js` `ts` `tsx` `py` `sh` `java` `kt` `go` `rs` `c` `cpp` `cs` `swift` `rb` `php` `css` `scss` `ini` `toml` `diff` `graphql` 등 |
 | 압축 | `zip` `rar` `7z` `alz` · 나눠 담은 조각(`.001` `.r01` `.z01` `.a01` …) |
 
@@ -337,7 +337,7 @@ tags: [회사, 신입]
 | `json` `yaml` `xml` | 가능 | 색을 입혀 보여 줍니다 |
 | 코드 파일 | 가능 | **실행하지 않고 문법 강조만** 합니다 |
 | `html` | 가능 | **그리지 않고 문법 강조**로 보여 줍니다. 그려 보려면 브라우저로 그 파일을 여세요 |
-| `txt` | 가능 | 편집기만 씁니다 |
+| `txt` `log` `out` | 가능 | 편집기만 씁니다 |
 | `xlsx` `xls` | — | 표로 그립니다(시트가 여럿이면 탭으로) |
 | `docx` | — | 제목·목록·표·굵기와 그림까지 글로 풀어 보여 줍니다 |
 | 이미지 | — | 그림으로 봅니다 — [그림 다루기](#그림-다루기)에서 크게 보거나 손질할 수 있습니다 |

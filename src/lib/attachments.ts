@@ -55,7 +55,7 @@ export function archivePart(path: string): { base: string; order: number } | nul
 }
 
 export const DOCUMENT_EXTENSIONS = [
-  'pdf', 'txt', 'csv', 'tsv', 'json', 'yaml', 'yml', 'xml', 'html', 'htm',
+  'pdf', 'txt', 'log', 'out', 'csv', 'tsv', 'json', 'yaml', 'yml', 'xml', 'html', 'htm',
   'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'hwp', 'hwpx',
   ...ARCHIVE_EXTENSIONS,
   ...CODE_EXTENSIONS,
@@ -68,7 +68,10 @@ const SHEET_EXTENSIONS = ['xlsx', 'xlsm', 'xls', 'csv2']
 const WORD_EXTENSIONS = ['docx']
 
 /** 글자로 되어 있어 편집기에서 고쳐 쓸 수 있는 형식. */
-const TEXT_EXTENSIONS = ['txt', 'csv', 'tsv', 'json', 'yaml', 'yml', 'xml', 'html', 'htm', ...CODE_EXTENSIONS]
+/* `log`·`out` 은 `txt` 와 같이 봅니다 — 글자 파일이고, 앞부분만 읽는 검색과도 결이 맞습니다. */
+const TEXT_EXTENSIONS = [
+  'txt', 'log', 'out', 'csv', 'tsv', 'json', 'yaml', 'yml', 'xml', 'html', 'htm', ...CODE_EXTENSIONS,
+]
 
 const ATTACHMENT_EXTENSIONS = new Set([...IMAGE_EXTENSIONS, ...DOCUMENT_EXTENSIONS])
 
@@ -85,7 +88,7 @@ export const ATTACHMENT_GROUPS: { name: string; extensions: string[]; note?: str
   {
     name: '문서',
     extensions: [
-      'pdf', 'txt', 'csv', 'tsv', 'json', 'yaml', 'yml', 'xml', 'html', 'htm',
+      'pdf', 'txt', 'log', 'out', 'csv', 'tsv', 'json', 'yaml', 'yml', 'xml', 'html', 'htm',
       'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'hwp', 'hwpx',
     ],
   },
