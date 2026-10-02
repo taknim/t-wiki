@@ -1,5 +1,5 @@
 import { useState, type DragEvent } from 'react'
-import { DOCUMENT_EXTENSIONS, IMAGE_EXTENSIONS } from '../lib/attachments'
+import { ATTACHMENT_GROUPS } from '../lib/attachments'
 
 interface FolderViewProps {
   onDropFiles: (files: File[]) => void
@@ -47,10 +47,28 @@ export function FolderView({ onDropFiles, onPickFiles }: FolderViewProps) {
             골라서 넣기
           </button>
         </p>
-        <p className="folder-drop-types">
-          <strong>마크다운</strong> (md), <strong>이미지</strong> ({IMAGE_EXTENSIONS.join(', ')}),{' '}
-          <strong>문서</strong> ({DOCUMENT_EXTENSIONS.join(', ')}) 형식의 파일을 추가하실 수 있습니다.
-        </p>
+        {/*
+          갈래는 `attachments.ts` 에서 정한 것을 그대로 그립니다. 여기서 묶었더니 형식이
+          늘 때마다 엉뚱한 갈래로 흘러들어 갔습니다.
+        */}
+        <dl className="folder-drop-types">
+          <dt>위키 문서</dt>
+          <dd>
+            md
+            <span className="folder-drop-note">크기 제한 없이 동기화되고 링크·검색·목차가 모두 됩니다</span>
+          </dd>
+          <dt>첨부</dt>
+          <dd>
+            <ul>
+              {ATTACHMENT_GROUPS.map((group) => (
+                <li key={group.name}>
+                  <strong>{group.name}</strong> {group.extensions.join(', ')}
+                  {group.note && <span className="folder-drop-note">{group.note}</span>}
+                </li>
+              ))}
+            </ul>
+          </dd>
+        </dl>
       </div>
     </div>
   )

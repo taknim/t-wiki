@@ -2173,14 +2173,33 @@ button.info-caret:focus-visible { outline: 2px solid var(--accent); outline-offs
 }
 .folder-drop-title { margin: 0; font-size: 15px; font-weight: 600; }
 .folder-drop-hint { margin: 0; font-size: 13px; color: var(--text-muted); }
+/*
+ * 받는 형식. 갈래 이름을 왼쪽에 세우고 확장자를 그 옆에 늘어놓습니다.
+ * 한 문단으로 이어 적었더니 문서·압축·개발 소스가 한 덩어리로 흘러 어디까지가 어느
+ * 갈래인지 알 수 없었습니다.
+ */
 .folder-drop-types {
-  margin: 4px 0 0;
-  max-width: 46em;
+  margin: 10px 0 0;
+  max-width: 52em;
   font-size: 12px;
   line-height: 1.6;
   color: var(--text-muted);
+  text-align: start;
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 4px 12px;
 }
-.folder-drop-types strong { color: var(--text); }
+.folder-drop-types dt { color: var(--text); font-weight: 600; }
+.folder-drop-types dd { margin: 0; }
+.folder-drop-types ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 3px; }
+.folder-drop-types strong {
+  /* 갈래 이름은 폭을 맞춰 두어 확장자들의 왼쪽 끝이 한 줄로 섭니다. */
+  display: inline-block;
+  min-width: 4.6em;
+  color: var(--text);
+}
+/* 곁들이는 말. 줄을 바꿔 확장자와 섞이지 않게 합니다. */
+.folder-drop-note { display: block; opacity: 0.8; }
 
 .link-button {
   padding: 0;

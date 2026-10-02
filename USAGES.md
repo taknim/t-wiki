@@ -321,10 +321,10 @@ tags: [회사, 신입]
 
 | 갈래 | 확장자 |
 | --- | --- |
-| 마크다운 | `md` |
+| **위키 문서** | `md` — 크기 제한 없이 동기화되고 링크·검색·목차가 모두 됩니다 |
 | 이미지 | `png` `jpg` `jpeg` `gif` `webp` `svg` `avif` `bmp` `ico` |
 | 문서 | `pdf` `txt` `csv` `tsv` `json` `yaml` `yml` `xml` `html` `htm` `doc` `docx` `xls` `xlsx` `ppt` `pptx` `hwp` `hwpx` |
-| 코드 | `sql` `js` `ts` `tsx` `py` `sh` `java` `kt` `go` `rs` `c` `cpp` `cs` `swift` `rb` `php` `css` `scss` `ini` `toml` `diff` `graphql` 등 |
+| 개발 소스 | `sql` `js` `ts` `tsx` `py` `sh` `java` `kt` `go` `rs` `c` `cpp` `cs` `swift` `rb` `php` `css` `scss` `ini` `toml` `diff` `graphql` 등 |
 | 압축 | `zip` `rar` `7z` `alz` · 나눠 담은 조각(`.001` `.r01` `.z01` `.a01` …) |
 
 고르면 이렇게 보입니다.

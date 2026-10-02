@@ -93,6 +93,44 @@ try {
   await page.waitForTimeout(500)
   const zip = await page.locator('.tree-row:has-text("자료 묶음")').count()
   expect('트리에 들어옴', zip === 1, String(zip))
+  /*
+   * 받는 형식을 한 문단으로 이어 적었더니 문서·압축·개발 소스가 한 덩어리로 흘러,
+   * 어디까지가 어느 갈래인지 알 수 없었습니다. 갈래를 갈라 세웁니다.
+   */
+  step('7. 받는 형식을 갈래별로 보여 준다')
+  await page.click('.tree-row:has-text("회사") .tree-name')
+  await page.waitForSelector('.folder-drop-types', { timeout: 5000 })
+  const groups = await page.evaluate(() => {
+    const box = document.querySelector('.folder-drop-types')
+    return {
+      칸: [...box.querySelectorAll('dt')].map((one) => one.textContent),
+      갈래: [...box.querySelectorAll('li strong')].map((one) => one.textContent),
+      압축줄: [...box.querySelectorAll('li')].map((one) => one.textContent).find((one) => one.startsWith('압축')),
+      마크다운줄: box.querySelector('dd').textContent.replace(/\s+/g, ' '),
+    }
+  })
+  console.log('  ' + JSON.stringify(groups))
+  expect('위키 문서와 첨부를 가름',
+    JSON.stringify(groups.칸) === JSON.stringify(['위키 문서', '첨부']), JSON.stringify(groups.칸))
+  expect('첨부를 넷으로 가름',
+    JSON.stringify(groups.갈래) === JSON.stringify(['이미지', '문서', '압축', '개발 소스']), JSON.stringify(groups.갈래))
+  // "코드" 만으로는 무슨 코드인지 알 수 없습니다.
+  expect('개발 소스라고 적음', groups.갈래.includes('개발 소스'), JSON.stringify(groups.갈래))
+  expect('압축 갈래에 zip·rar·7z·alz 가 모두', ['zip', 'rar', '7z', 'alz'].every((one) => groups.압축줄.includes(one)),
+    String(groups.압축줄))
+  expect('나눠 담은 조각도 알림', groups.압축줄.includes('나눠 담은 조각'), String(groups.압축줄))
+  // 마크다운은 첨부가 아니라 위키의 본체라, 왜 따로인지까지 적습니다.
+  expect('마크다운이 왜 따로인지 적음', groups.마크다운줄.includes('크기 제한 없이'), groups.마크다운줄)
+  // 문서 갈래에 압축이나 개발 소스가 섞이지 않아야 합니다.
+  const mixed = await page.evaluate(() => {
+    const docs = [...document.querySelectorAll('.folder-drop-types li')]
+      .map((one) => one.textContent).find((one) => one.startsWith('문서'))
+    return { zip: docs.includes('zip'), code: docs.includes('sql') }
+  })
+  expect('문서에 압축·개발 소스가 섞이지 않음', !mixed.zip && !mixed.code, JSON.stringify(mixed))
+  await page.screenshot({ path: join(HERE, '..', 'shots', 'addfiles', '01-types.png'),
+    clip: { x: 430, y: 40, width: 870, height: 330 } })
+
 } catch (cause) {
   fail('묶음이 도중에 멈춤', cause instanceof Error ? (cause.stack ?? cause.message) : String(cause))
 } finally {

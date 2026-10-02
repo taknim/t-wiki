@@ -72,6 +72,28 @@ const TEXT_EXTENSIONS = ['txt', 'csv', 'tsv', 'json', 'yaml', 'yml', 'xml', 'htm
 
 const ATTACHMENT_EXTENSIONS = new Set([...IMAGE_EXTENSIONS, ...DOCUMENT_EXTENSIONS])
 
+/**
+ * 받는 형식을 사람에게 보여 줄 때 쓰는 갈래.
+ *
+ * **여기 한 군데서 정합니다.** 화면이 직접 묶었더니 압축을 더했을 때 그것이 `문서` 속으로
+ * 흘러들어 가, 문서·압축·개발 소스가 한 덩어리로 늘어섰습니다.
+ * 마크다운은 첨부가 아니라 **위키의 본체**라 따로 둡니다 — 크기 제한 없이 동기화되고
+ * 링크·검색·목차가 모두 되는 것은 마크다운뿐입니다.
+ */
+export const ATTACHMENT_GROUPS: { name: string; extensions: string[]; note?: string }[] = [
+  { name: '이미지', extensions: IMAGE_EXTENSIONS },
+  {
+    name: '문서',
+    extensions: [
+      'pdf', 'txt', 'csv', 'tsv', 'json', 'yaml', 'yml', 'xml', 'html', 'htm',
+      'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'hwp', 'hwpx',
+    ],
+  },
+  { name: '압축', extensions: ARCHIVE_EXTENSIONS, note: '나눠 담은 조각(.001 .r01 .z01 .a01)도 받습니다' },
+  // "코드" 만으로는 무슨 코드인지 알 수 없습니다. 개발에 쓰는 소스 파일이라고 밝힙니다.
+  { name: '개발 소스', extensions: CODE_EXTENSIONS },
+]
+
 /** 이보다 큰 첨부는 동기화하지 않습니다. 로컬에는 그대로 두고 목록에만 표시합니다. */
 export const MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024
 
