@@ -67,6 +67,13 @@ export function ArchiveView({ root, path }: ArchiveViewProps) {
   // 압축율. 푼 크기가 0 이면(빈 파일·폴더) 셀 것이 없습니다.
   const ratio = (one: { bytes: number; packed: number }) =>
     (one.bytes === 0 ? '' : `${Math.round((1 - one.packed / one.bytes) * 100)}%`)
+  /*
+   * 폴더 안엣것은 **들여씁니다.** 긴 경로를 통째로 적어 두었더니 어느 것이 어느 폴더
+   * 아래인지 눈으로 좇기 어려웠습니다. 깊이만큼 밀고 **마지막 마디만** 적되, 온 경로는
+   * 쪽지로 남깁니다 — 폴더 자리가 아예 없는 압축도 있어 경로를 잃으면 안 됩니다.
+   */
+  const depth = (path: string) => path.replace(/\/$/, '').split('/').length - 1
+  const leaf = (path: string) => path.replace(/\/$/, '').split('/').pop() ?? path
 
   return (
     <div className="archive-view">
@@ -85,7 +92,13 @@ export function ArchiveView({ root, path }: ArchiveViewProps) {
           <tbody>
             {listing.entries.map((one) => (
               <tr key={one.path} className={one.dir ? 'archive-dir' : undefined}>
-                <td className="archive-name">{one.path}</td>
+                <td
+                  className="archive-name"
+                  style={{ paddingInlineStart: `${10 + depth(one.path) * 18}px` }}
+                  data-tip={depth(one.path) > 0 ? one.path : undefined}
+                >
+                  {leaf(one.path)}{one.dir && '/'}
+                </td>
                 <td className="archive-size">{one.dir ? '' : formatBytes(one.bytes)}</td>
                 <td className="archive-size">{one.dir ? '' : formatBytes(one.packed)}</td>
                 <td className="archive-size">{one.dir ? '' : ratio(one)}</td>

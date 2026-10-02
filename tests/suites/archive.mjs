@@ -23,6 +23,8 @@ const zip = makeZip([
   { name: '읽어보기.txt', text: '안녕하세요. 이 압축에는 자료가 들어 있습니다.' },
   { name: '자료/', text: '' },
   { name: '자료/표.csv', text: 'id,name\n1,하나\n2,둘\n' },
+  // 두 칸 깊이. 들여쓰기가 깊이만큼 벌어지는지 봅니다.
+  { name: '자료/안쪽/메모.txt', text: '깊은 자리' },
 ])
 /*
  * 맥에서 만든 꼴: **깃발을 세우지 않고 UTF-8** 로 적습니다. 깃발만 믿으면 한글 이름이
@@ -111,7 +113,8 @@ try {
   }))
   console.log('  ' + JSON.stringify(listed))
   expect('안엣것이 모두 적힘',
-    JSON.stringify(listed.이름) === JSON.stringify(['읽어보기.txt', '자료/', '자료/표.csv']), JSON.stringify(listed.이름))
+    JSON.stringify(listed.이름) === JSON.stringify(['읽어보기.txt', '자료/', '표.csv', '메모.txt']),
+    JSON.stringify(listed.이름))
   // 한글 이름이 깨지지 않아야 합니다. UTF-8 로 담긴 이름입니다.
   expect('한글 이름이 그대로', listed.이름[0] === '읽어보기.txt', listed.이름[0])
   expect('칸 이름이 unzip 처럼',
@@ -126,7 +129,38 @@ try {
   expect('폴더 줄은 숫자가 비어 있음',
     listed.폴더줄[1] === '' && listed.폴더줄[2] === '' && listed.폴더줄[3] === '', JSON.stringify(listed.폴더줄))
   expect('합계를 목록 아래에 적음', listed.아래 !== 0, String(listed.아래))
-  expect('총 개수와 크기', /^총 2개 파일 · \d/.test(listed.합계), listed.합계)
+  /*
+   * 긴 경로를 통째로 적어 두었더니 어느 것이 어느 폴더 아래인지 눈으로 좇기 어려웠고,
+   * 폴더 이름은 흐려서 되레 읽기 어려웠습니다.
+   */
+  const nested = await page.evaluate(() => {
+    const rows = [...document.querySelectorAll('.archive-table tbody tr')]
+    const cell = (at) => rows[at].querySelector('.archive-name')
+    const left = (at) => Math.round(Number.parseFloat(getComputedStyle(cell(at)).paddingInlineStart))
+    const tone = getComputedStyle(cell(1)).color.match(/\d+/g).map(Number)
+    const plain = getComputedStyle(cell(0)).color.match(/\d+/g).map(Number)
+    return {
+      들여쓰기: [left(0), left(1), left(2), left(3)],
+      쪽지: cell(2).getAttribute('data-tip'),
+      폴더색: tone,
+      파일색: plain,
+      폴더굵기: getComputedStyle(cell(1)).fontWeight,
+    }
+  })
+  console.log('  ' + JSON.stringify(nested))
+  // 깊이만큼 벌어집니다: 뿌리 < 한 칸 < 두 칸.
+  expect('깊이만큼 들여씀',
+    nested.들여쓰기[0] === nested.들여쓰기[1]
+    && nested.들여쓰기[2] > nested.들여쓰기[0]
+    && nested.들여쓰기[3] > nested.들여쓰기[2], JSON.stringify(nested.들여쓰기))
+  // 마디만 적는 대신 온 경로는 쪽지로 남깁니다. 폴더 자리가 없는 압축도 있습니다.
+  expect('온 경로는 쪽지로 남김', nested.쪽지 === '자료/표.csv', String(nested.쪽지))
+  expect('폴더 이름이 파일과 다른 색', JSON.stringify(nested.폴더색) !== JSON.stringify(nested.파일색),
+    JSON.stringify(nested))
+  expect('폴더 이름이 굵음', Number(nested.폴더굵기) >= 600, String(nested.폴더굵기))
+  await page.screenshot({ path: join(HERE, '..', 'shots', 'archive', '01-list.png'),
+    clip: { x: 430, y: 40, width: 870, height: 330 } })
+  expect('총 개수와 크기', /^총 3개 파일 · \d/.test(listed.합계), listed.합계)
   // 설명 문구는 걷어냈습니다. unzip 처럼 목록과 합계만 둡니다.
   expect('군말이 없음', !listed.합계.includes('목록만'), listed.합계)
 
@@ -141,8 +175,8 @@ try {
   expect('생성일시 칸이 섬', stampedRow.머리.includes('생성일시'), JSON.stringify(stampedRow.머리))
   expect('지은 때가 적힘', stampedRow.줄[5].includes('2026') && stampedRow.줄[5].includes('01'),
     JSON.stringify(stampedRow.줄))
-  await page.screenshot({ path: join(HERE, '..', 'shots', 'archive', '01-list.png'),
-    clip: { x: 430, y: 40, width: 870, height: 360 } })
+  await page.screenshot({ path: join(HERE, '..', 'shots', 'archive', '02-stamped.png'),
+    clip: { x: 430, y: 40, width: 870, height: 300 } })
 
   /*
    * 규격은 "깃발이 서 있으면 UTF-8" 이라지만 맥의 압축은 깃발 없이 UTF-8 로 적습니다.
@@ -150,7 +184,8 @@ try {
    */
   step('2-1-2. 깃발이 없어도 한글 이름이 깨지지 않는다')
   for (const [file, want] of [
-    ['맥에서 만든.zip', ['본인확인 모듈 설명서.txt', '자료/분기 보고.pdf']],
+    // 이름은 마디만 적습니다(깊이는 들여쓰기로). 온 경로는 쪽지에 있습니다.
+    ['맥에서 만든.zip', ['본인확인 모듈 설명서.txt', '분기 보고.pdf']],
     ['윈도에서 만든.zip', ['한글.txt']],
   ]) {
     await page.click(`.tree-row:has-text("${file}") .tree-name`)
@@ -170,7 +205,8 @@ try {
   }))
   console.log('  ' + JSON.stringify(split))
   expect('조각을 이어 목록을 읽음',
-    JSON.stringify(split.이름) === JSON.stringify(['읽어보기.txt', '자료/', '자료/표.csv']), JSON.stringify(split.이름))
+    JSON.stringify(split.이름) === JSON.stringify(['읽어보기.txt', '자료/', '표.csv', '메모.txt']),
+    JSON.stringify(split.이름))
   expect('몇 조각을 이었는지 알림', split.합계.includes('조각 2개를 이어서 읽음'), split.합계)
   // 뒤 조각을 골라도 같은 목록이어야 합니다. 조각마다 다르게 보이면 헷갈립니다.
   await page.click('.tree-row:has-text("나눈 것.zip.002") .tree-name')

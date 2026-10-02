@@ -1144,8 +1144,11 @@ mark { background: var(--mark); color: inherit; border-radius: 2px; }
 .archive-name { font-family: var(--mono); white-space: nowrap; }
 /* 숫자는 오른쪽으로 모아 자릿수를 견주기 쉽게 합니다. */
 .archive-size { text-align: end; font-variant-numeric: tabular-nums; white-space: nowrap; }
-/* 폴더 자리는 크기가 없습니다. 흐리게 두어 파일과 갈라 보입니다. */
-.archive-dir .archive-name { color: var(--text-muted); }
+/*
+ * 폴더 자리. 흐리게 두었더니 되레 읽기 어려웠습니다 — 안엣것을 가르는 머리글이라
+ * **또렷하고 굵게** 두어야 어디서부터 그 폴더인지 한눈에 보입니다.
+ */
+.archive-dir .archive-name { color: var(--accent); font-weight: 600; }
 
 /* ---------- 지난 동기화 결과 ---------- */
 
