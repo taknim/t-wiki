@@ -1693,14 +1693,18 @@ a.btn { text-decoration: none; color: inherit; display: inline-block; }
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding: 12px 8px;
+  padding: 10px 8px;
   border-inline-end: 1px solid var(--border);
   background: var(--bg-sunken);
   overflow-y: auto;
 }
 .settings-nav button {
   text-align: start;
-  padding: 8px 10px;
+  /*
+   * 줄 사이를 한 단 줄입니다. 설정 갈래가 늘면서 메뉴가 창보다 20픽셀쯤 길어졌는데,
+   * 갈래를 줄여 숨기느니 간격을 좁히는 편이 낫습니다 — 찾을 것이 메뉴에 다 보여야 합니다.
+   */
+  padding: 6px 10px;
   border: 0;
   border-radius: 6px;
   background: transparent;
@@ -1716,7 +1720,7 @@ a.btn { text-decoration: none; color: inherit; display: inline-block; }
   font-weight: 600;
 }
 /* 묶음과 그 갈래를 한 덩어리로 묶습니다. 사이가 벌어지면 어느 묶음의 갈래인지 흐려집니다. */
-.settings-nav-group { display: flex; flex-direction: column; gap: 1px; margin-bottom: 8px; }
+.settings-nav-group { display: flex; flex-direction: column; gap: 1px; margin-bottom: 6px; }
 /* 묶음 이름 앞 꺾쇠. 접혔는지 펴졌는지 눌러 보지 않아도 압니다. */
 .settings-nav-group > button:not(.settings-nav-item) {
   display: flex;

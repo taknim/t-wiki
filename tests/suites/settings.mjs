@@ -294,9 +294,16 @@ try {
   console.log('  ' + JSON.stringify(menu))
   expect('묶음이 셋', menu.groups.join() === '일반,모양,GitHub 동기화', JSON.stringify(menu.groups))
   expect('갈래가 펼쳐져 있음', menu.items.length >= 8, String(menu.items.length))
-  // 설정 하나에 한 줄씩 세우면 메뉴가 화면보다 길어집니다. 갈래로 묶어 둡니다.
-  // 설정 하나마다 줄을 세우면 목록이 화면보다 길어집니다. 갈래 수는 열넷 안쪽으로 묶어 둡니다.
-  expect('갈래로 묶여 있음', menu.items.length <= 14, String(menu.items.length))
+  /*
+   * 설정 하나마다 줄을 세우면 목록이 화면보다 길어집니다. 수를 세는 대신 **정말 넘치는지**
+   * 잽니다 — 지키려는 것은 "열넷 이하" 가 아니라 "굴리지 않고 다 보인다" 입니다.
+   */
+  const fits = await page.evaluate(() => {
+    const nav = document.querySelector('.settings-nav')
+    return { 넘침: nav.scrollHeight - nav.clientHeight, 줄수: nav.querySelectorAll('.settings-nav-item').length }
+  })
+  console.log('  ' + JSON.stringify(fits))
+  expect('굴리지 않고 다 보임', fits.넘침 <= 1, JSON.stringify(fits))
   expect('미리보기가 한 갈래로 묶임',
     menu.items.includes('미리보기') && !menu.items.includes('오피스 미리보기'),
     JSON.stringify(menu.items))

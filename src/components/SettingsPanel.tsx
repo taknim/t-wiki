@@ -19,6 +19,7 @@ import type { ImageBackdrop, SidebarTab } from '../types'
 import { useEscapeClose } from '../hooks/useEscapeClose'
 import { useTheme } from './themeContext'
 import { useDialogs } from './dialogContext'
+import { joinNames, removeJunk, scanTidy } from '../lib/tidyVault'
 
 const MODES: { id: ModeSetting; name: string; hint: string }[] = [
   { id: 'system', name: '시스템 따름', hint: '운영체제의 밝게/어둡게 설정을 그대로 따릅니다' },
@@ -92,6 +93,7 @@ const TABS: { id: TabId; name: string; hint: string; items: { id: string; name: 
       { id: 'set-autosave', name: '자동 저장' },
       { id: 'set-tidy', name: '저장할 때 정돈' },
       { id: 'set-trash', name: '휴지통' },
+      { id: 'set-tidy-vault', name: '폴더 정돈' },
       { id: 'set-transfer', name: '설정 주고받기' },
     ],
   },
@@ -141,6 +143,78 @@ export function SettingsPanel({
   const [includeToken, setIncludeToken] = useState(readIncludeToken)
   /** 주고받기 결과 한 줄. 조심해야 할 결과는 눈에 띄게 그립니다. */
   const [transfer, setTransfer] = useState<{ text: string; danger?: boolean } | null>(null)
+  /** 폴더 정돈. 훑는 중인 일과 그 결과 한 줄. */
+  const [busy, setBusy] = useState<'apart' | 'junk' | null>(null)
+  const [tidyTold, setTidyTold] = useState<{ text: string; bad?: boolean } | null>(null)
+
+  /*
+   * 자모가 나뉜 이름을 모아 적습니다.
+   *
+   * 훑기와 손대기를 **가릅니다.** 누르자마자 고치면 무엇이 바뀌는지 모른 채 파일 이름이
+   * 달라집니다. 몇 개인지 보여 주고 고른 뒤에 손을 댑니다.
+   */
+  const joinApartNames = async () => {
+    if (!vaultRoot) return
+    setBusy('apart')
+    setTidyTold(null)
+    try {
+      const plan = await scanTidy(vaultRoot)
+      if (plan.apart.length === 0) {
+        setTidyTold({ text: '자모가 나뉜 이름은 없습니다.' })
+        return
+      }
+      const sample = plan.apart.slice(0, 5).map((one) => `· ${one.path.normalize('NFC')}`).join('\n')
+      const more = plan.apart.length > 5 ? `\n… 그 밖에 ${plan.apart.length - 5}개` : ''
+      const go = await dialogs.confirm({
+        title: `이름 ${plan.apart.length}개를 모아 적을까요?`,
+        label: `${sample}${more}\n\n`
+          + '글자는 그대로이고 적는 방식만 바뀝니다. 같은 이름이 이미 있으면 건너뜁니다.',
+        confirmText: '합치기',
+      })
+      if (!go) return
+      const result = await joinNames(vaultRoot, plan.apart)
+      setTidyTold(result.skipped.length > 0
+        ? { text: `${result.done}개를 합쳤습니다. ${result.skipped.length}개는 건너뛰었습니다`
+            + ` (${result.skipped[0].why}).`, bad: true }
+        : { text: `${result.done}개를 합쳤습니다. 폴더를 다시 읽어 주세요.` })
+    } catch (cause) {
+      setTidyTold({ text: cause instanceof Error ? cause.message : String(cause), bad: true })
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  /** 운영체제가 만든 살림 파일을 지웁니다. 되돌릴 수 없으므로 목록을 보여 주고 묻습니다. */
+  const sweepJunk = async () => {
+    if (!vaultRoot) return
+    setBusy('junk')
+    setTidyTold(null)
+    try {
+      const plan = await scanTidy(vaultRoot)
+      if (plan.junk.length === 0) {
+        setTidyTold({ text: '지울 살림 파일이 없습니다.' })
+        return
+      }
+      const sample = plan.junk.slice(0, 5).map((one) => `· ${one.path}`).join('\n')
+      const more = plan.junk.length > 5 ? `\n… 그 밖에 ${plan.junk.length - 5}개` : ''
+      const go = await dialogs.confirm({
+        title: `${plan.junk.length}개를 지울까요?`,
+        label: `${sample}${more}\n\n운영체제가 만든 살림 파일입니다. 휴지통을 거치지 않고 바로`
+          + ' 지우며 되돌릴 수 없습니다. 지워도 운영체제가 필요할 때 다시 만듭니다.',
+        confirmText: '지우기',
+        danger: true,
+      })
+      if (!go) return
+      const result = await removeJunk(vaultRoot, plan.junk)
+      setTidyTold(result.skipped.length > 0
+        ? { text: `${result.done}개를 지웠습니다. ${result.skipped.length}개는 지우지 못했습니다.`, bad: true }
+        : { text: `${result.done}개를 지웠습니다.` })
+    } catch (cause) {
+      setTidyTold({ text: cause instanceof Error ? cause.message : String(cause), bad: true })
+    } finally {
+      setBusy(null)
+    }
+  }
   const bundleInput = useRef<HTMLInputElement>(null)
 
   const exportSettings = async () => {
@@ -954,6 +1028,44 @@ export function SettingsPanel({
                 />
                 <span className="hint" style={{ margin: 0 }}>일 (1 ~ 365, 기본 30)</span>
               </div>
+            </section>
+            </div>
+
+            <div className="field-group" id="set-tidy-vault">
+              <h4 className="field-group-title">폴더 정돈</h4>
+            <section className="field">
+              <p className="hint" style={{ marginTop: 0 }}>
+                밖에서 들어온 파일에는 군더더기가 따라옵니다. <strong>훑어서 무엇을 몇 개 고칠지
+                먼저 보여 주고</strong>, 고르면 그때 손을 댑니다. 앱이 쓰는 자리는 건드리지 않습니다.
+              </p>
+
+              <div className="row" style={{ alignItems: 'center', gap: 8 }}>
+                <button
+                  type="button"
+                  className="btn"
+                  disabled={busy !== null || !vaultRoot}
+                  data-tip="자모가 나뉘어 적힌 이름을 찾아 모아 적습니다"
+                  onClick={() => void joinApartNames()}
+                >
+                  {busy === 'apart' ? '훑는 중…' : '자소 분리된 이름 합치기'}
+                </button>
+                <button
+                  type="button"
+                  className="btn"
+                  disabled={busy !== null || !vaultRoot}
+                  data-tip=".DS_Store 같은 운영체제 살림 파일을 찾아 지웁니다"
+                  onClick={() => void sweepJunk()}
+                >
+                  {busy === 'junk' ? '훑는 중…' : '쓸모없는 파일 지우기'}
+                </button>
+              </div>
+              {tidyTold && <p className={tidyTold.bad ? 'status status-error' : 'status'}>{tidyTold.text}</p>}
+              <p className="hint" style={{ margin: 0 }}>
+                맥은 파일 이름을 <strong>자모가 나뉜 꼴</strong>로 적습니다. 눈에는 같은 글자인데
+                찾기에서 어긋나는 일이 있어 모아 적어 둡니다.
+                지우는 쪽은 <code>.DS_Store</code> · <code>Thumbs.db</code> · <code>desktop.ini</code> ·
+                <code>__MACOSX</code> · <code>._…</code> 입니다.
+              </p>
             </section>
             </div>
 

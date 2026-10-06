@@ -187,8 +187,18 @@ try {
   await page.waitForTimeout(700)
   const wide = await gaps()
   console.log('  자리 먹는 굴림대: ' + JSON.stringify(wide))
-  expect('굴림대가 자리를 먹음', wide.bar > 8, JSON.stringify(wide))
-  expect('그래도 틈은 그대로', Math.abs(wide.right - plain.right) <= 2, JSON.stringify(wide))
+  /*
+   * 굴림대가 **자리를 먹는 때**를 가려 보는 걸음입니다. 그런데 맥은 굴림대 꼴이 기기에 따라
+   * 달라집니다 — 마우스를 꽂으면 자리를 먹고, 트랙패드만 쓰면 글 위에 떠서 `scrollbar-gutter`
+   * 를 세워도 0입니다. 떠 있는 기계에서는 그 일이 아예 일어나지 않으므로, 없는 일을 두고
+   * 실패라고 하지 않고 건너뛰었다고 적습니다.
+   */
+  if (wide.bar > 8) {
+    ok('굴림대가 자리를 먹음')
+    expect('그래도 틈은 그대로', Math.abs(wide.right - plain.right) <= 2, JSON.stringify(wide))
+  } else {
+    console.log('  건너뜀: 이 기계는 굴림대가 자리를 먹지 않습니다(떠 있는 꼴)')
+  }
 
   step('3. 눌러서 목차를 폈다 접는다')
   await page.click('.doc-tool:has-text("목차")')
