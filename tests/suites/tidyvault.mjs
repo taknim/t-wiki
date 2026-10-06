@@ -75,26 +75,31 @@ try {
   expect('건너뛸 수도 있다고 알림', asked.includes('같은 이름이 이미 있으면 건너뜁니다'), asked.slice(0, 200))
   /*
    * 몇 줄만 보여 주고 "그 밖에 N개" 로 접으면 정작 무엇이 바뀌는지 알 수 없습니다.
-   * 다 적되 묻는 칸 안에서 굴려 봅니다.
+   * 다 적되 **목록 칸만** 굴립니다 — 설명은 굴린 뒤에도 그 자리에 남아야 합니다.
    */
   const listed = await page.evaluate(() => {
-    const box = document.querySelector('.dialog-label')
+    const dialog = document.querySelector('.dialog')
+    const box = dialog.querySelector('.dialog-list')
+    const label = dialog.querySelector('.dialog-label')
     return {
-      줄수: box.textContent.split('\n').filter((one) => one.startsWith('·')).length,
-      접음: box.textContent.includes('그 밖에'),
+      줄수: box.querySelectorAll('li').length,
+      접음: dialog.textContent.includes('그 밖에'),
       굴러감: box.scrollHeight > box.clientHeight + 1,
-      칸높이: Math.round(box.getBoundingClientRect().height),
-      창높이: Math.round(document.querySelector('.dialog').getBoundingClientRect().height),
+      설명굴림: label.scrollHeight > label.clientHeight + 1,
+      창너비: Math.round(dialog.getBoundingClientRect().width),
+      창높이: Math.round(dialog.getBoundingClientRect().height),
     }
   })
   console.log('  ' + JSON.stringify(listed))
   expect('바뀔 것을 모두 적음', listed.줄수 >= 32, JSON.stringify(listed))
   expect('접어 두지 않음', listed.접음 === false, JSON.stringify(listed))
-  expect('길면 그 칸 안에서 굴러감', listed.굴러감, JSON.stringify(listed))
+  expect('목록 칸만 굴러감', listed.굴러감 && listed.설명굴림 === false, JSON.stringify(listed))
+  // 좁은 창에서는 경로가 꺾여 몇 개가 바뀌는지조차 세기 어려웠습니다.
+  expect('목록이 든 창은 넓게 열림', listed.창너비 >= 700, JSON.stringify(listed))
   // 창이 화면 밖으로 자라면 단추를 누를 수 없습니다.
   expect('창은 화면 안에 머묾', listed.창높이 <= 900, JSON.stringify(listed))
   await page.screenshot({ path: join(HERE, '..', 'shots', 'tidyvault', '01-ask.png'),
-    clip: { x: 300, y: 150, width: 700, height: 320 } })
+    clip: { x: 200, y: 90, width: 900, height: 520 } })
 
   step('2. 물러서면 아무것도 바뀌지 않는다')
   const before = await names()

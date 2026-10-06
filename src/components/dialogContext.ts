@@ -22,6 +22,13 @@ export interface DialogApi {
   confirm: (options: {
     title: string
     label: string
+    /**
+     * 무엇이 바뀔지 줄줄이 보여 줄 목록(경로 따위). 설명(label)에 이어 붙이지 않고 따로 받는
+     * 까닭은, 길어지면 **목록만 굴리고 설명은 늘 보이게** 두어야 하기 때문입니다. 접어서
+     * "그 밖에 N개" 로 가리지 않습니다 — 고르기 전에 사실을 다 보여 주는 자리입니다.
+     * 목록이 있으면 창도 넓게 엽니다(경로가 한 줄에 들어가야 읽힙니다).
+     */
+    items?: string[]
     confirmText?: string
     danger?: boolean
   }) => Promise<boolean>

@@ -23,6 +23,7 @@ interface ConfirmRequest {
   kind: 'confirm'
   title: string
   label: string
+  items: string[]
   confirmText: string
   danger: boolean
 }
@@ -81,12 +82,13 @@ export function DialogProvider({ children }: { children: ReactNode }) {
             settle: (result) => resolve(result !== null && typeof result === 'object' ? result : null),
           })
         }),
-      confirm: ({ title, label, confirmText = '확인', danger = false }) =>
+      confirm: ({ title, label, items = [], confirmText = '확인', danger = false }) =>
         new Promise<boolean>((resolve) => {
           setRequest({
             kind: 'confirm',
             title,
             label,
+            items,
             confirmText,
             danger,
             settle: (result) => resolve(result === true),
@@ -141,6 +143,8 @@ export function DialogProvider({ children }: { children: ReactNode }) {
     // 갈림길에는 Enter 로 고를 기본 답이 없습니다. 무엇을 잃을지 읽고 눌러야 합니다.
   }, [close, request, value, values])
 
+  const listing = request?.kind === 'confirm' ? request.items : []
+
   return (
     <DialogContext.Provider value={api}>
       {children}
@@ -152,9 +156,24 @@ export function DialogProvider({ children }: { children: ReactNode }) {
             if (event.target === event.currentTarget) close(null)
           }}
         >
-          <div className="dialog" role="dialog" aria-modal="true" aria-label={request.title}>
+          {/* 목록을 안은 물음은 넓게 엽니다. 경로가 한 줄에 들어가야 무엇이 바뀌는지 읽힙니다. */}
+          <div
+            className={listing.length > 0 ? 'dialog is-wide' : 'dialog'}
+            role="dialog"
+            aria-modal="true"
+            aria-label={request.title}
+          >
             <h2>{request.title}</h2>
             <p className="dialog-label">{request.label}</p>
+            {/*
+              * 설명은 늘 보이고 **목록만** 굴립니다. 둘을 한 칸에 담아 함께 굴렸더니, 굴린
+              * 뒤에는 무엇을 묻는 물음인지(건너뛴다·되돌릴 수 없다) 사라져 보이지 않았습니다.
+              */}
+            {listing.length > 0 && (
+              <ul className="dialog-list">
+                {listing.map((one) => <li key={one}>{one}</li>)}
+              </ul>
+            )}
             {request.kind === 'prompt' && (
               <input
                 ref={inputRef}
