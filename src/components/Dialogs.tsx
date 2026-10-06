@@ -28,6 +28,13 @@ interface ConfirmRequest {
   danger: boolean
 }
 
+interface TellRequest {
+  kind: 'tell'
+  title: string
+  label: string
+  items: string[]
+}
+
 interface ChooseRequest {
   kind: 'choose'
   title: string
@@ -37,7 +44,7 @@ interface ChooseRequest {
 
 type Answer = string | boolean | Record<string, number> | null
 
-type Request = (PromptRequest | NumbersRequest | ConfirmRequest | ChooseRequest) & {
+type Request = (PromptRequest | NumbersRequest | ConfirmRequest | TellRequest | ChooseRequest) & {
   settle: (value: Answer) => void
 }
 
@@ -94,6 +101,10 @@ export function DialogProvider({ children }: { children: ReactNode }) {
             settle: (result) => resolve(result === true),
           })
         }),
+      tell: ({ title, label, items = [] }) =>
+        new Promise<void>((resolve) => {
+          setRequest({ kind: 'tell', title, label, items, settle: () => resolve() })
+        }),
       choose: ({ title, label, options }) =>
         new Promise<string | null>((resolve) => {
           setRequest({
@@ -139,11 +150,13 @@ export function DialogProvider({ children }: { children: ReactNode }) {
       close(answer)
     } else if (request.kind === 'confirm') {
       close(true)
+    } else if (request.kind === 'tell') {
+      close(null)
     }
     // 갈림길에는 Enter 로 고를 기본 답이 없습니다. 무엇을 잃을지 읽고 눌러야 합니다.
   }, [close, request, value, values])
 
-  const listing = request?.kind === 'confirm' ? request.items : []
+  const listing = request?.kind === 'confirm' || request?.kind === 'tell' ? request.items : []
 
   return (
     <DialogContext.Provider value={api}>
@@ -220,14 +233,17 @@ export function DialogProvider({ children }: { children: ReactNode }) {
               </div>
             )}
             <div className="dialog-actions">
-              <button
-                type="button"
-                className="btn"
-                data-tip="아무것도 바꾸지 않고 닫습니다 (Esc)"
-                onClick={() => close(null)}
-              >
-                취소
-              </button>
+              {/* 알림에는 취소가 없습니다. 이미 끝난 일이라 물러설 자리가 없습니다. */}
+              {request.kind !== 'tell' && (
+                <button
+                  type="button"
+                  className="btn"
+                  data-tip="아무것도 바꾸지 않고 닫습니다 (Esc)"
+                  onClick={() => close(null)}
+                >
+                  취소
+                </button>
+              )}
               {request.kind === 'choose' ? (
                 request.options.map((option) => (
                   <button
@@ -244,14 +260,16 @@ export function DialogProvider({ children }: { children: ReactNode }) {
                   type="button"
                   className={request.kind === 'confirm' && request.danger ? 'btn btn-danger' : 'btn btn-primary'}
                   data-tip={
-                    request.kind === 'confirm' && request.danger
-                      ? '되돌릴 수 없습니다'
-                      : '입력한 대로 진행합니다 (Enter)'
+                    request.kind === 'tell'
+                      ? '읽었습니다. 창을 닫습니다 (Enter)'
+                      : request.kind === 'confirm' && request.danger
+                        ? '되돌릴 수 없습니다'
+                        : '입력한 대로 진행합니다 (Enter)'
                   }
                   onClick={submit}
-                  autoFocus={request.kind === 'confirm'}
+                  autoFocus={request.kind === 'confirm' || request.kind === 'tell'}
                 >
-                  {request.confirmText}
+                  {request.kind === 'tell' ? '확인' : request.confirmText}
                 </button>
               )}
             </div>

@@ -285,7 +285,12 @@ async function copyDir(
   const src = await resolveDir(root, from.split('/').filter(Boolean))
   await createDir(root, to)
   for await (const [name, handle] of src.entries()) {
-    if (name.startsWith('.') || IGNORED.has(name)) continue
+    /*
+     * 숨은 파일(`.` 으로 시작하는 것)도 함께 옮깁니다. 옮기기는 복사한 뒤 원본을 통째로
+     * 지우는 일이라, 복사에서 빠뜨린 것은 **사라집니다.** 트리에 보이지 않을 뿐 남의 파일입니다.
+     * 들어 있어도 뜻이 없는 자리(`node_modules`·휴지통)만 두고 옵니다.
+     */
+    if (IGNORED.has(name)) continue
     if (handle.kind === 'directory') {
       await copyDir(root, `${from}/${name}`, `${to}/${name}`)
     } else {

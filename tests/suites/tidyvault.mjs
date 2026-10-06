@@ -56,8 +56,25 @@ const openTidy = async () => {
   await page.click('.settings-nav button:has-text("폴더 정돈")')
   await page.waitForTimeout(300)
 }
-const told = () => page.evaluate(() =>
-  document.querySelector('#set-tidy-vault .status')?.textContent ?? null)
+/*
+ * 결과는 **알림 창**에서 읽습니다. 설정 창 본문 한 줄에 적었더니, 일은 모달에서 시켜 놓고
+ * 그 결과만 뒤에 가린 창에 적혀 보이지 않았습니다.
+ */
+const told = () => page.evaluate(() => {
+  const dialog = document.querySelector('.dialog')
+  if (!dialog) return null
+  return {
+    title: dialog.querySelector('h2')?.textContent ?? '',
+    label: dialog.querySelector('.dialog-label')?.textContent ?? '',
+    items: [...dialog.querySelectorAll('.dialog-list li')].map((one) => one.textContent),
+    단추: [...dialog.querySelectorAll('.dialog-actions button')].map((one) => one.textContent),
+  }
+})
+/** 알림 창의 확인을 눌러 닫습니다. */
+const readOff = async () => {
+  await page.click('.dialog button:has-text("확인")')
+  await page.waitForTimeout(400)
+}
 
 try {
   await page.goto(process.env.APP_URL ?? 'http://localhost:5173', { waitUntil: 'domcontentloaded' })
@@ -106,7 +123,7 @@ try {
   await page.keyboard.press('Escape')
   await page.waitForTimeout(400)
   expect('이름이 그대로', JSON.stringify(await names()) === JSON.stringify(before), JSON.stringify(await names()))
-  expect('한 일이 없다고 적지도 않음', (await told()) === null, String(await told()))
+  expect('한 일이 없다고 알리지도 않음', (await told()) === null, JSON.stringify(await told()))
 
   step('3. 합치면 이름이 모아 적히고, 겹치는 것은 건너뛴다')
   await page.click('button:has-text("자소 분리된 이름 합치기")')
@@ -120,10 +137,22 @@ try {
   // 겹치던 자리는 둘 다 남아 있어야 합니다. 덮어쓰면 먼저 있던 글이 사라집니다.
   const both = after.filter((one) => one.nfc === '겹치는 글.md')
   expect('겹치는 것은 건너뛰어 둘 다 남음', both.length === 2, JSON.stringify(both))
+  /*
+   * 결과는 시킨 자리에서, 확인 단추 하나로 닫는 알림 창에 적힙니다.
+   * 건너뛴 것은 **무엇을 왜** 건너뛰었는지 줄줄이 적습니다.
+   */
   const result = await told()
-  console.log('  알림: ' + String(result))
-  expect('몇 개를 했고 몇 개를 건너뛰었는지 적음',
-    /\d+개를 합쳤습니다/.test(result ?? '') && result.includes('건너뛰었습니다'), String(result))
+  console.log('  알림: ' + JSON.stringify(result))
+  expect('알림 창으로 알림', result !== null, JSON.stringify(result))
+  expect('몇 개를 했는지 적음', /이름 \d+개를 모아 적었습니다/.test(result.title), JSON.stringify(result))
+  expect('건너뛴 수도 적음', result.label.includes('건너뛰었습니다'), JSON.stringify(result))
+  expect('건너뛴 것이 무엇이고 왜인지 적음',
+    result.items.some((one) => one.includes('겹치는 글.md') && one.includes('이미 있습니다')),
+    JSON.stringify(result.items))
+  expect('단추는 확인 하나', JSON.stringify(result.단추) === JSON.stringify(['확인']), JSON.stringify(result.단추))
+  await page.screenshot({ path: join(HERE, '..', 'shots', 'tidyvault', '02-told.png'),
+    clip: { x: 200, y: 90, width: 900, height: 420 } })
+  await readOff()
   expect('심어 둔 것이 모두 합쳐짐',
     after.filter((one) => /^나뉜 이름 \d+\.md$/.test(one.nfc) && one.raw === one.nfc).length === 30,
     JSON.stringify(after.map((one) => one.nfc)))
@@ -133,6 +162,11 @@ try {
   const inside = await page.evaluate(() =>
     [...(window.__mockRoot._children.get('자료 묶음')?._children.keys() ?? [])])
   expect('안엣것이 따라옴', inside.includes('안엣글.md'), JSON.stringify(inside))
+  /*
+   * 옮기기는 복사한 뒤 원본을 지우는 일입니다. 숨은 파일을 복사에서 빼놓고 지우면
+   * 그 파일은 **사라집니다.** 이름을 고치자고 부른 일에서 무언가를 잃을 수는 없습니다.
+   */
+  expect('숨은 파일도 따라옴', inside.includes('.DS_Store'), JSON.stringify(inside))
 
   step('4. 살림 파일은 목록을 보여 주고 지운다')
   await page.click('button:has-text("쓸모없는 파일 지우기")')
@@ -143,6 +177,10 @@ try {
   expect('되돌릴 수 없다고 밝힘', junkAsked.includes('되돌릴 수 없습니다'), junkAsked.slice(0, 200))
   await page.click('.dialog button:has-text("지우기")')
   await page.waitForTimeout(800)
+  const swept = await told()
+  console.log('  알림: ' + JSON.stringify(swept))
+  expect('지운 수를 알림 창으로 알림', /\d+개를 지웠습니다/.test(swept?.title ?? ''), JSON.stringify(swept))
+  await readOff()
   const left = await names()
   console.log('  남은 것: ' + JSON.stringify(left.map((one) => one.nfc)))
   for (const junk of ['.DS_Store', 'Thumbs.db', '._숨은 자취.txt']) {
@@ -154,11 +192,16 @@ try {
   expect('폴더 안의 살림 파일도 지워짐', !deepLeft.includes('.DS_Store'), JSON.stringify(deepLeft))
   expect('글은 그대로 남음', deepLeft.includes('안엣글.md'), JSON.stringify(deepLeft))
 
-  step('5. 더 치울 것이 없으면 없다고 한다')
+  step('5. 더 치울 것이 없으면 찾지 못했다고 한다')
   await page.click('button:has-text("쓸모없는 파일 지우기")')
   await page.waitForTimeout(600)
-  expect('없다고 알림', (await told() ?? '').includes('없습니다'), String(await told()))
-  expect('묻지 않음', (await page.locator('.dialog').count()) === 0)
+  const none = await told()
+  console.log('  알림: ' + JSON.stringify(none))
+  // "지울 살림 파일이 없습니다" 는 무엇을 했다는 말인지 어색했습니다.
+  expect('찾지 못했다고 알림', none?.title === '지울 파일을 찾을 수 없습니다', JSON.stringify(none))
+  expect('지울지 묻지는 않음', JSON.stringify(none?.단추) === JSON.stringify(['확인']), JSON.stringify(none))
+  await readOff()
+  expect('닫으면 창이 사라짐', (await page.locator('.dialog').count()) === 0)
 } catch (cause) {
   fail('묶음이 도중에 멈춤', cause instanceof Error ? (cause.stack ?? cause.message) : String(cause))
 } finally {

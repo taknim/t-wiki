@@ -56,9 +56,26 @@ window.__installMockFs = function installMockFs() {
       this.name = name
       this._children = new Map()
     }
+    /*
+     * 맥(APFS)은 이름을 **모아 적든 나눠 적든 같은 것으로 찾습니다.** `나뉜 이름.md` 를
+     * 담아 두고 `나뉜 이름.md`(모아 적은 꼴)로 물어도 그 파일을 내어 줍니다. 대신 새로
+     * 만들 때는 **준 그대로** 적습니다.
+     *
+     * 글자 그대로 맞춰 찾도록 두었더니, 자소 분리 이름 합치기가 시험에서만 되고 진짜
+     * 맥에서는 "같은 이름이 이미 있습니다" 로 모두 건너뛰었습니다. 여기서 맥처럼 굴어야
+     * 그 증상이 시험에 잡힙니다.
+     */
+    _find(name) {
+      if (this._children.has(name)) return this._children.get(name)
+      const key = name.normalize('NFC')
+      for (const [at, child] of this._children) {
+        if (at.normalize('NFC') === key) return child
+      }
+      return null
+    }
     async getDirectoryHandle(name, options) {
       guard()
-      let child = this._children.get(name)
+      let child = this._find(name)
       if (!child) {
         if (!options?.create) throw new DOMException(name + ' not found', 'NotFoundError')
         child = new MemDir(name)
@@ -69,7 +86,7 @@ window.__installMockFs = function installMockFs() {
     }
     async getFileHandle(name, options) {
       guard()
-      let child = this._children.get(name)
+      let child = this._find(name)
       if (!child) {
         if (!options?.create) throw new DOMException(name + ' not found', 'NotFoundError')
         child = new MemFile(name, '')
@@ -80,8 +97,10 @@ window.__installMockFs = function installMockFs() {
     }
     async removeEntry(name) {
       guard()
-      if (!this._children.has(name)) throw new DOMException(name + ' not found', 'NotFoundError')
-      this._children.delete(name)
+      const child = this._find(name)
+      if (!child) throw new DOMException(name + ' not found', 'NotFoundError')
+      // 담긴 이름으로 지웁니다. 물어본 꼴과 적힌 꼴이 다를 수 있습니다.
+      for (const [at, one] of this._children) if (one === child) this._children.delete(at)
     }
     async *entries() {
       guard()

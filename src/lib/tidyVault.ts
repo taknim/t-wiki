@@ -1,4 +1,4 @@
-import { dirEntries, exists, movePath, removeEntry } from './fsAccess'
+import { dirEntries, movePath, removeEntry } from './fsAccess'
 
 /*
  * 폴더 정돈.
@@ -78,14 +78,37 @@ export async function joinNames(
   const skipped: { path: string; why: string }[] = []
   let done = 0
 
-  for (const item of items) {
+  for (const [order, item] of items.entries()) {
+    const at = item.to.lastIndexOf('/')
+    const dir = at < 0 ? '' : item.to.slice(0, at)
+    const name = at < 0 ? item.to : item.to.slice(at + 1)
     try {
-      if (await exists(root, item.to)) {
+      /*
+       * **"있는지" 를 손잡이로 물어서는 안 됩니다.** 맥(APFS)은 모아 적은 이름으로 물어도
+       * 나눠 적힌 그 파일을 내어 줍니다. 그래서 있는지만 물었더니 늘 있다고 하여, 고칠 것을
+       * 하나도 손대지 못한 채 "같은 이름이 이미 있습니다" 로 모두 건너뛰었습니다.
+       * 담긴 이름을 **글자 그대로** 견주어, 정말 남의 파일일 때만 비킵니다.
+       */
+      const here = await dirEntries(root, dir)
+      if (here.some((one) => one.name === name)) {
         skipped.push({ path: item.path, why: '같은 이름이 이미 있습니다' })
         continue
       }
-      await movePath(root, item.path, item.to)
-      done += 1
+      /*
+       * 바로 옮기면 제자리걸음입니다 — 맥에서는 옮길 곳이 곧 제 자신이라, 복사한 뒤 원본을
+       * 지우는 길에서 애먼 파일을 지울 뻔합니다. 임시 이름을 한 번 거쳐야 적힌 꼴이 바뀝니다.
+       * 임시 이름은 앱이 쓰는 꼴(`_t-wiki…`)로 두어 훑기에서도 빠집니다.
+       */
+      const temp = `${dir ? `${dir}/` : ''}_t-wiki-tidy-${order}`
+      await movePath(root, item.path, temp)
+      await movePath(root, temp, item.to)
+      /*
+       * 적힌 꼴이 정말 바뀌었는지 눈으로 확인합니다. 파일 시스템에 따라서는 준 이름을
+       * 제 꼴로 되돌려 적습니다. 그때 "합쳤습니다" 라고 하면 거짓말이 됩니다.
+       */
+      const after = await dirEntries(root, dir)
+      if (after.some((one) => one.name === name)) done += 1
+      else skipped.push({ path: item.path, why: '파일 시스템이 이름을 다시 나눠 적습니다' })
     } catch (cause) {
       skipped.push({ path: item.path, why: cause instanceof Error ? cause.message : String(cause) })
     }

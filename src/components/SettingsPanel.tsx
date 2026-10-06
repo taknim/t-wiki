@@ -143,9 +143,8 @@ export function SettingsPanel({
   const [includeToken, setIncludeToken] = useState(readIncludeToken)
   /** 주고받기 결과 한 줄. 조심해야 할 결과는 눈에 띄게 그립니다. */
   const [transfer, setTransfer] = useState<{ text: string; danger?: boolean } | null>(null)
-  /** 폴더 정돈. 훑는 중인 일과 그 결과 한 줄. */
+  /** 폴더 정돈. 훑는 중인 일. 결과는 알림 창으로 알립니다. */
   const [busy, setBusy] = useState<'apart' | 'junk' | null>(null)
-  const [tidyTold, setTidyTold] = useState<{ text: string; bad?: boolean } | null>(null)
 
   /*
    * 자모가 나뉜 이름을 모아 적습니다.
@@ -156,11 +155,13 @@ export function SettingsPanel({
   const joinApartNames = async () => {
     if (!vaultRoot) return
     setBusy('apart')
-    setTidyTold(null)
     try {
       const plan = await scanTidy(vaultRoot)
       if (plan.apart.length === 0) {
-        setTidyTold({ text: '자모가 나뉜 이름은 없습니다.' })
+        await dialogs.tell({
+          title: '합칠 이름을 찾을 수 없습니다',
+          label: '이 폴더의 이름은 모두 모아 적혀 있습니다.',
+        })
         return
       }
       /*
@@ -175,12 +176,24 @@ export function SettingsPanel({
       })
       if (!go) return
       const result = await joinNames(vaultRoot, plan.apart)
-      setTidyTold(result.skipped.length > 0
-        ? { text: `${result.done}개를 합쳤습니다. ${result.skipped.length}개는 건너뛰었습니다`
-            + ` (${result.skipped[0].why}).`, bad: true }
-        : { text: `${result.done}개를 합쳤습니다. 폴더를 다시 읽어 주세요.` })
+      /*
+       * 손댄 자리에서 결과까지 알립니다. 건너뛴 것은 **무엇을 왜** 건너뛰었는지 줄줄이 적습니다 —
+       * "몇 개는 건너뛰었습니다" 만으로는 어느 파일을 손봐야 하는지 알 수 없었습니다.
+       */
+      await dialogs.tell({
+        title: `이름 ${result.done}개를 모아 적었습니다`,
+        label: result.skipped.length > 0
+          ? `${result.skipped.length}개는 건너뛰었습니다. 트리의 새로 고침으로 폴더를 다시 읽어 주세요.`
+          : '트리의 새로 고침으로 폴더를 다시 읽어 주세요.',
+        // 건너뛴 이름도 모아 적어 보여 줍니다. 나뉜 꼴 그대로 적으면 눈으로는 같은 글자인데
+        // 물음 창에 적힌 것과 달라 보입니다.
+        items: result.skipped.map((one) => `${one.path.normalize('NFC')} — ${one.why}`),
+      })
     } catch (cause) {
-      setTidyTold({ text: cause instanceof Error ? cause.message : String(cause), bad: true })
+      await dialogs.tell({
+        title: '이름을 모아 적지 못했습니다',
+        label: cause instanceof Error ? cause.message : String(cause),
+      })
     } finally {
       setBusy(null)
     }
@@ -190,11 +203,13 @@ export function SettingsPanel({
   const sweepJunk = async () => {
     if (!vaultRoot) return
     setBusy('junk')
-    setTidyTold(null)
     try {
       const plan = await scanTidy(vaultRoot)
       if (plan.junk.length === 0) {
-        setTidyTold({ text: '지울 살림 파일이 없습니다.' })
+        await dialogs.tell({
+          title: '지울 파일을 찾을 수 없습니다',
+          label: '이 폴더에는 운영체제가 만든 살림 파일이 없습니다.',
+        })
         return
       }
       // 지울 것도 모두 적습니다. 지우는 일에서 "그 밖에 N개" 로 접는 것은 더더욱 안 됩니다.
@@ -208,11 +223,18 @@ export function SettingsPanel({
       })
       if (!go) return
       const result = await removeJunk(vaultRoot, plan.junk)
-      setTidyTold(result.skipped.length > 0
-        ? { text: `${result.done}개를 지웠습니다. ${result.skipped.length}개는 지우지 못했습니다.`, bad: true }
-        : { text: `${result.done}개를 지웠습니다.` })
+      await dialogs.tell({
+        title: `${result.done}개를 지웠습니다`,
+        label: result.skipped.length > 0
+          ? `${result.skipped.length}개는 지우지 못했습니다.`
+          : '운영체제가 필요할 때 다시 만듭니다.',
+        items: result.skipped.map((one) => `${one.path} — ${one.why}`),
+      })
     } catch (cause) {
-      setTidyTold({ text: cause instanceof Error ? cause.message : String(cause), bad: true })
+      await dialogs.tell({
+        title: '살림 파일을 지우지 못했습니다',
+        label: cause instanceof Error ? cause.message : String(cause),
+      })
     } finally {
       setBusy(null)
     }
@@ -1061,7 +1083,6 @@ export function SettingsPanel({
                   {busy === 'junk' ? '훑는 중…' : '쓸모없는 파일 지우기'}
                 </button>
               </div>
-              {tidyTold && <p className={tidyTold.bad ? 'status status-error' : 'status'}>{tidyTold.text}</p>}
               <p className="hint" style={{ margin: 0 }}>
                 맥은 파일 이름을 <strong>자모가 나뉜 꼴</strong>로 적습니다. 눈에는 같은 글자인데
                 찾기에서 어긋나는 일이 있어 모아 적어 둡니다.

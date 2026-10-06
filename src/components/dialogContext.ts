@@ -33,6 +33,13 @@ export interface DialogApi {
     danger?: boolean
   }) => Promise<boolean>
   /**
+   * 알림. 묻지 않고 **알리기만** 합니다. 단추는 확인 하나뿐입니다.
+   *
+   * 일을 모달에서 시켜 놓고 그 결과만 설정 창 본문에 적었더니, 창에 가려 보이지 않았습니다.
+   * 시킨 자리에서 결과까지 받고 확인으로 닫습니다. `items` 는 결과에 딸린 목록(건너뛴 것 따위).
+   */
+  tell: (options: { title: string; label: string; items?: string[] }) => Promise<void>
+  /**
    * 갈림길. 예/아니오로 안 되는 물음에 씁니다. 고른 단추의 id 를, 물러서면 null 을 돌려줍니다.
    * 물러서는 길(취소·Esc·바깥 누르기)은 늘 "아무것도 하지 않음" 이어야 하므로,
    * 무언가를 잃는 선택은 반드시 이름 붙은 단추로 둡니다.
