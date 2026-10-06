@@ -41,6 +41,11 @@ interface SettingsPanelProps {
   vaultName: string | null
   /** 지금 열려 있는 폴더. 내보낸 파일이 그 안에 떨어졌는지 가리는 데 씁니다. */
   vaultRoot: FileSystemDirectoryHandle | null
+  /**
+   * 폴더 정돈이 끝난 뒤. 트리를 다시 읽고, 이름이 바뀐 자리를 **보고 있던 문서와
+   * 즐겨찾기가 따라가게** 합니다. 사람에게 "새로 고침을 눌러 주세요" 라고 미루지 않습니다.
+   */
+  onTidied: (moved: { from: string; to: string }[]) => Promise<void>
   /** 트리를 펴 두었는지. 내보내고 들여올 때 함께 다룹니다. */
   sidebarOpen: boolean
   onSidebarOpen: (open: boolean) => void
@@ -122,7 +127,8 @@ const TABS: { id: TabId; name: string; hint: string; items: { id: string; name: 
 ]
 
 export function SettingsPanel({
-  onClose, sync, onShowHistory, vaultName, vaultRoot,
+  onClose,
+  onTidied, sync, onShowHistory, vaultName, vaultRoot,
   sidebarOpen, onSidebarOpen, sidebarWidth, onSidebarWidth, sidebarTab, onSidebarTab,
   splitRatio, onSplitRatio,
   imagePreview, onImagePreview, imageBackdrop, onImageBackdrop,
@@ -176,6 +182,8 @@ export function SettingsPanel({
       })
       if (!go) return
       const result = await joinNames(vaultRoot, plan.apart)
+      // 알리기 전에 트리를 맞춰 둡니다. 창을 닫았을 때 옛 이름이 남아 있으면 안 됩니다.
+      await onTidied(result.moved)
       /*
        * 손댄 자리에서 결과까지 알립니다. 건너뛴 것은 **무엇을 왜** 건너뛰었는지 줄줄이 적습니다 —
        * "몇 개는 건너뛰었습니다" 만으로는 어느 파일을 손봐야 하는지 알 수 없었습니다.
@@ -183,8 +191,8 @@ export function SettingsPanel({
       await dialogs.tell({
         title: `이름 ${result.done}개를 모아 적었습니다`,
         label: result.skipped.length > 0
-          ? `${result.skipped.length}개는 건너뛰었습니다. 트리의 새로 고침으로 폴더를 다시 읽어 주세요.`
-          : '트리의 새로 고침으로 폴더를 다시 읽어 주세요.',
+          ? `${result.skipped.length}개는 건너뛰었습니다. 트리는 새 이름으로 다시 읽었습니다.`
+          : '트리도 새 이름으로 다시 읽었습니다.',
         // 건너뛴 이름도 모아 적어 보여 줍니다. 나뉜 꼴 그대로 적으면 눈으로는 같은 글자인데
         // 물음 창에 적힌 것과 달라 보입니다.
         items: result.skipped.map((one) => `${one.path.normalize('NFC')} — ${one.why}`),
@@ -199,7 +207,7 @@ export function SettingsPanel({
     }
   }
 
-  /** 운영체제가 만든 살림 파일을 지웁니다. 되돌릴 수 없으므로 목록을 보여 주고 묻습니다. */
+  /** 운영체제가 만든 불필요한 파일을 지웁니다. 되돌릴 수 없으므로 목록을 보여 주고 묻습니다. */
   const sweepJunk = async () => {
     if (!vaultRoot) return
     setBusy('junk')
@@ -208,14 +216,14 @@ export function SettingsPanel({
       if (plan.junk.length === 0) {
         await dialogs.tell({
           title: '지울 파일을 찾을 수 없습니다',
-          label: '이 폴더에는 운영체제가 만든 살림 파일이 없습니다.',
+          label: '이 폴더에는 운영체제가 만든 불필요한 파일이 없습니다.',
         })
         return
       }
       // 지울 것도 모두 적습니다. 지우는 일에서 "그 밖에 N개" 로 접는 것은 더더욱 안 됩니다.
       const go = await dialogs.confirm({
         title: `${plan.junk.length}개를 지울까요?`,
-        label: '운영체제가 만든 살림 파일입니다. 휴지통을 거치지 않고 바로 지우며 되돌릴 수'
+        label: '운영체제가 만든 불필요한 파일입니다. 휴지통을 거치지 않고 바로 지우며 되돌릴 수'
           + ' 없습니다. 지워도 운영체제가 필요할 때 다시 만듭니다.',
         items: plan.junk.map((one) => one.path),
         confirmText: '지우기',
@@ -223,6 +231,8 @@ export function SettingsPanel({
       })
       if (!go) return
       const result = await removeJunk(vaultRoot, plan.junk)
+      // 지운 것은 트리에서도 사라져야 합니다. 옮긴 자리는 없습니다.
+      await onTidied([])
       await dialogs.tell({
         title: `${result.done}개를 지웠습니다`,
         label: result.skipped.length > 0
@@ -232,7 +242,7 @@ export function SettingsPanel({
       })
     } catch (cause) {
       await dialogs.tell({
-        title: '살림 파일을 지우지 못했습니다',
+        title: '불필요한 파일을 지우지 못했습니다',
         label: cause instanceof Error ? cause.message : String(cause),
       })
     } finally {
@@ -1077,7 +1087,7 @@ export function SettingsPanel({
                   type="button"
                   className="btn"
                   disabled={busy !== null || !vaultRoot}
-                  data-tip=".DS_Store 같은 운영체제 살림 파일을 찾아 지웁니다"
+                  data-tip=".DS_Store 같은 운영체제가 만든 불필요한 파일을 찾아 지웁니다"
                   onClick={() => void sweepJunk()}
                 >
                   {busy === 'junk' ? '훑는 중…' : '쓸모없는 파일 지우기'}

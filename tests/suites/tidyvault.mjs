@@ -17,7 +17,7 @@ const errors = []
 page.on('pageerror', (e) => errors.push('pageerror: ' + e.message))
 await page.addInitScript(readFileSync(join(HERE, '..', 'mock-fs.js'), 'utf8'))
 /*
- * 밖에서 들어온 꼴을 지어 둡니다. 자모가 나뉜 이름(맥), 운영체제 살림 파일, 그리고
+ * 밖에서 들어온 꼴을 지어 둡니다. 자모가 나뉜 이름(맥), 운영체제가 만든 불필요한 파일, 그리고
  * **모아 적은 이름이 이미 있는** 자리까지. 마지막 것은 덮어쓰지 않고 건너뛰어야 합니다.
  */
 await page.addInitScript(() => {
@@ -32,9 +32,9 @@ await page.addInitScript(() => {
   put('밖에서 온 기록.txt'.normalize('NFD'), '자모가 나뉜 이름')
   // 묻는 칸을 넘치도록 넉넉히 심습니다. 모두 적히는지와 굴러가는지를 함께 가립니다.
   for (let at = 1; at <= 30; at += 1) put(`나뉜 이름 ${at}.md`.normalize('NFD'), '글')
-  put('.DS_Store', '살림')
-  put('._숨은 자취.txt', '살림')
-  put('Thumbs.db', '살림')
+  put('.DS_Store', '군더더기')
+  put('._숨은 자취.txt', '군더더기')
+  put('Thumbs.db', '군더더기')
   // 모아 적은 이름이 이미 있는 자리. 합치려 들면 남의 파일을 덮게 되므로 건너뜁니다.
   put('겹치는 글.md', '먼저 있던 것')
   put('겹치는 글.md'.normalize('NFD'), '나중에 들어온 것')
@@ -42,7 +42,7 @@ await page.addInitScript(() => {
   const dir = Object.assign(Object.create(Object.getPrototypeOf(root)),
     { kind: 'directory', name: '자료 묶음'.normalize('NFD'), _children: new Map() })
   dir._children.set('안엣글.md', file('안엣글.md', '안에 있던 글'))
-  dir._children.set('.DS_Store', file('.DS_Store', '살림'))
+  dir._children.set('.DS_Store', file('.DS_Store', '군더더기'))
   root._children.set(dir.name, dir)
 })
 
@@ -70,6 +70,18 @@ const told = () => page.evaluate(() => {
     단추: [...dialog.querySelectorAll('.dialog-actions button')].map((one) => one.textContent),
   }
 })
+/** 트리에 적힌 이름들. 적힌 꼴 그대로 봅니다. */
+const treeNames = () => page.evaluate(() =>
+  [...document.querySelectorAll('.tree .tree-name')].map((one) => one.textContent))
+/** 지금 고른 줄의 이름. */
+const picked = () => page.evaluate(() =>
+  document.querySelector('.tree .tree-row.is-selected .tree-name')?.textContent ?? null)
+/** 이름이 그 글자인 트리 줄을 누릅니다. 적힌 꼴이 달라도 같은 글자면 누릅니다. */
+const clickTree = (name) => page.evaluate((want) => {
+  const row = [...document.querySelectorAll('.tree .tree-name')]
+    .find((one) => one.textContent.normalize('NFC') === want)
+  row?.closest('.tree-row')?.click()
+}, name.normalize('NFC'))
 /** 알림 창의 확인을 눌러 닫습니다. */
 const readOff = async () => {
   await page.click('.dialog button:has-text("확인")')
@@ -126,6 +138,15 @@ try {
   expect('한 일이 없다고 알리지도 않음', (await told()) === null, JSON.stringify(await told()))
 
   step('3. 합치면 이름이 모아 적히고, 겹치는 것은 건너뛴다')
+  /*
+   * 고친 자리를 보고 있었다면 그 문서를 놓치지 않아야 합니다. 나뉜 이름의 문서를 하나 열어
+   * 둔 채로 합칩니다.
+   */
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(300)
+  await clickTree('나뉜 이름 1.md')
+  await page.waitForTimeout(400)
+  await openTidy()
   await page.click('button:has-text("자소 분리된 이름 합치기")')
   await page.waitForSelector('.dialog', { timeout: 8000 })
   await page.click('.dialog button:has-text("합치기")')
@@ -167,14 +188,35 @@ try {
    * 그 파일은 **사라집니다.** 이름을 고치자고 부른 일에서 무언가를 잃을 수는 없습니다.
    */
   expect('숨은 파일도 따라옴', inside.includes('.DS_Store'), JSON.stringify(inside))
+  /*
+   * 새로 고침을 사람에게 미루지 않습니다. 미뤘더니 창을 닫은 트리에는 옛 이름이 그대로
+   * 남아, 눌러도 없는 파일이었습니다.
+   */
+  const shown = await treeNames()
+  const stale = shown.filter((one) => one.normalize('NFC') !== one)
+  // 건너뛴 그 하나만 옛 꼴로 남습니다. 손대지 않았으니 당연합니다.
+  expect('트리가 새 이름으로 다시 읽힘',
+    stale.every((one) => one.normalize('NFC') === '겹치는 글.md'.normalize('NFC')), JSON.stringify(stale))
+  expect('손댄 것은 하나도 옛 이름으로 남지 않음',
+    shown.some((one) => one === '자료 묶음'.normalize('NFC')), JSON.stringify(shown))
+  // 보고 있던 문서는 새 이름을 따라갑니다.
+  const here = await picked()
+  expect('보던 문서가 새 이름을 따라감',
+    here !== null && here === '나뉜 이름 1.md'.normalize('NFC'), String(here))
 
-  step('4. 살림 파일은 목록을 보여 주고 지운다')
+  step('4. 불필요한 파일은 목록을 보여 주고 지운다')
   await page.click('button:has-text("쓸모없는 파일 지우기")')
   await page.waitForSelector('.dialog', { timeout: 8000 })
   const junkAsked = (await page.textContent('.dialog')).replace(/\s+/g, ' ')
   console.log('  ' + junkAsked.slice(0, 120))
   expect('무엇을 지울지 보여 줌', junkAsked.includes('.DS_Store'), junkAsked.slice(0, 120))
   expect('되돌릴 수 없다고 밝힘', junkAsked.includes('되돌릴 수 없습니다'), junkAsked.slice(0, 200))
+  /*
+   * "살림 파일" 은 제가 지어낸 말이라 사람들이 쓰지 않습니다. 사람이 읽는 자리에는
+   * 운영체제가 만든 것은 "불필요한 파일" 로 적습니다.
+   */
+  expect('쓰는 말로 적음',
+    junkAsked.includes('불필요한 파일') && !junkAsked.includes('살림'), junkAsked.slice(0, 200))
   await page.click('.dialog button:has-text("지우기")')
   await page.waitForTimeout(800)
   const swept = await told()
@@ -186,10 +228,10 @@ try {
   for (const junk of ['.DS_Store', 'Thumbs.db', '._숨은 자취.txt']) {
     expect(`${junk} 가 지워짐`, !left.some((one) => one.nfc === junk), JSON.stringify(left.map((one) => one.nfc)))
   }
-  // 폴더 안의 살림 파일도 함께 지웁니다.
+  // 폴더 안의 불필요한 파일도 함께 지웁니다.
   const deepLeft = await page.evaluate(() =>
     [...(window.__mockRoot._children.get('자료 묶음')?._children.keys() ?? [])])
-  expect('폴더 안의 살림 파일도 지워짐', !deepLeft.includes('.DS_Store'), JSON.stringify(deepLeft))
+  expect('폴더 안의 불필요한 파일도 지워짐', !deepLeft.includes('.DS_Store'), JSON.stringify(deepLeft))
   expect('글은 그대로 남음', deepLeft.includes('안엣글.md'), JSON.stringify(deepLeft))
 
   step('5. 더 치울 것이 없으면 찾지 못했다고 한다')
@@ -197,8 +239,10 @@ try {
   await page.waitForTimeout(600)
   const none = await told()
   console.log('  알림: ' + JSON.stringify(none))
-  // "지울 살림 파일이 없습니다" 는 무엇을 했다는 말인지 어색했습니다.
+  // "살림 파일" 은 사람들이 쓰지 않는 말이고, "없습니다" 는 무엇을 했다는 말인지 어색했습니다.
   expect('찾지 못했다고 알림', none?.title === '지울 파일을 찾을 수 없습니다', JSON.stringify(none))
+  expect('여기도 쓰는 말로 적음',
+    none.label.includes('불필요한 파일') && !none.label.includes('살림'), JSON.stringify(none))
   expect('지울지 묻지는 않음', JSON.stringify(none?.단추) === JSON.stringify(['확인']), JSON.stringify(none))
   await readOff()
   expect('닫으면 창이 사라짐', (await page.locator('.dialog').count()) === 0)

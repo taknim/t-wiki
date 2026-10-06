@@ -4,12 +4,12 @@ import { dirEntries, movePath, removeEntry } from './fsAccess'
  * 폴더 정돈.
  *
  * 밖에서 들어온 파일에는 두 가지 군더더기가 따라옵니다. 하나는 **자모가 분리된 이름**
- * (맥이 NFD 로 적습니다), 다른 하나는 **운영체제가 만든 살림 파일**(`.DS_Store` 따위)입니다.
+ * (맥이 NFD 로 적습니다), 다른 하나는 **운영체제가 만든 불필요한 파일**(`.DS_Store` 따위)입니다.
  * 앞의 것은 눈에는 같은 글자인데 찾기에서 어긋나고, 뒤의 것은 저장소에 쌓입니다.
  * 둘 다 **훑어서 보여 주고, 사람이 고른 뒤에** 손을 댑니다.
  */
 
-/** 운영체제가 만들어 두는 살림 파일. 지워도 다시 생기며 아무 뜻이 없습니다. */
+/** 운영체제가 만들어 두는 불필요한 파일. 지워도 다시 생기며 아무 뜻이 없습니다. */
 const JUNK_NAMES = new Set(['.DS_Store', 'Thumbs.db', 'desktop.ini', '.localized'])
 
 /** 맥이 압축이나 복사 때 흘리는 자취. 폴더째 또는 `._이름` 꼴로 따라옵니다. */
@@ -25,7 +25,7 @@ export function isApart(name: string): boolean {
 export interface TidyPlan {
   /** 합칠 이름들. 깊은 자리부터 담습니다 — 부모를 먼저 고치면 자식의 경로가 어긋납니다. */
   apart: { path: string; to: string }[]
-  /** 지울 살림 파일들. */
+  /** 지울 불필요한 파일들. */
   junk: { path: string; kind: 'file' | 'dir' }[]
 }
 
@@ -63,6 +63,11 @@ export interface TidyResult {
   done: number
   /** 손대지 못한 것과 그 까닭. 같은 이름이 이미 있으면 건드리지 않습니다. */
   skipped: { path: string; why: string }[]
+  /**
+   * 실제로 이름이 바뀐 자리. 트리를 다시 읽고 **보고 있던 문서와 즐겨찾기를 새 이름으로
+   * 따라가게** 하려면 어느 것이 어디로 갔는지 알아야 합니다.
+   */
+  moved: { from: string; to: string }[]
 }
 
 /**
@@ -76,6 +81,7 @@ export async function joinNames(
   items: { path: string; to: string }[],
 ): Promise<TidyResult> {
   const skipped: { path: string; why: string }[] = []
+  const moved: { from: string; to: string }[] = []
   let done = 0
 
   for (const [order, item] of items.entries()) {
@@ -107,17 +113,19 @@ export async function joinNames(
        * 제 꼴로 되돌려 적습니다. 그때 "합쳤습니다" 라고 하면 거짓말이 됩니다.
        */
       const after = await dirEntries(root, dir)
-      if (after.some((one) => one.name === name)) done += 1
-      else skipped.push({ path: item.path, why: '파일 시스템이 이름을 다시 나눠 적습니다' })
+      if (after.some((one) => one.name === name)) {
+        done += 1
+        moved.push({ from: item.path, to: item.to })
+      } else skipped.push({ path: item.path, why: '파일 시스템이 이름을 다시 나눠 적습니다' })
     } catch (cause) {
       skipped.push({ path: item.path, why: cause instanceof Error ? cause.message : String(cause) })
     }
   }
 
-  return { done, skipped }
+  return { done, skipped, moved }
 }
 
-/** 살림 파일을 지웁니다. 하나가 막혀도 나머지는 치웁니다. */
+/** 불필요한 파일을 지웁니다. 하나가 막혀도 나머지는 치웁니다. */
 export async function removeJunk(
   root: FileSystemDirectoryHandle,
   items: { path: string }[],
@@ -134,5 +142,6 @@ export async function removeJunk(
     }
   }
 
-  return { done, skipped }
+  // 지우기는 자리를 옮기지 않습니다. 그래도 트리에서 사라져야 하므로 같은 꼴로 돌려줍니다.
+  return { done, skipped, moved: [] }
 }

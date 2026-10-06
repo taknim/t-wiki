@@ -1247,6 +1247,37 @@ export default function App() {
     [dialogs, report, vault],
   )
 
+  /*
+   * 폴더 정돈이 끝난 뒤.
+   *
+   * "새로 고침을 눌러 주세요" 라고 미루지 않고 **여기서 다시 읽습니다.** 이름이 바뀐 자리는
+   * 어디서 어디로 갔는지 받아 두었으므로, 보고 있던 문서·즐겨찾기·펴 둔 폴더가 그 이름을
+   * 따라갑니다. 그러지 않으면 다시 읽은 트리에 없는 옛 경로를 쥔 채로 남습니다.
+   */
+  const handleTidied = useCallback(
+    async (moved: { from: string; to: string }[]) => {
+      await vault.refresh()
+      // 폴더가 바뀌면 그 아래 모든 경로가 함께 옮겨 갑니다.
+      const follow = (path: string): string => {
+        let at = path
+        for (const one of moved) {
+          if (at === one.from) at = one.to
+          else if (at.startsWith(`${one.from}/`)) at = one.to + at.slice(one.from.length)
+        }
+        return at
+      }
+      if (selectedPath !== null) {
+        const next = follow(selectedPath)
+        if (next !== selectedPath) setSelectedPath(next)
+      }
+      setExpanded((previous) => new Set([...previous].map(follow)))
+      let marks = favorites
+      for (const one of moved) marks = movedFavorites(marks, one.from, one.to)
+      if (marks !== favorites) applyFavorites(marks)
+    },
+    [applyFavorites, favorites, selectedPath, vault],
+  )
+
   const handleRename = useCallback(
     async (path: string) => {
       const current = fileNameOf(path)
@@ -1891,7 +1922,7 @@ export default function App() {
                     : <span className="pill">읽기 전용</span>
                 )}
                 {/*
-                  앱이 쓰는 살림 파일입니다. 트리에는 감춰 두었지만 동기화 결과에서는
+                  앱이 쓰는 내부 파일입니다. 트리에는 감춰 두었지만 동기화 결과에서는
                   이름이 나오고, 그 이름을 눌러 여기까지 올 수 있습니다.
                   손대면 즐겨찾기가 통째로 흐트러지므로 열자마자 눈에 띄게 알립니다.
                 */}
@@ -2078,6 +2109,7 @@ export default function App() {
           sync={sync}
           vaultName={vault.vaultName ?? null}
           vaultRoot={vault.root}
+          onTidied={handleTidied}
           sidebarOpen={sidebarOpen}
           onSidebarOpen={applySidebarOpen}
           sidebarWidth={sidebarWidth}

@@ -17,7 +17,7 @@ export function fileNameOf(path: string): string {
  * 앱이 폴더 안에 두는 파일.
  *
  * 즐겨찾기를 여기에 적어 두면 GitHub 동기화를 타고 다른 기기로도 따라갑니다.
- * 트리에는 보이지 않습니다. 사람이 열어 고칠 파일이 아니라 앱이 쓰는 살림입니다.
+ * 트리에는 보이지 않습니다. 사람이 열어 고칠 파일이 아니라 앱이 쓰는 내부 파일입니다.
  * 점으로 시작하지 않는 것은 그러면 동기화에서도 빠지기 때문입니다.
  */
 export const FAVORITES_FILE = '_t-wiki.favorites.json'

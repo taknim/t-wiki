@@ -134,7 +134,7 @@ async function walk(
     })
 
     // 아는 형식만 트리에 보여 줍니다. 그래야 목록이 잡동사니로 넘치지 않습니다.
-    // 앱이 두는 살림 파일은 목록에서 빼되, 위 assets 에는 남아 동기화는 됩니다.
+    // 앱이 두는 내부 파일은 목록에서 빼되, 위 assets 에는 남아 동기화는 됩니다.
     if (isAttachment(name) && !isAppFile(path)) {
       children.push({ kind: 'file', name, path, lastModified: file.lastModified, size: file.size })
     }
