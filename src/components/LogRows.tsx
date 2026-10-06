@@ -1,13 +1,16 @@
 import { Fragment } from 'react'
-import type { GitHubConfig, SyncLogLine } from '../types'
-import { commitUrl } from '../lib/github/links'
+import type { SyncLogLine } from '../types'
 import { ACTION_LABEL, splitCommitSha } from './syncLabels'
 
 interface LogRowsProps {
   lines: SyncLogLine[]
-  /** 이 회차가 남긴 커밋. 줄 끝에 붙은 이름을 그 커밋으로 가는 길로 바꿉니다. */
+  /**
+   * 이 회차가 남긴 커밋. 줄 끝에 붙은 그 이름을 **떼어 냅니다.**
+   *
+   * 한 회차의 줄은 모두 같은 커밋에서 났으므로 줄마다 적으면 같은 일곱 글자가
+   * 수십 번 되풀이됩니다. 이름은 회차 머리줄(동기화 일시가 있는 줄)에 한 번만 답니다.
+   */
   commitSha: string | null
-  config: GitHubConfig
   /** 경로를 눌러 그 파일로 갈 수 있게 합니다. 지운 줄에는 걸지 않습니다. */
   onOpen: (path: string) => void
   /** 경로 가운데 폴더 이름을 눌렀을 때. 지운 줄에도 겁니다. 담고 있던 폴더는 남아 있습니다. */
@@ -76,13 +79,12 @@ function PathTrail({
  *
  * 결과 창과 지난 기록이 같은 줄을 그립니다. 두 벌로 두면 한쪽만 고치게 됩니다.
  */
-export function LogRows({ lines, commitSha, config, onOpen, onOpenDir }: LogRowsProps) {
-  const href = commitUrl(config, commitSha)
-
+export function LogRows({ lines, commitSha, onOpen, onOpenDir }: LogRowsProps) {
   return (
     <ul className="plan">
       {lines.map((line, position) => {
-        const { text, sha } = splitCommitSha(line.detail, commitSha)
+        // 커밋 이름은 떼어 버립니다(머리줄에 한 번 적힙니다). 남는 것은 까닭뿐입니다.
+        const { text } = splitCommitSha(line.detail, commitSha)
         return (
           <li
             key={`${line.path}-${position}`}
@@ -95,29 +97,7 @@ export function LogRows({ lines, commitSha, config, onOpen, onOpenDir }: LogRows
               onOpen={onOpen}
               onOpenDir={onOpenDir}
             />
-            {(text || sha) && (
-              <span className="plan-reason">
-                {text}
-                {sha && (
-                  <>
-                    {text && ' · '}
-                    {href ? (
-                      <a
-                        className="commit-link"
-                        href={href}
-                        target="_blank"
-                        rel="noreferrer noopener"
-                        data-tip={`${sha.slice(0, 7)} 커밋을 GitHub 에서 새 탭으로 엽니다`}
-                      >
-                        {sha.slice(0, 7)}
-                      </a>
-                    ) : (
-                      sha.slice(0, 7)
-                    )}
-                  </>
-                )}
-              </span>
-            )}
+            {text && <span className="plan-reason">{text}</span>}
           </li>
         )
       })}

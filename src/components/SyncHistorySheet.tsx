@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { GitHubConfig, SyncRun } from '../types'
-import { commitsUrl } from '../lib/github/links'
+import { commitsUrl, commitUrl } from '../lib/github/links'
 import { MAX_SYNC_HISTORY } from '../lib/store'
 import { useEscapeClose } from '../hooks/useEscapeClose'
 import { LogRows } from './LogRows'
@@ -91,20 +91,43 @@ export function SyncHistorySheet({
               {shown.map((run) => {
                 const open = opened === run.at
                 const failures = run.log.filter((line) => line.status === 'error').length
+                const href = commitUrl(config, run.commitSha)
                 return (
                   <li key={run.at} className="run">
-                    <button
-                      type="button"
-                      className="run-open"
-                      aria-expanded={open}
-                      onClick={() => setOpened(open ? null : run.at)}
-                    >
-                      <span className="run-when">{when(run.at)}</span>
-                      <span className="run-trigger">{run.trigger === 'auto' ? '자동' : '직접'}</span>
-                      <span className={run.error || failures > 0 ? 'run-sum is-bad' : 'run-sum'}>
-                        {run.error ?? summarizeLog(run.log)}
-                      </span>
-                    </button>
+                    {/*
+                      커밋 이름은 **머리줄 오른쪽 끝에 한 번만** 답니다. 한 회차의 줄은 모두
+                      같은 커밋에서 나므로 줄마다 적으면 같은 일곱 글자가 수십 번 되풀이됩니다.
+                      펴는 단추 안에 넣지 않은 까닭은, 링크를 누르면 회차가 함께 접혀서입니다.
+                    */}
+                    <div className="run-head">
+                      <button
+                        type="button"
+                        className="run-open"
+                        aria-expanded={open}
+                        onClick={() => setOpened(open ? null : run.at)}
+                      >
+                        <span className="run-when">{when(run.at)}</span>
+                        <span className="run-trigger">{run.trigger === 'auto' ? '자동' : '직접'}</span>
+                        <span className={run.error || failures > 0 ? 'run-sum is-bad' : 'run-sum'}>
+                          {run.error ?? summarizeLog(run.log)}
+                        </span>
+                      </button>
+                      {run.commitSha && (
+                        href ? (
+                          <a
+                            className="commit-link run-commit"
+                            href={href}
+                            target="_blank"
+                            rel="noreferrer noopener"
+                            data-tip={`${run.commitSha.slice(0, 7)} 커밋을 GitHub 에서 새 탭으로 엽니다`}
+                          >
+                            {run.commitSha.slice(0, 7)}
+                          </a>
+                        ) : (
+                          <span className="run-commit">{run.commitSha.slice(0, 7)}</span>
+                        )
+                      )}
+                    </div>
 
                     {open && (
                       run.log.length === 0 ? (
@@ -124,7 +147,6 @@ export function SyncHistorySheet({
                           <LogRows
                             lines={run.log}
                             commitSha={run.commitSha}
-                            config={config}
                             onOpen={onOpen}
                             onOpenDir={onOpenDir}
                           />

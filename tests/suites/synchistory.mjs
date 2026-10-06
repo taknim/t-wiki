@@ -80,20 +80,16 @@ const rows = () => page.evaluate(() => [...document.querySelectorAll('.run')].ma
   sum: li.querySelector('.run-sum')?.textContent ?? '',
 })))
 
-/** 펼친 회차의 첫 줄. 커밋 이름은 이 줄 안에 있어야 합니다. */
+/** 펼친 회차의 첫 줄. 커밋 이름은 이 줄에 **없어야** 합니다(머리줄에 한 번만 적습니다). */
 const firstLine = () => page.evaluate(() => {
   const row = document.querySelector('.run .plan li')
   if (!row) return null
   const path = row.querySelector('.plan-path')
   const reason = row.querySelector('.plan-reason')
-  const link = row.querySelector('.plan-reason .commit-link')
   return {
     path: path?.textContent ?? '',
     reason: reason?.textContent ?? '',
-    sha: link?.textContent ?? null,
-    href: link?.getAttribute('href') ?? null,
-    target: link?.getAttribute('target') ?? null,
-    rel: link?.getAttribute('rel') ?? null,
+    줄안링크: row.querySelectorAll('.commit-link').length,
     // 까닭은 경로 **아래**에 섭니다. 윗변이 더 아래면 줄이 내려간 것입니다.
     belowPath: path && reason
       ? reason.getBoundingClientRect().top >= path.getBoundingClientRect().bottom - 1
@@ -163,6 +159,25 @@ const seedRun = (run) => page.evaluate(async (one) => {
   })
 }, run)
 
+/** 회차 머리줄 오른쪽에 달린 커밋 이름. */
+const headCommit = () => page.evaluate(() => {
+  const head = document.querySelector('.run .run-head')
+  const link = head?.querySelector('.commit-link') ?? null
+  const button = head?.querySelector('.run-open') ?? null
+  return {
+    sha: link?.textContent ?? null,
+    href: link?.getAttribute('href') ?? null,
+    target: link?.getAttribute('target') ?? null,
+    rel: link?.getAttribute('rel') ?? null,
+    // 요약 뒤, 줄의 오른쪽 끝에 서야 합니다.
+    오른쪽: link && button
+      ? link.getBoundingClientRect().left >= button.getBoundingClientRect().right - 1
+      : false,
+    // 펴는 단추 **밖에** 있어야 누를 때 회차가 접히지 않습니다.
+    단추밖: link ? button?.contains(link) === false : false,
+  }
+})
+
 try {
   await page.goto(process.env.APP_URL ?? 'http://localhost:5173', { waitUntil: 'domcontentloaded' })
 
@@ -180,8 +195,16 @@ try {
   expect('한 줄이 생김', one.length === 1, JSON.stringify(one))
   expect('무엇이 올라갔는지 적힘', /올림 \d+/.test(one[0].sum), JSON.stringify(one[0]))
   expect('직접 돌린 것으로 셈', one[0].trigger === '직접', JSON.stringify(one[0]))
-  const headLinks = await page.locator('.run .commit-link').count()
-  expect('머리줄에는 커밋 링크가 없음', headLinks === 0, String(headLinks))
+  /*
+   * 커밋 이름은 머리줄에 **한 번만** 섭니다. 줄마다 달았더니 한 회차의 줄이 모두 같은
+   * 커밋에서 나는 터라 같은 일곱 글자가 수십 번 되풀이되었습니다.
+   */
+  const head = await headCommit()
+  console.log('  머리줄: ' + JSON.stringify(head))
+  expect('머리줄에 커밋이 한 번 적힘',
+    (await page.locator('.run .commit-link').count()) === 1, JSON.stringify(head))
+  expect('줄의 오른쪽 끝에 섬', head.오른쪽, JSON.stringify(head))
+  expect('펴는 단추 밖에 있음', head.단추밖, JSON.stringify(head))
   await page.screenshot({ path: join(HERE, '..', 'shots', 'synchistory', '01-one.png') })
 
   step('3. 회차를 누르면 오간 파일이 펴진다')
@@ -210,16 +233,17 @@ try {
   expect('마지막 줄에는 밑줄이 없음', edges.width === '0px', JSON.stringify(edges))
   await page.screenshot({ path: join(HERE, '..', 'shots', 'synchistory', '02-open.png') })
 
-  step('4. 그 줄의 커밋 이름이 커밋으로 가는 길이다')
-  expect('커밋 이름이 줄 안에 있음',
-    line.sha !== null && github.headSha.startsWith(line.sha), line.sha + ' vs ' + github.headSha)
+  step('4. 머리줄의 커밋 이름이 커밋으로 가는 길이다')
+  expect('그 회차의 커밋임',
+    head.sha !== null && github.headSha.startsWith(head.sha), head.sha + ' vs ' + github.headSha)
   expect('그 커밋으로 감',
-    line.href === 'https://github.com/tester/wiki/commit/' + github.headSha, String(line.href))
-  expect('새 탭으로 열림', line.target === '_blank', String(line.target))
-  expect('opener 를 넘기지 않음', String(line.rel).includes('noopener'), String(line.rel))
-  // 링크로 바꾼 자리에 글자가 남아 두 번 적히면 안 됩니다.
-  expect('이름이 한 번만 적힘',
-    (line.reason.match(new RegExp(line.sha ?? 'x', 'g')) ?? []).length === 1, line.reason)
+    head.href === 'https://github.com/tester/wiki/commit/' + github.headSha, String(head.href))
+  expect('새 탭으로 열림', head.target === '_blank', String(head.target))
+  expect('opener 를 넘기지 않음', String(head.rel).includes('noopener'), String(head.rel))
+  // 줄마다 되풀이되던 자리입니다. 까닭만 남고 이름은 흔적도 없어야 합니다.
+  expect('오간 줄에는 커밋 이름이 없음', line.줄안링크 === 0, JSON.stringify(line))
+  expect('까닭에 글자로도 남지 않음',
+    head.sha !== null && !line.reason.includes(head.sha), line.reason)
 
   step('5. 자세히 보기는 그 저장소의 커밋 목록으로 간다')
   const link = await detailLink()

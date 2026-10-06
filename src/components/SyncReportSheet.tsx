@@ -1,6 +1,7 @@
 import type { GitHubConfig } from '../types'
 import type { SyncReport } from '../hooks/useGitHubSync'
 import { displayPath } from '../lib/paths'
+import { commitUrl } from '../lib/github/links'
 import { useEscapeClose } from '../hooks/useEscapeClose'
 import { LogRows } from './LogRows'
 import { ACTION_LABEL, failureFacts } from './syncLabels'
@@ -22,6 +23,7 @@ export function SyncReportSheet({
   // 설정 창 위에 떠 있을 때가 많습니다. Esc 는 위에 있는 이쪽부터 닫습니다.
   useEscapeClose(onClose)
 
+  const commitHref = commitUrl(config, report.commitSha)
   const failures = report.log.filter((line) => line.status === 'error')
   const changed = report.plan.filter((item) => item.action !== 'skip')
 
@@ -54,10 +56,31 @@ export function SyncReportSheet({
         </header>
 
         <div className="sheet-body">
+          {/*
+            커밋 이름은 이 첫 줄에만 둡니다. 아래 목록의 줄들은 모두 같은 커밋에서 나므로
+            줄마다 적으면 같은 일곱 글자가 수십 번 되풀이됩니다.
+          */}
           <p className="hint" style={{ marginTop: 0 }}>
             {new Date(report.at).toLocaleString('ko-KR')}
             {report.trigger === 'auto' ? ' · 자동 동기화' : ' · 직접 실행'}
-            {report.commitSha && ` · 커밋 ${report.commitSha.slice(0, 7)}`}
+            {report.commitSha && (
+              <>
+                {' · 커밋 '}
+                {commitHref ? (
+                  <a
+                    className="commit-link"
+                    href={commitHref}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    data-tip={`${report.commitSha.slice(0, 7)} 커밋을 GitHub 에서 새 탭으로 엽니다`}
+                  >
+                    {report.commitSha.slice(0, 7)}
+                  </a>
+                ) : (
+                  report.commitSha.slice(0, 7)
+                )}
+              </>
+            )}
           </p>
 
           {report.error && (
@@ -148,7 +171,6 @@ export function SyncReportSheet({
               <LogRows
                 lines={report.log}
                 commitSha={report.commitSha}
-                config={config}
                 onOpen={onOpen}
                 onOpenDir={onOpenDir}
               />
