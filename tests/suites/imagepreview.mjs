@@ -46,7 +46,15 @@ const pickImage = async () => {
     await page.waitForTimeout(300)
   }
   await page.click('.tree-row:has-text("도표")')
-  await page.waitForTimeout(600)
+  /*
+   * 넉넉히 기다리는 대신 **그림 자리가 설 때까지** 기다립니다. 600밀리초로 두었더니 여럿이
+   * 한꺼번에 돌 때 아직 아무것도 뜨지 않은 자리를 재어 `{image:null, note:null}` 로 넘어졌습니다.
+   */
+  await page.waitForFunction(
+    () => document.querySelector('.asset-image') !== null || document.querySelector('.asset-note') !== null,
+    undefined,
+    { timeout: 10000 },
+  )
 }
 const setPreview = async (on) => {
   await page.click('button[aria-label="설정"]')
