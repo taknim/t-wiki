@@ -1220,8 +1220,12 @@ mark { background: var(--mark); color: inherit; border-radius: 2px; }
   white-space: nowrap;
 }
 .run-sum.is-bad { color: var(--danger); }
-/* 커밋 이름은 머리줄 오른쪽 끝에 섭니다. 요약이 길어도 자리를 빼앗기지 않습니다. */
-.run-commit { flex: 0 0 auto; padding-right: 4px; font-size: 12px; white-space: nowrap; }
+/*
+ * 커밋 이름은 머리줄 오른쪽 끝에 섭니다. 요약이 길어도 자리를 빼앗기지 않습니다.
+ * 오른쪽 틈은 **바깥 여백**으로 둡니다. 안쪽 여백으로 두면 링크 밑줄이 글자보다
+ * 네 픽셀 더 길게 그어집니다.
+ */
+.run-commit { flex: 0 0 auto; margin-right: 4px; font-size: 12px; white-space: nowrap; }
 .run .plan { margin-bottom: 8px; }
 .run .panel-empty { margin: 0 0 8px 4px; }
 

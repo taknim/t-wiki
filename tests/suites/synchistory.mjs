@@ -175,6 +175,17 @@ const headCommit = () => page.evaluate(() => {
       : false,
     // 펴는 단추 **밖에** 있어야 누를 때 회차가 접히지 않습니다.
     단추밖: link ? button?.contains(link) === false : false,
+    /*
+     * 밑줄이 글자 폭만큼만 그어지는지. 오른쪽 틈을 안쪽 여백으로 두었더니 밑줄이
+     * 글자보다 길게 삐져나왔습니다. 틈은 바깥 여백으로 둡니다.
+     */
+    밑줄폭: link ? Math.round(link.getBoundingClientRect().width) : null,
+    글자폭: (() => {
+      if (!link) return null
+      const range = document.createRange()
+      range.selectNodeContents(link)
+      return Math.round(range.getBoundingClientRect().width)
+    })(),
   }
 })
 
@@ -205,6 +216,7 @@ try {
     (await page.locator('.run .commit-link').count()) === 1, JSON.stringify(head))
   expect('줄의 오른쪽 끝에 섬', head.오른쪽, JSON.stringify(head))
   expect('펴는 단추 밖에 있음', head.단추밖, JSON.stringify(head))
+  expect('밑줄이 글자 폭을 넘지 않음', head.밑줄폭 === head.글자폭, JSON.stringify(head))
   await page.screenshot({ path: join(HERE, '..', 'shots', 'synchistory', '01-one.png') })
 
   step('3. 회차를 누르면 오간 파일이 펴진다')
