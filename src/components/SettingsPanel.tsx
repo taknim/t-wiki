@@ -163,12 +163,15 @@ export function SettingsPanel({
         setTidyTold({ text: '자모가 나뉜 이름은 없습니다.' })
         return
       }
-      const sample = plan.apart.slice(0, 5).map((one) => `· ${one.path.normalize('NFC')}`).join('\n')
-      const more = plan.apart.length > 5 ? `\n… 그 밖에 ${plan.apart.length - 5}개` : ''
+      /*
+       * 바뀔 것을 **모두** 적습니다. 몇 줄만 보여 주고 접으면 정작 무엇이 바뀌는지 알 수
+       * 없습니다. 길면 묻는 칸 안에서 굴려 봅니다.
+       */
+      const listing = plan.apart.map((one) => `· ${one.path.normalize('NFC')}`).join('\n')
       const go = await dialogs.confirm({
         title: `이름 ${plan.apart.length}개를 모아 적을까요?`,
-        label: `${sample}${more}\n\n`
-          + '글자는 그대로이고 적는 방식만 바뀝니다. 같은 이름이 이미 있으면 건너뜁니다.',
+        label: '글자는 그대로이고 적는 방식만 바뀝니다. 같은 이름이 이미 있으면 건너뜁니다.\n\n'
+          + listing,
         confirmText: '합치기',
       })
       if (!go) return
@@ -195,12 +198,13 @@ export function SettingsPanel({
         setTidyTold({ text: '지울 살림 파일이 없습니다.' })
         return
       }
-      const sample = plan.junk.slice(0, 5).map((one) => `· ${one.path}`).join('\n')
-      const more = plan.junk.length > 5 ? `\n… 그 밖에 ${plan.junk.length - 5}개` : ''
+      // 지울 것도 모두 적습니다. 지우는 일에서 "그 밖에 N개" 로 접는 것은 더더욱 안 됩니다.
+      const listing = plan.junk.map((one) => `· ${one.path}`).join('\n')
       const go = await dialogs.confirm({
         title: `${plan.junk.length}개를 지울까요?`,
-        label: `${sample}${more}\n\n운영체제가 만든 살림 파일입니다. 휴지통을 거치지 않고 바로`
-          + ' 지우며 되돌릴 수 없습니다. 지워도 운영체제가 필요할 때 다시 만듭니다.',
+        label: '운영체제가 만든 살림 파일입니다. 휴지통을 거치지 않고 바로 지우며 되돌릴 수'
+          + ' 없습니다. 지워도 운영체제가 필요할 때 다시 만듭니다.\n\n'
+          + listing,
         confirmText: '지우기',
         danger: true,
       })
