@@ -165,8 +165,8 @@ export function SettingsPanel({
       const plan = await scanTidy(vaultRoot)
       if (plan.apart.length === 0) {
         await dialogs.tell({
-          title: '합칠 이름을 찾을 수 없습니다',
-          label: '이 폴더의 이름은 모두 모아 적혀 있습니다.',
+          title: '파일을 찾을 수 없습니다',
+          label: '자소 분리된 파일 이름이 없습니다.',
         })
         return
       }
@@ -215,8 +215,8 @@ export function SettingsPanel({
       const plan = await scanTidy(vaultRoot)
       if (plan.junk.length === 0) {
         await dialogs.tell({
-          title: '지울 파일을 찾을 수 없습니다',
-          label: '이 폴더에는 운영체제가 만든 불필요한 파일이 없습니다.',
+          title: '파일을 찾을 수 없습니다',
+          label: '운영체제가 만든 불필요한 파일이 없습니다.',
         })
         return
       }
@@ -1081,7 +1081,7 @@ export function SettingsPanel({
                   data-tip="자모가 나뉘어 적힌 이름을 찾아 모아 적습니다"
                   onClick={() => void joinApartNames()}
                 >
-                  {busy === 'apart' ? '훑는 중…' : '자소 분리된 이름 합치기'}
+                  {busy === 'apart' ? '훑는 중…' : '자소 분리된 파일 이름 합치기'}
                 </button>
                 <button
                   type="button"

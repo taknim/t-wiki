@@ -95,7 +95,7 @@ try {
 
   step('1. 자모가 나뉜 이름을 찾아 몇 개인지 먼저 묻는다')
   await openTidy()
-  await page.click('button:has-text("자소 분리된 이름 합치기")')
+  await page.click('button:has-text("자소 분리된 파일 이름 합치기")')
   await page.waitForSelector('.dialog', { timeout: 8000 })
   const asked = (await page.textContent('.dialog')).replace(/\s+/g, ' ')
   console.log('  ' + asked.slice(0, 110))
@@ -147,7 +147,7 @@ try {
   await clickTree('나뉜 이름 1.md')
   await page.waitForTimeout(400)
   await openTidy()
-  await page.click('button:has-text("자소 분리된 이름 합치기")')
+  await page.click('button:has-text("자소 분리된 파일 이름 합치기")')
   await page.waitForSelector('.dialog', { timeout: 8000 })
   await page.click('.dialog button:has-text("합치기")')
   await page.waitForTimeout(800)
@@ -240,12 +240,28 @@ try {
   const none = await told()
   console.log('  알림: ' + JSON.stringify(none))
   // "살림 파일" 은 사람들이 쓰지 않는 말이고, "없습니다" 는 무엇을 했다는 말인지 어색했습니다.
-  expect('찾지 못했다고 알림', none?.title === '지울 파일을 찾을 수 없습니다', JSON.stringify(none))
+  expect('찾지 못했다고 알림', none?.title === '파일을 찾을 수 없습니다', JSON.stringify(none))
   expect('여기도 쓰는 말로 적음',
     none.label.includes('불필요한 파일') && !none.label.includes('살림'), JSON.stringify(none))
   expect('지울지 묻지는 않음', JSON.stringify(none?.단추) === JSON.stringify(['확인']), JSON.stringify(none))
   await readOff()
   expect('닫으면 창이 사라짐', (await page.locator('.dialog').count()) === 0)
+
+  step('6. 합칠 이름이 없을 때도 같은 말로 알린다')
+  // 일부러 건너뛴 그 하나를 치워, 나뉜 이름이 하나도 없는 자리를 만듭니다.
+  await page.evaluate(() => {
+    for (const name of [...window.__mockRoot._children.keys()]) {
+      if (name.normalize('NFC') !== name) window.__mockRoot._children.delete(name)
+    }
+  })
+  await page.click('button:has-text("자소 분리된 파일 이름 합치기")')
+  await page.waitForTimeout(600)
+  const noApart = await told()
+  console.log('  알림: ' + JSON.stringify(noApart))
+  expect('찾지 못했다고 알림', noApart?.title === '파일을 찾을 수 없습니다', JSON.stringify(noApart))
+  expect('무엇이 없는지 밝힘',
+    noApart.label === '자소 분리된 파일 이름이 없습니다.', JSON.stringify(noApart))
+  await readOff()
 } catch (cause) {
   fail('묶음이 도중에 멈춤', cause instanceof Error ? (cause.stack ?? cause.message) : String(cause))
 } finally {
