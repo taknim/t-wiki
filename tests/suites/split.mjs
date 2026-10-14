@@ -160,7 +160,12 @@ try {
   expect('Shift 는 8%', bigStep.saved === '56', String(bigStep.saved))
 
   step('7. 새로고침해도 그 몫으로 열린다')
-  await page.reload({ waitUntil: 'domcontentloaded' })
+  /*
+   * 틀이 다 선 뒤에 만집니다. `domcontentloaded` 만 기다리고 곧바로 재면, 아직 걸음을
+   * 내딛는 중인 쪽과 겹쳐 "실행 자리가 사라졌다" 며 묶음이 통째로 멈춥니다.
+   */
+  await page.reload({ waitUntil: 'load' })
+  await page.waitForSelector('button:has-text("폴더 열기")', { timeout: 10000 })
   await openVault()
   await openDoc('개발 환경')
   const kept = await panes()
