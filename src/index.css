@@ -770,6 +770,45 @@ mark { background: var(--mark); color: inherit; border-radius: 2px; }
  * 거울은 글상자와 같은 자리에 같은 폭으로 놓되 보이지 않습니다.
  * 글상자의 왼쪽 여백(20px)과 오른쪽 여백을 똑같이 두어 접히는 자리가 같게 합니다.
  */
+/*
+ * 색칠. 글상자 밑에 깔려 사람이 실제로 보는 글자가 되는 칸입니다.
+ *
+ * 글꼴·크기·줄 간격·여백·접는 방식이 글상자와 **한 치도 달라서는 안 됩니다.** 어긋나면
+ * 커서가 글자 사이에 서지 않습니다. 그래서 거울과 똑같은 값을 쓰고, 자리와 여백은
+ * 글상자를 재서 스크립트가 맞춥니다.
+ */
+.editor-paint {
+  position: absolute;
+  inset-block-start: 0;
+  margin: 0;
+  box-sizing: border-box;
+  overflow: hidden;
+  pointer-events: none;
+  background: var(--bg);
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: var(--doc-leading, 1.7);
+  tab-size: 2;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+.editor-paint code {
+  font: inherit;
+  padding: 0;
+  background: none;
+  white-space: inherit;
+  overflow-wrap: inherit;
+}
+/*
+ * 글자는 색칠이 맡고 글상자에는 **커서와 선택만** 남깁니다. 바탕까지 투명하게 두지 않으면
+ * 밑의 색칠이 가려집니다.
+ */
+.editor-frame.has-paint .editor {
+  position: relative;
+  background: transparent;
+  color: transparent;
+  caret-color: var(--text);
+}
 .editor-mirror {
   position: absolute;
   inset-block-start: 0;

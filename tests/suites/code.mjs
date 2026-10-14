@@ -38,6 +38,28 @@ const preview = () => page.evaluate(() => ({
   modes: document.querySelectorAll('.mode-switch button').length,
   text: document.querySelector('.main .code-preview')?.textContent ?? '',
 }))
+/** 고치는 자리의 색칠. 글상자와 한 치도 어긋나지 않아야 커서가 글자 사이에 섭니다. */
+const paint = () => page.evaluate(() => {
+  const area = document.querySelector('.main .editor')
+  const glass = document.querySelector('.main .editor-paint')
+  if (!area || !glass) return { 색칠: false }
+  const a = area.getBoundingClientRect()
+  const b = glass.getBoundingClientRect()
+  const look = getComputedStyle(area)
+  const mine = getComputedStyle(glass)
+  return {
+    색칠: true,
+    낱말: glass.querySelectorAll('.hljs-keyword').length,
+    글자: glass.textContent.replace(/\n$/, ''),
+    글상자글: area.value,
+    // 글상자의 글자는 보이지 않아야 합니다. 보이면 색칠과 두 겹으로 겹쳐 보입니다.
+    글상자색: look.color,
+    포갬: Math.abs(a.left - b.left) < 1 && Math.abs(a.top - b.top) < 1
+      && Math.abs(a.width - b.width) < 2,
+    같은꼴: look.fontFamily === mine.fontFamily && look.fontSize === mine.fontSize
+      && look.lineHeight === mine.lineHeight && look.paddingLeft === mine.paddingLeft,
+  }
+})
 
 try {
   await page.goto(process.env.APP_URL ?? 'http://localhost:5173', { waitUntil: 'domcontentloaded' })
@@ -70,26 +92,73 @@ try {
   await page.click('.mode-switch button[aria-label="편집"]')
   await page.waitForTimeout(400)
 
-  step('1. SQL 이 트리에 보이고, 편집기와 문법 강조 미리보기가 나란히 선다')
+  step('1. SQL 이 트리에 보이고, 미리보기에서 문법 강조로 선다')
   expect('트리에 있음', (await page.locator('.tree-row:has-text("질의.sql")').count()) === 1)
   await page.click('.tree-row:has-text("질의.sql") .tree-name')
   await page.waitForSelector('.main .editor', { timeout: 8000 })
-  await page.click('.mode-switch button[aria-label="나란히"]')
+  await page.click('.mode-switch button[aria-label="미리보기"]')
   await page.waitForTimeout(1500)
   const sql = await preview()
   console.log('  ' + JSON.stringify({ ...sql, text: sql.text.slice(0, 40) }))
-  expect('편집기와 미리보기가 함께', sql.editor && sql.code && sql.modes === 3, JSON.stringify(sql))
+  /*
+   * 나란히는 두지 않습니다. 양쪽에 같은 글이 서고 색만 다른데, 그 색은 이제 고치는
+   * 자리에서도 입습니다. 두 벌로 벌려 놓으면 읽을 자리만 반으로 줄어듭니다.
+   */
+  expect('고를 수 있는 모드는 둘', sql.modes === 2, JSON.stringify(sql))
   expect('SQL 예약어가 강조됨', sql.keywords >= 4 && sql.strings >= 1, JSON.stringify(sql))
   expect('실행하지 않고 글 그대로', sql.text.includes('SELECT id, name FROM users'), sql.text)
   await page.screenshot({ path: join(HERE, '..', 'shots', 'code', '01-sql.png'), clip: { x: 440, y: 60, width: 860, height: 260 } })
 
-  step('2. 고쳐 쓰면 저장되고 미리보기도 따라온다')
+  step('1-2. 고치는 자리에도 같은 색이 입는다')
+  await page.click('.mode-switch button[aria-label="편집"]')
+  await page.waitForTimeout(1200)
+  const painted = await paint()
+  console.log('  ' + JSON.stringify({ ...painted, 글자: painted.글자?.slice(0, 40), 글상자글: undefined }))
+  expect('색칠이 깔림', painted.색칠 && painted.낱말 >= 4, JSON.stringify(painted.낱말))
+  expect('글상자와 같은 글', painted.글자 === painted.글상자글, painted.글자?.slice(0, 60))
+  expect('글상자 글자는 비침', painted.글상자색 === 'rgba(0, 0, 0, 0)', String(painted.글상자색))
+  expect('글 자리가 포개짐', painted.포갬, JSON.stringify(painted))
+  expect('글꼴·줄 간격·여백이 같음', painted.같은꼴, JSON.stringify(painted))
+  await page.screenshot({ path: join(HERE, '..', 'shots', 'code', '02-edit.png'), clip: { x: 440, y: 60, width: 860, height: 260 } })
+
+  step('1-3. 줄 번호를 켜도 색칠이 글과 어긋나지 않는다')
+  /*
+   * 번호 칸이 서면 글상자의 왼쪽 여백만 넓어집니다. 색칠이 그 여백을 따라가지 않으면
+   * 글자가 번호 위로 밀려 커서와 어긋납니다.
+   */
+  await page.evaluate(() => {
+    const look = JSON.parse(localStorage.getItem('mdwiki:theme') ?? '{}')
+    localStorage.setItem('mdwiki:theme', JSON.stringify({ ...look, lineNumbers: true }))
+  })
+  await page.reload({ waitUntil: 'load' })
+  await page.waitForSelector('button:has-text("폴더 열기")', { timeout: 10000 })
+  await page.click('button:has-text("폴더 열기")')
+  await page.waitForSelector('.tree', { timeout: 10000 })
+  await page.click('.tree-row:has-text("질의.sql") .tree-name')
+  await page.waitForSelector('.main .editor', { timeout: 8000 })
+  await page.waitForTimeout(1200)
+  const numbered = await paint()
+  console.log('  ' + JSON.stringify({ 포갬: numbered.포갬, 같은꼴: numbered.같은꼴, 낱말: numbered.낱말 }))
+  expect('번호 칸이 섰음', (await page.locator('.main .editor-gutter').count()) === 1)
+  expect('그래도 포개짐', numbered.포갬 && numbered.같은꼴, JSON.stringify(numbered))
+  expect('색도 그대로', numbered.낱말 >= 4, String(numbered.낱말))
+
+  step('2. 고쳐 쓰면 글자만 저장되고 색칠도 따라온다')
   await page.click('.main .editor')
   await page.keyboard.press('End')
   await page.keyboard.type(' LIMIT 10;')
   await page.waitForTimeout(1500)
   const saved = await page.evaluate(() => window.__vaultText('질의.sql'))
   expect('파일에 저장됨', saved.includes('LIMIT 10'), saved)
+  /*
+   * 색은 밑에 깔린 칸이 입는 것이고 파일에 들어가는 것은 글자뿐입니다.
+   * 색칠한 조각이 파일에 섞이면 그 파일은 더 이상 그 코드가 아닙니다.
+   */
+  expect('파일에는 색칠이 섞이지 않음',
+    !saved.includes('<span') && !saved.includes('hljs'), saved.slice(0, 120))
+  expect('색칠도 따라옴', (await paint()).글자.includes('LIMIT 10'))
+  await page.click('.mode-switch button[aria-label="미리보기"]')
+  await page.waitForTimeout(900)
   expect('미리보기도 바뀜', (await preview()).text.includes('LIMIT 10'))
 
   step('3. 다른 언어도 제 강조기로 읽는다')

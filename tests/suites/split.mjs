@@ -193,6 +193,8 @@ try {
   await page.waitForTimeout(900)
   await page.fill('.editor', '이름,값\n하나,1\n')
   await page.waitForTimeout(900)
+  // 갓 만든 파일은 쓰라고 편집으로 열립니다. 나란히는 그 뒤에 골라 봅니다.
+  await setMode('나란히')
   const csv = await panes()
   console.log('  ' + JSON.stringify(csv))
   expect('첨부에도 손잡이가 있음', (await page.locator('.split-resizer').count()) === 1)

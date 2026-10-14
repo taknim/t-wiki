@@ -46,7 +46,7 @@ import { readTrashPolicy } from './lib/saveOptions'
 import type { TrashItem } from './lib/trash'
 import { entryKind, readFile } from './lib/fsAccess'
 import { DEFAULT_VIEW_MODE, loadSession, saveSession } from './lib/session'
-import { formatTidyFor, textPreviewKind, trimWhitespace } from './lib/textPreview'
+import { formatTidyFor, highlightLanguage, textPreviewKind, trimWhitespace } from './lib/textPreview'
 import { isBigText } from './lib/bigText'
 import {
   clampSidebarWidth, DEFAULT_SIDEBAR_WIDTH, maxSidebarWidth, MIN_SIDEBAR_WIDTH,
@@ -101,6 +101,8 @@ export default function App() {
   const [editedAt, setEditedAt] = useState(0)
   const [autoSave, setAutoSave] = useState<AutoSavePolicy>(readAutoSave)
   const [viewMode, setViewMode] = useState<ViewMode>(DEFAULT_VIEW_MODE)
+  /** 방금 만든 파일. 그 파일에 머무는 동안에는 보기 모드와 상관없이 편집으로 엽니다. */
+  const [fresh, setFresh] = useState<string | null>(null)
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set())
   const [query, setQuery] = useState('')
   // 즐겨찾기 탭의 찾기. 폴더 탭의 검색과는 하는 일이 달라 따로 둡니다.
@@ -931,12 +933,22 @@ export default function App() {
   /*
    * 글 첨부를 어느 모드로 열지.
    *
-   * 그냥 글에는 나란히가 없으므로(양쪽이 같은 글입니다) 나란히로 두었다면 **보기**로 엽니다.
-   * 기본값이 나란히라, 이렇게 두면 txt·log 는 읽는 자리로 열립니다 — 읽으러 연 파일에서
-   * 글상자가 먼저 뜨면 글쇠 한 번에 내용이 바뀝니다. 고치려면 편집을 고르면 되고,
-   * 그 고른 값은 마크다운 문서와 같은 자리에 남아 다음에도 따라옵니다.
+   * **나란히는 표(csv·tsv)에만 둡니다.** 그냥 글은 양쪽이 같은 글이고, 코드도 글은 같고 색만
+   * 다릅니다 — 색은 이제 고치는 자리에서도 입으므로 두 벌로 벌려 놓을 까닭이 없습니다.
+   * 나란히로 두었다면 그런 파일은 **보기**로 엽니다. 기본값이 나란히라, 이렇게 두면 글 첨부는
+   * 읽는 자리로 열립니다 — 읽으러 연 파일에서 글상자가 먼저 뜨면 글쇠 한 번에 내용이 바뀝니다.
+   * 고치려면 편집을 고르면 되고, 그 값은 마크다운 문서와 같은 자리에 남아 다음에도 따라옵니다.
    */
-  const textMode: ViewMode = textPreview === 'plain' && viewMode === 'split' ? 'preview' : viewMode
+  /*
+   * 그 파일을 떠나면 "방금 만든" 딱지도 뗍니다. 들고 있으면 나중에 다시 열 때까지 편집으로
+   * 열려, 읽으러 들어간 자리에서 또 글상자를 만납니다. effect 가 아니라 렌더 중에 되돌립니다.
+   */
+  if (fresh !== null && selectedPath !== fresh) setFresh(null)
+
+  const splitable = textPreview === 'table'
+  const textMode: ViewMode = selection !== null && fresh === selection.path
+    ? 'edit'
+    : !splitable && viewMode === 'split' ? 'preview' : viewMode
 
   const { fields, body } = useMemo(() => parseFrontmatter(draft), [draft])
   /*
@@ -1054,7 +1066,16 @@ export default function App() {
       if (!name) return
       try {
         const path = await vault.createDoc(dirPath, name)
+        /*
+         * 갓 만든 파일은 **쓰려고 만든 것**입니다. 글 첨부는 읽는 자리로 열리지만, 방금
+         * 지은 빈 파일까지 그렇게 열면 만들자마자 편집을 눌러야 글을 쓸 수 있습니다.
+         * 기억해 둔 보기 모드는 건드리지 않고, 그 파일에 머무는 동안에만 편집으로 엽니다.
+         *
+         * 딱지는 **연 뒤에** 답니다. 먼저 달면 아직 옛 문서를 보고 있는 그 한 번의 그림에서
+         * "떠났다" 로 읽혀 곧바로 떨어집니다.
+         */
         await openDoc(path)
+        setFresh(path)
       } catch (cause) {
         report(cause)
       }
@@ -1195,9 +1216,10 @@ export default function App() {
            * 나란히로 적혀 있어도 그냥 글에서는 보기로 보이는 중이라, 거기서 이어 돌립니다.
            */
           setViewMode((mode) => {
-            const plain = kind === 'plain'
-            const now = plain && mode === 'split' ? 'preview' : mode
-            if (now === 'edit') return plain ? 'preview' : 'split'
+            // 나란히가 있는 것은 마크다운과 표뿐입니다. 없는 자리에서는 건너뜁니다.
+            const twoWay = kind === 'plain' || kind === 'code'
+            const now = twoWay && mode === 'split' ? 'preview' : mode
+            if (now === 'edit') return twoWay ? 'preview' : 'split'
             return now === 'split' ? 'preview' : 'edit'
           })
           return
@@ -1953,8 +1975,12 @@ export default function App() {
                 {editableText && textPreview && (
                   <ViewModeSwitch
                     mode={textMode}
-                    onChange={setViewMode}
-                    withSplit={textPreview !== 'plain'}
+                    onChange={(mode) => {
+                      // 스스로 고른 모드가 "방금 만든" 딱지보다 셉니다. 아니면 단추가 먹지 않습니다.
+                      setFresh(null)
+                      setViewMode(mode)
+                    }}
+                    withSplit={splitable}
                   />
                 )}
                 {selection.kind === 'image' && imagePreview && editingImage !== selection.path && (
@@ -1994,6 +2020,8 @@ export default function App() {
                       lineNumbers={look.lineNumbers}
                       busy={saving}
                       onCaret={look.caretPosition ? setCaret : undefined}
+                      // 코드는 고치는 동안에도 색을 입습니다. 파일에 들어가는 것은 글자뿐입니다.
+                      language={textPreview === 'code' ? highlightLanguage(selection.path) : null}
                     />
                   )}
                   {textPreview && textMode === 'split' && (

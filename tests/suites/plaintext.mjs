@@ -109,7 +109,7 @@ try {
   expect('다시 읽는 자리로', back.글상자 === false && back.보기, JSON.stringify(back))
   expect('기록도 글 그대로 보임', back.글.includes('WARN  느립니다'), back.글.slice(0, 80))
 
-  step('5. 표와 코드는 나란히가 그대로다')
+  step('5. 표에만 나란히가 남는다')
   await open('작은 표.csv')
   const table = await page.evaluate(() =>
     [...document.querySelectorAll('.doc-head .mode-switch button')].map((one) => one.textContent))
@@ -120,9 +120,34 @@ try {
     모드: [...document.querySelectorAll('.doc-head .mode-switch button')].map((one) => one.textContent),
     강조: document.querySelector('.main .code-preview') !== null,
   }))
-  expect('코드에도 세 모드', JSON.stringify(code.모드) === JSON.stringify(['편집', '나란히', '미리보기']),
+  // 코드도 글은 같고 색만 다릅니다. 그 색은 고치는 자리에서도 입으므로 나란히를 두지 않습니다.
+  expect('코드는 두 모드', JSON.stringify(code.모드) === JSON.stringify(['편집', '미리보기']),
     JSON.stringify(code))
   expect('코드는 문법 강조로 그림', code.강조, JSON.stringify(code))
+
+  step('5-2. 갓 만든 파일은 쓰라고 편집으로 열린다')
+  /*
+   * 만들자마자 읽는 자리로 열면, 쓰려고 지은 빈 파일에서 편집을 한 번 더 눌러야 합니다.
+   * 다만 그 딱지는 스스로 고른 모드보다 셀 수 없고, 떠나면 떨어져야 합니다.
+   */
+  await page.click('.tree-root button[aria-label="새 문서"]')
+  await page.waitForSelector('.dialog-input')
+  await page.fill('.dialog-input', '새 메모.txt')
+  await page.click('.dialog button:has-text("만들기")')
+  await page.waitForTimeout(800)
+  const born = await shape()
+  console.log('  ' + JSON.stringify({ ...born, 글: '' }))
+  expect('편집으로 열림', born.글상자 && born.고른모드 === '편집', JSON.stringify(born))
+  await page.fill('.main textarea', '여기에 바로 씁니다.\n')
+  await page.waitForTimeout(1200)
+  await pick('미리보기')
+  const read = await shape()
+  expect('미리보기를 고르면 따름', read.글상자 === false && read.보기, JSON.stringify(read))
+  expect('쓴 글이 그대로', read.글.includes('여기에 바로 씁니다.'), read.글)
+  await open('회의 메모.txt')
+  await open('새 메모.txt')
+  const again = await shape()
+  expect('다시 열면 읽는 자리', again.글상자 === false, JSON.stringify(again))
 
   step('6. 글쇠로 돌릴 때도 나란히를 건너뛴다')
   await open('회의 메모.txt')

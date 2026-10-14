@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react'
+import { highlightCode } from '../lib/markdown'
 import { applyFormat, type FormatId } from '../lib/markdownFormat'
 import { selectionBox, type SelectionBox } from '../lib/textareaCaret'
 import { caretAt } from '../lib/editorJump'
@@ -15,6 +16,13 @@ interface EditorProps {
   busy?: boolean
   /** 커서가 있는 자리(1부터 세는 행·열)가 바뀔 때. 아래 표시줄에 적습니다. */
   onCaret?: (at: { line: number; column: number } | null) => void
+  /**
+   * 고치는 동안에도 색을 입힐 말(highlight.js 의 언어 이름). 코드 파일에서만 줍니다.
+   *
+   * 파일에 들어가는 것은 **글자뿐입니다.** 색은 글상자 밑에 깔린 칸이 입는 것이고,
+   * 글상자가 들고 있는 값은 사람이 친 글 그대로입니다.
+   */
+  language?: string | null
 }
 
 
@@ -47,9 +55,66 @@ const SHORTCUTS: Record<string, FormatId> = {
   k: 'link',
 }
 
-export function Editor({ value, path, onChange, onSave, lineNumbers = false, busy = false, onCaret }: EditorProps) {
+export function Editor({
+  value, path, onChange, onSave, lineNumbers = false, busy = false, onCaret, language = null,
+}: EditorProps) {
   const ref = useRef<HTMLTextAreaElement>(null)
   const [box, setBox] = useState<SelectionBox | null>(null)
+
+  /*
+   * 색칠.
+   *
+   * 글상자는 글자에 색을 입히지 못합니다. 그래서 같은 글을 **글상자 밑에 한 벌 더 깔고**,
+   * 글상자의 글자는 투명하게 두어 커서만 남깁니다. 사람이 보는 글자는 밑의 칸입니다.
+   * 미리보기를 따로 띄워 나란히 두는 길은 버렸습니다 — 같은 글이 두 벌 서서 읽을 자리만
+   * 반으로 줄고, 고치는 자리에는 여전히 색이 없었습니다.
+   *
+   * 색칠은 한 박자 늦게 옵니다(강조기가 비동기). 그동안 옛 글을 비추면 방금 친 글자가
+   * 보이지 않으므로, **지금 값과 맞는 색칠이 올 때까지는 글 그대로** 깔아 둡니다.
+   */
+  const paint = useRef<HTMLPreElement>(null)
+  const [painted, setPainted] = useState<{ text: string; html: string } | null>(null)
+  useEffect(() => {
+    if (!language) return
+    let cancelled = false
+    void highlightCode(value, language).then((html) => {
+      if (!cancelled) setPainted({ text: value, html })
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [language, value])
+
+  /*
+   * 색칠을 글상자의 글 자리에 정확히 포갭니다. 거울과 같은 셈입니다 — 한 치라도 어긋나면
+   * 커서가 글자 사이에 서지 않습니다. 번호 칸이 서면 글상자의 왼쪽 여백이 달라지므로
+   * 여백도 재어서 그대로 옮깁니다.
+   */
+  useLayoutEffect(() => {
+    if (!language) return
+    const place = () => {
+      const area = ref.current
+      const glass = paint.current
+      if (!area || !glass) return
+      const style = getComputedStyle(area)
+      glass.style.left = `${area.offsetLeft}px`
+      glass.style.width = `${area.clientWidth}px`
+      glass.style.height = `${area.clientHeight}px`
+      /*
+       * 여백은 네 변을 따로 옮깁니다. 번호 칸이 서면 왼쪽만 넓어지는데(논리 속성으로 줍니다),
+       * 묶음 값 하나로 받으면 그런 때 빈 글자가 돌아와 여백이 통째로 날아갑니다.
+       */
+      glass.style.paddingTop = style.paddingTop
+      glass.style.paddingRight = style.paddingRight
+      glass.style.paddingBottom = style.paddingBottom
+      glass.style.paddingLeft = style.paddingLeft
+      glass.scrollTop = area.scrollTop
+    }
+    place()
+    const watcher = new ResizeObserver(place)
+    if (ref.current) watcher.observe(ref.current)
+    return () => watcher.disconnect()
+  }, [language, value])
 
   /*
    * 줄 번호.
@@ -193,8 +258,22 @@ export function Editor({ value, path, onChange, onSave, lineNumbers = false, bus
 
   const lines = lineNumbers ? value.split('\n') : []
 
+  const frame = ['editor-frame', lineNumbers ? 'has-gutter' : '', language ? 'has-paint' : '']
+    .filter(Boolean).join(' ')
+
   return (
-    <div className={lineNumbers ? 'editor-frame has-gutter' : 'editor-frame'}>
+    <div className={frame}>
+      {language && (
+        /*
+         * 맨 끝에 줄바꿈 하나를 더 답니다. 글상자는 마지막 줄바꿈 뒤의 빈 줄까지 자리를
+         * 내주는데 `<pre>` 는 그러지 않아, 끝까지 굴리면 색칠이 한 줄만큼 짧았습니다.
+         */
+        <pre ref={paint} className="editor-paint" aria-hidden="true">
+          {painted?.text === value
+            ? <code className="hljs" dangerouslySetInnerHTML={{ __html: `${painted.html}\n` }} />
+            : <code className="hljs">{`${value}\n`}</code>}
+        </pre>
+      )}
       {lineNumbers && (
         <>
           <div ref={gutter} className="editor-gutter" aria-hidden="true">
@@ -235,6 +314,8 @@ export function Editor({ value, path, onChange, onSave, lineNumbers = false, bus
           syncToolbar()
           // 번호도 함께 굴립니다. 글상자만 굴러가면 번호가 엉뚱한 줄 옆에 섭니다.
           if (gutter.current) gutter.current.scrollTop = event.currentTarget.scrollTop
+          // 색칠도 같이 굴러야 글자와 색이 어긋나지 않습니다.
+          if (paint.current) paint.current.scrollTop = event.currentTarget.scrollTop
         }}
         onBlur={(event) => {
           // 도구 막대를 누른 경우에는 닫지 않습니다.
