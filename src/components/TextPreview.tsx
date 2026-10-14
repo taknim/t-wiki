@@ -5,7 +5,7 @@ import {
 } from '../lib/textPreview'
 
 interface TextPreviewProps {
-  kind: Exclude<TextPreviewKind, null>
+  kind: TextPreviewKind
   path: string
   text: string
 }
@@ -15,7 +15,23 @@ const MAX_ROWS = 500
 
 export function TextPreview({ kind, path, text }: TextPreviewProps) {
   if (kind === 'table') return <TablePreview path={path} text={text} />
-  return <CodePreview path={path} text={text} />
+  if (kind === 'code') return <CodePreview path={path} text={text} />
+  return <PlainPreview text={text} />
+}
+
+/*
+ * 그릴 것이 따로 없는 글. 편집기와 **같은 글**을 보여 주지만 고칠 수는 없습니다.
+ *
+ * 꾸미지 않고 `<pre>` 에 그대로 담습니다. 글줄을 다시 묶거나 들여쓰기를 손보면 원문과
+ * 다른 것을 보여 주는 셈이고, 기록 파일은 그 줄 그대로가 뜻입니다. 긴 줄은 가로로
+ * 굴리는 대신 접어 내립니다 — 읽자고 연 자리라 한 줄을 쫓아 옆으로 끌게 할 수 없습니다.
+ */
+function PlainPreview({ text }: { text: string }) {
+  return (
+    <div className="preview text-preview is-plain">
+      <pre className="plain-preview">{text}</pre>
+    </div>
+  )
 }
 
 function TablePreview({ path, text }: { path: string; text: string }) {

@@ -1,7 +1,13 @@
 import { CODE_EXTENSIONS, extensionOf } from './attachments'
 
-/** 글자 파일을 어떤 방식으로 보여 줄지. null 이면 보여 줄 것이 없어 편집기만 씁니다. */
-export type TextPreviewKind = 'table' | 'code' | null
+/**
+ * 글자 파일을 어떤 방식으로 보여 줄지.
+ *
+ * `plain` 은 그릴 것이 따로 없는 글(txt·log·out)입니다. 전에는 이런 파일에 보기 모드를
+ * 두지 않고 **글상자만** 띄웠는데, 읽으러 연 사람이 글쇠 한 번에 내용을 바꿔 놓는 일이
+ * 있었습니다. 보여 줄 모양이 같더라도 **읽는 자리와 고치는 자리는 갈라** 둡니다.
+ */
+export type TextPreviewKind = 'table' | 'code' | 'plain'
 
 /*
  * HTML 도 **그리지 않고 글로** 보여 줍니다.
@@ -16,7 +22,7 @@ export function textPreviewKind(path: string): TextPreviewKind {
   if (extension === 'csv' || extension === 'tsv') return 'table'
   if (['json', 'yaml', 'yml', 'xml', 'html', 'htm'].includes(extension)
     || CODE_EXTENSIONS.includes(extension)) return 'code'
-  return null
+  return 'plain'
 }
 
 /*

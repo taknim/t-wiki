@@ -4,6 +4,11 @@ import type { ViewMode } from '../types'
 interface ViewModeSwitchProps {
   mode: ViewMode
   onChange: (mode: ViewMode) => void
+  /**
+   * 나란히를 둘지. 그릴 것이 따로 없는 글(txt·log·out)에서는 뺍니다 —
+   * 양쪽에 같은 글이 서므로 나눌 뜻이 없고, 자리만 반으로 줄어듭니다.
+   */
+  withSplit?: boolean
 }
 
 const MODES: { key: ViewMode; label: string; tip: string }[] = [
@@ -19,13 +24,15 @@ const MODES: { key: ViewMode; label: string; tip: string }[] = [
  * 아이콘 옆에 이름을 함께 적습니다. 그림만으로는 어느 것이 어느 모드인지
  * 눌러 봐야 알고, 세 아이콘은 서로 닮았습니다.
  */
-export function ViewModeSwitch({ mode, onChange }: ViewModeSwitchProps) {
+export function ViewModeSwitch({ mode, onChange, withSplit = true }: ViewModeSwitchProps) {
+  const shown = withSplit ? MODES : MODES.filter((entry) => entry.key !== 'split')
+
   return (
     <div className="head-tool">
       {/* 단추 넷이 나란히 선 다른 줄(배경)과 헷갈리지 않도록 무엇을 고르는지 적어 둡니다. */}
       <span className="head-tool-label">보기 모드</span>
       <div className="mode-switch" role="group" aria-label="보기 모드">
-        {MODES.map((entry) => (
+        {shown.map((entry) => (
           <button
             key={entry.key}
             type="button"

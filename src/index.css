@@ -2329,6 +2329,21 @@ button.info-caret:focus-visible { outline: 2px solid var(--accent); outline-offs
  */
 .text-preview.markdown-body img { display: block; margin: 8px 0; }
 
+/*
+ * 그냥 글의 보기. 코드처럼 테두리를 두르지 않고 칸을 그대로 씁니다 — 이 칸이 곧 그 파일입니다.
+ * 긴 줄은 접어 내립니다. 가로로 굴려야 읽히는 보기는 읽는 자리로서 쓸모가 없습니다.
+ */
+.text-preview.is-plain { padding: 0; }
+.plain-preview {
+  margin: 0;
+  padding: 16px 20px;
+  min-height: 100%;
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
 .code-preview {
   margin: 0;
   padding: 12px 14px;

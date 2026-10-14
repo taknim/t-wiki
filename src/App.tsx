@@ -926,8 +926,17 @@ export default function App() {
    * 커서를 한 칸 옮기는 데만도 0.2초가 넘게 들고, 그것은 앱이 줄일 수 있는 값이 아닙니다.
    */
   const bigText = editableText && selection !== null && isBigText(selection.size, draft)
-  // 표나 코드처럼 그려서 보여 줄 것이 있는 형식인지. 큰 글은 그리지 않습니다.
+  // 어떤 방식으로 보여 줄 글인지(표·코드·그냥 글). 큰 글은 그리지 않습니다.
   const textPreview = editableText && selection && !bigText ? textPreviewKind(selection.path) : null
+  /*
+   * 글 첨부를 어느 모드로 열지.
+   *
+   * 그냥 글에는 나란히가 없으므로(양쪽이 같은 글입니다) 나란히로 두었다면 **보기**로 엽니다.
+   * 기본값이 나란히라, 이렇게 두면 txt·log 는 읽는 자리로 열립니다 — 읽으러 연 파일에서
+   * 글상자가 먼저 뜨면 글쇠 한 번에 내용이 바뀝니다. 고치려면 편집을 고르면 되고,
+   * 그 고른 값은 마크다운 문서와 같은 자리에 남아 다음에도 따라옵니다.
+   */
+  const textMode: ViewMode = textPreview === 'plain' && viewMode === 'split' ? 'preview' : viewMode
 
   const { fields, body } = useMemo(() => parseFrontmatter(draft), [draft])
   /*
@@ -1158,7 +1167,7 @@ export default function App() {
 
       const {
         handleNewDoc: newDoc, currentDir: dir, hasDoc, startSync: runSync,
-        handleGoTo: goTo, look: shown, image,
+        handleGoTo: goTo, look: shown, image, textPreview: kind,
       } = shortcutRefs.current
       switch (id) {
         case 'search':
@@ -1180,7 +1189,17 @@ export default function App() {
             return
           }
           if (!hasDoc) return
-          setViewMode((mode) => (mode === 'edit' ? 'split' : mode === 'split' ? 'preview' : 'edit'))
+          /*
+           * 그냥 글에는 나란히가 없으므로 건너뜁니다. 넣어 두면 같은 글이 두 번 이어 보여,
+           * 글쇠가 먹지 않은 것처럼 느껴집니다. 돌리는 자리는 **지금 보이는 모드**입니다 —
+           * 나란히로 적혀 있어도 그냥 글에서는 보기로 보이는 중이라, 거기서 이어 돌립니다.
+           */
+          setViewMode((mode) => {
+            const plain = kind === 'plain'
+            const now = plain && mode === 'split' ? 'preview' : mode
+            if (now === 'edit') return plain ? 'preview' : 'split'
+            return now === 'split' ? 'preview' : 'edit'
+          })
           return
         case 'tab-tree':
         case 'tab-favorites':
@@ -1932,7 +1951,11 @@ export default function App() {
                   </span>
                 )}
                 {editableText && textPreview && (
-                  <ViewModeSwitch mode={viewMode} onChange={setViewMode} />
+                  <ViewModeSwitch
+                    mode={textMode}
+                    onChange={setViewMode}
+                    withSplit={textPreview !== 'plain'}
+                  />
                 )}
                 {selection.kind === 'image' && imagePreview && editingImage !== selection.path && (
                   <BackdropSwitch backdrop={imageBackdrop} onChange={applyImageBackdrop} />
@@ -1953,12 +1976,12 @@ export default function App() {
               {editableText && bigText ? (
                 <BigTextView text={draft} bytes={selection.size} />
               ) : editableText ? (
-                // 보여 줄 것이 있으면 마크다운처럼 나란히 놓고, 없으면 편집기만 넓게 씁니다.
+                // 마크다운과 같은 자리를 씁니다. 보기면 그린 것만, 편집이면 글상자만.
                 <div
-                  className={`doc-body mode-${textPreview ? viewMode : 'edit'}`}
+                  className={`doc-body mode-${textMode}`}
                   style={{ '--split-a': `${splitRatio}%` } as CSSProperties}
                 >
-                  {(!textPreview || viewMode !== 'preview') && (
+                  {textMode !== 'preview' && (
                     <Editor
                       path={selection.path}
                       value={draft}
@@ -1973,10 +1996,10 @@ export default function App() {
                       onCaret={look.caretPosition ? setCaret : undefined}
                     />
                   )}
-                  {textPreview && viewMode === 'split' && (
+                  {textPreview && textMode === 'split' && (
                     <SplitResizer ratio={splitRatio} onRatio={applySplitRatio} />
                   )}
-                  {textPreview && viewMode !== 'edit' && (
+                  {textPreview && textMode !== 'edit' && (
                     <TextPreview kind={textPreview} path={selection.path} text={draft} />
                   )}
                 </div>

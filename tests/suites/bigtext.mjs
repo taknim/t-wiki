@@ -66,8 +66,20 @@ try {
   await open('작은 기록.txt')
   const small = await shape()
   console.log('  ' + JSON.stringify(small))
-  expect('글상자로 열림', small.글상자 && !small.큰모드, JSON.stringify(small))
-  expect('줄 번호가 섬', small.줄번호, JSON.stringify(small))
+  expect('대용량 모드가 아님', small.큰모드 === false, JSON.stringify(small))
+  /*
+   * 그냥 글은 **읽는 자리**로 열립니다(plaintext 묶음이 지킵니다). 여기서 가리는 것은
+   * 자를 넘지 않는 글이 여전히 **고쳐지는가** 이므로, 편집을 골라 보고 잽니다.
+   */
+  await page.click('.doc-head .mode-switch button:has-text("편집")')
+  await page.waitForTimeout(400)
+  const editing = await shape()
+  console.log('  ' + JSON.stringify(editing))
+  expect('편집을 고르면 글상자가 섬', editing.글상자 && !editing.큰모드, JSON.stringify(editing))
+  expect('줄 번호가 섬', editing.줄번호, JSON.stringify(editing))
+  // 고른 모드는 남으므로 되돌려 둡니다. 뒤 걸음이 미리보기를 봅니다.
+  await page.click('.doc-head .mode-switch button:has-text("미리보기")')
+  await page.waitForTimeout(300)
 
   step('2. 크기가 자를 넘으면 보는 자리로 연다')
   await open('큰 기록.txt')
