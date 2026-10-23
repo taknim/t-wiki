@@ -35,7 +35,6 @@ import {
 import { extractHeadings, parseFrontmatter, toggleTask } from './lib/markdown'
 import { ExternalChangeError } from './lib/fsAccess'
 import { exportDocumentPdf } from './components/PdfSheet'
-import { PdfExportButton } from './components/PdfExportButton'
 import { canExportPdf, imageToPdf, pdfNameFor } from './lib/pdfExport'
 import { TrashView } from './components/TrashView'
 import { KeyboardIcon, TrashIcon } from './components/icons'
@@ -2073,7 +2072,6 @@ export default function App() {
                     수정
                   </button>
                 )}
-                {exportable && <PdfExportButton busy={exporting} onExport={() => void handleExportPdf()} />}
               </div>
 
               {editableText && bigText ? (
@@ -2140,7 +2138,6 @@ export default function App() {
                 <h1>{fileNameOf(selectedPath)}</h1>
                 <SaveState dirty={dirty} saving={saving} dueAt={saveDueAt} seconds={autoSave.seconds} onSave={() => void commit()} />
                 <ViewModeSwitch mode={viewMode} onChange={setViewMode} />
-                {exportable && <PdfExportButton busy={exporting} onExport={() => void handleExportPdf()} />}
               </div>
 
               {fields.length > 0 && (
@@ -2225,6 +2222,7 @@ export default function App() {
               onNotice={flash}
               caret={look.caretPosition ? caret : null}
               onGoTo={() => void handleGoTo()}
+              pdf={exportable ? { busy: exporting, onExport: () => void handleExportPdf() } : null}
             />
           )}
         </main>

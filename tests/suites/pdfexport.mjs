@@ -66,7 +66,7 @@ const open = async (name) => {
   await page.click(`.tree-row:has-text("${name}") .tree-name`)
   await page.waitForTimeout(600)
 }
-const hasButton = () => page.locator('.doc-head .head-pdf').count()
+const hasButton = () => page.locator('.doc-tools .doc-tool-pdf').count()
 /*
  * PDF 단추를 누르고 **다 쓰일 때까지** 기다립니다.
  *
@@ -80,7 +80,7 @@ const saved = (name) => page.waitForFunction(
 ).then(() => page.evaluate((wanted) => window.__savedPdf(wanted), name))
 
 const exportPdf = async (name) => {
-  await page.click('.doc-head .head-pdf')
+  await page.click('.doc-tools .doc-tool-pdf')
   return saved(name)
 }
 const A4_PORTRAIT = '[[0,0,595.28,841.89]]'
@@ -97,7 +97,7 @@ try {
 
   step('1. 마크다운을 A4 세로 한 벌로 낸다')
   await open('개발 환경.md')
-  expect('제목 줄에 PDF 단추가 섬', (await hasButton()) === 1)
+  expect('글 옆에 PDF 단추가 섬', (await hasButton()) === 1)
   const doc = await exportPdf('개발 환경.pdf')
   console.log('  ' + JSON.stringify({ ...doc, boxes: doc.boxes }))
   expect('PDF 파일임', doc.head.startsWith('%PDF-'), doc.head)
@@ -112,7 +112,7 @@ try {
    */
   await open('판매표.xlsx')
   await page.waitForSelector('.data-table', { timeout: 20000 })
-  await page.click('.doc-head .head-pdf')
+  await page.click('.doc-tools .doc-tool-pdf')
   await page.waitForSelector('.pdf-sheet .sheet-page', { timeout: 20000 })
   const sheet = await page.evaluate(() => {
     const host = document.querySelector('.pdf-sheet')
@@ -170,7 +170,7 @@ try {
   await page.waitForTimeout(400)
   await page.fill('.main textarea', 'id,name\n1,하나\n2,둘\n3,셋\n')
   await page.waitForTimeout(400)
-  await page.click('.doc-head .head-pdf')
+  await page.click('.doc-tools .doc-tool-pdf')
   await page.waitForSelector('.pdf-sheet .data-table', { timeout: 20000 })
   const rows = await page.evaluate(() =>
     [...document.querySelectorAll('.pdf-sheet .data-table tbody tr')].map((one) => one.textContent))
@@ -201,20 +201,70 @@ try {
   await open('개발 환경.md')
   const before = await page.evaluate(() => window.__savedNames().length)
   await page.evaluate(() => { window.__saveCancel = true })
-  await page.click('.doc-head .head-pdf')
+  await page.click('.doc-tools .doc-tool-pdf')
   await page.waitForTimeout(1200)
   const after = await page.evaluate(() => ({
     saved: window.__savedNames().length,
     sheets: document.querySelectorAll('.pdf-sheet').length,
-    busy: document.querySelector('.head-pdf')?.disabled ?? null,
+    busy: document.querySelector('.doc-tool-pdf')?.disabled ?? null,
   }))
   console.log('  ' + JSON.stringify({ before, ...after }))
   expect('새로 저장된 것이 없음', after.saved === before, JSON.stringify(after))
   expect('그리지도 않음', after.sheets === 0, JSON.stringify(after))
   expect('단추가 잠긴 채 남지 않음', after.busy === false, JSON.stringify(after))
   await page.evaluate(() => { window.__saveCancel = false })
+
+  step('11. 단추는 글 오른쪽 아래, 목차 위에 선다')
+  /*
+   * 제목 줄에 있던 것을 글 옆으로 내렸습니다. 다 읽고 나서 "이대로 종이에 담자" 가
+   * 되는 일이라, 눈과 손이 글 끝에 가 있을 때 닿아야 합니다.
+   */
+  await open('긴 글.md')
+  await page.waitForTimeout(600)
+  const stack = await page.evaluate(() => {
+    const main = document.querySelector('.main').getBoundingClientRect()
+    const box = document.querySelector('.doc-tools').getBoundingClientRect()
+    return {
+      차례: [...document.querySelectorAll('.doc-tools .doc-tool')].map((one) => one.textContent.trim()),
+      제목줄: document.querySelectorAll('.doc-head .doc-tool-pdf, .doc-head .head-pdf').length,
+      오른쪽: Math.round(main.right - box.right),
+      아래: Math.round(main.bottom - box.bottom),
+    }
+  })
+  console.log('  ' + JSON.stringify(stack))
+  expect('글자가 Export PDF', stack.차례[0] === 'Export PDF', JSON.stringify(stack.차례))
+  expect('목차보다 위', stack.차례.findIndex((one) => one.startsWith('목차')) === 1,
+    JSON.stringify(stack.차례))
+  expect('제목 줄에는 없음', stack.제목줄 === 0, String(stack.제목줄))
+  expect('오른쪽 아래에 뜸', stack.오른쪽 < 40 && stack.아래 < 90, JSON.stringify(stack))
   await page.screenshot({ path: join(HERE, '..', 'shots', 'pdfexport', '01-button.png'),
-    clip: { x: 430, y: 40, width: 970, height: 320 } })
+    clip: { x: 900, y: 480, width: 500, height: 420 } })
+
+  step('12. 그림에서는 배율 손잡이와 겹치지 않는다')
+  /*
+   * 배율 손잡이도 같은 구석에 떠 있습니다. 네모가 겹치는지만 보지 않고, 그 자리를
+   * 눌렀을 때 무엇이 잡히는지까지 물어봅니다 — 눌리지 않으면 없는 것과 같습니다.
+   */
+  await open('세로 그림.png')
+  await page.waitForSelector('.asset-view > .zoom-control', { timeout: 15000 })
+  await page.waitForTimeout(500)
+  const corner = await page.evaluate(() => {
+    const tools = document.querySelector('.doc-tools').getBoundingClientRect()
+    const zoom = document.querySelector('.asset-view > .zoom-control').getBoundingClientRect()
+    const button = document.querySelector('.asset-view > .zoom-control button')
+    const spot = button.getBoundingClientRect()
+    const hit = document.elementFromPoint(spot.left + spot.width / 2, spot.top + spot.height / 2)
+    return {
+      겹침: tools.bottom > zoom.top && tools.top < zoom.bottom
+        && tools.right > zoom.left && tools.left < zoom.right,
+      틈: Math.round(zoom.top - tools.bottom),
+      잡힌것: hit?.closest('.zoom-control') !== null ? '배율' : (hit?.className ?? '모름'),
+    }
+  })
+  console.log('  ' + JSON.stringify(corner))
+  expect('네모가 겹치지 않음', corner.겹침 === false, JSON.stringify(corner))
+  expect('배율 단추가 그대로 눌림', corner.잡힌것 === '배율', JSON.stringify(corner))
+  expect('단추 사이만큼 띄움', corner.틈 >= 6 && corner.틈 <= 16, JSON.stringify(corner))
 } catch (cause) {
   fail('묶음이 도중에 멈춤', cause instanceof Error ? (cause.stack ?? cause.message) : String(cause))
 } finally {

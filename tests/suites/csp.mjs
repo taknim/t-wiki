@@ -213,7 +213,7 @@ try {
   step('7. PDF 로 내보내기도 울타리 안에서 돈다')
   await page.click('.tree-row:has-text("모둠")')
   await page.waitForSelector('.preview .mermaid-figure svg', { timeout: 15000 })
-  await page.click('.doc-head .head-pdf')
+  await page.click('.doc-tools .doc-tool-pdf')
   await page.waitForFunction(() => window.__savedSize('모둠.pdf') > 0, undefined, { timeout: 60000 })
   const paper = await page.evaluate(() => window.__savedPdf('모둠.pdf'))
   console.log('  ' + JSON.stringify(paper))

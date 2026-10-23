@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react'
-import { InboundIcon, ListIcon, ToBottomIcon, ToTopIcon } from './icons'
+import { InboundIcon, ListIcon, PdfIcon, ToBottomIcon, ToTopIcon } from './icons'
 
 interface DocToolsProps {
   /** 목차. 볼 것이 없으면 null. */
   toc: { count: number; open: boolean; onToggle: () => void } | null
   /** 백링크. 마크다운이 아닐 때는 null. */
   backlinks: { count: number; open: boolean; onToggle: () => void } | null
+  /** PDF 로 내보내기. 그려서 보여 주는 것이 아니면 null. */
+  pdf: { busy: boolean; onExport: () => void } | null
   /** 지금 보고 있는 것. 이것이 바뀌면 굴림 여부를 새로 잽니다. */
   path: string
 }
@@ -47,8 +49,10 @@ function findPane(): HTMLElement | null {
  */
 /** 글에서 띄울 만큼. 굴림대와 아래 표시줄은 이 값에 더해 따로 셉니다. */
 const GAP = 24
+/** 떠 있는 것끼리의 틈. 단추 사이(.doc-tools 의 gap)와 같습니다. */
+const STACK_GAP = 8
 
-export function DocTools({ toc, backlinks, path }: DocToolsProps) {
+export function DocTools({ toc, backlinks, pdf, path }: DocToolsProps) {
   const [rolls, setRolls] = useState(false)
   /** 오른쪽·아래로 얼마나 띄울지. 굴림대와 아래 표시줄만큼 더해 잽니다. */
   const [gap, setGap] = useState({ right: GAP, bottom: GAP })
@@ -90,11 +94,17 @@ export function DocTools({ toc, backlinks, path }: DocToolsProps) {
        * 굴림대가 자리를 차지하는 기계에서는 오른쪽 여백이 그만큼 깎여 단추가
        * 굴림대에 달라붙습니다. 눈에 보이는 틈을 같게 하려면 굴림대 너비를 재서
        * 더해야 합니다. 아래도 표시줄 높이만큼 더합니다.
+       *
+       * 그림을 볼 때는 **배율 손잡이가 같은 구석에** 떠 있습니다. 그 높이만큼 더 올라서지
+       * 않으면 두 벌이 그대로 겹쳐, 아래 것이 눌리지 않습니다. PDF 단추가 생기기 전에는
+       * 그림 화면에 뜰 단추가 없어 부딪힐 일이 없었습니다.
        */
       const dock = box.querySelector(':scope > .info-dock')?.getBoundingClientRect().height ?? 0
+      const zoom = box.querySelector(':scope > .asset-view > .zoom-control')
+        ?.getBoundingClientRect().height ?? 0
       const next = {
         right: GAP + (pane ? pane.offsetWidth - pane.clientWidth : 0),
-        bottom: GAP + dock,
+        bottom: GAP + dock + (zoom > 0 ? zoom + STACK_GAP : 0),
       }
       // 같은 값을 새 꾸러미로 담아 돌려주면 다시 그려지고, 그것이 또 알림을 부릅니다.
       setGap((now) => (now.right === next.right && now.bottom === next.bottom ? now : next))
@@ -119,13 +129,31 @@ export function DocTools({ toc, backlinks, path }: DocToolsProps) {
     pane.scrollTo({ top: to === 'top' ? 0 : pane.scrollHeight, behavior: 'smooth' })
   }
 
-  if (!toc && !backlinks && !rolls) return null
+  if (!toc && !backlinks && !pdf && !rolls) return null
 
   return (
     <div
       className="doc-tools"
       style={{ insetInlineEnd: gap.right, insetBlockEnd: gap.bottom }}
     >
+      {/*
+        PDF 는 맨 위에 둡니다. 제목 줄에 있던 것을 글 옆으로 내렸습니다 — 다 읽고 나서
+        "이대로 종이에 담자" 가 되는 일이라, 손이 글 끝에 가 있을 때 닿아야 합니다.
+      */}
+      {pdf && (
+        <button
+          type="button"
+          className="doc-tool doc-tool-pdf"
+          data-tip="보고 있는 그대로 PDF 파일로 냅니다"
+          disabled={pdf.busy}
+          onClick={pdf.onExport}
+        >
+          <span className="doc-tool-top"><PdfIcon /></span>
+          {/* 뜨는 데 몇 초 걸립니다. 잠가 두지 않으면 두 벌을 뜨게 됩니다. */}
+          <span className="doc-tool-label">{pdf.busy ? '만드는 중…' : 'Export PDF'}</span>
+        </button>
+      )}
+
       {toc && (
         <button
           type="button"

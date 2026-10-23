@@ -34,6 +34,8 @@ interface InfoBarProps {
   caret?: { line: number; column: number } | null
   /** 행·열 표시를 눌렀을 때. 행·열을 물어 그 자리로 데려다 줍니다. */
   onGoTo?: () => void
+  /** PDF 로 내보내기. 그려서 보여 주는 것이 아니면 null. 글 옆 단추로 섭니다. */
+  pdf?: { busy: boolean; onExport: () => void } | null
 }
 
 const KIND_LABEL: Record<SelectionKind, string> = {
@@ -46,7 +48,7 @@ const KIND_LABEL: Record<SelectionKind, string> = {
 type Panel = 'toc' | 'backlinks' | null
 
 export function InfoBar({
-  info, headings, index, onOpen, vaultName, onNotice, caret = null, onGoTo,
+  info, headings, index, onOpen, vaultName, onNotice, caret = null, onGoTo, pdf = null,
 }: InfoBarProps) {
   const [panel, setPanel] = useState<Panel>(null)
 
@@ -101,6 +103,7 @@ export function InfoBar({
       {/* 목차·백링크는 표시줄이 아니라 글 옆에 뜹니다. 읽던 자리에서 손이 닿습니다. */}
       <DocTools
         path={info.path}
+        pdf={pdf}
         toc={tocAvailable
           ? { count: headings.length, open: panel === 'toc', onToggle: () => toggle('toc') }
           : null}

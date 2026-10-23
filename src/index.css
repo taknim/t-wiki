@@ -2134,6 +2134,13 @@ button.info-caret:focus-visible { outline: 2px solid var(--accent); outline-offs
 /* 셈은 이 단추에서 가장 굵게. 몇 개인지가 먼저 눈에 들어와야 합니다. */
 .doc-tool-count { font-weight: 700; font-size: 12px; font-variant-numeric: tabular-nums; }
 .doc-tool-label { white-space: nowrap; }
+/*
+ * `Export PDF` 는 단추 너비(58px)에 한 줄로 들어가지 않습니다. 단추만 넓히면 한 줄에
+ * 늘어선 단추들의 폭이 어긋나므로, 글자를 두 줄로 접습니다.
+ */
+.doc-tool-pdf .doc-tool-label { white-space: normal; text-align: center; }
+/* 뜨는 동안. 눌리지 않는다는 것이 보여야 합니다. */
+.doc-tool:disabled { cursor: default; color: var(--text-muted); border-color: var(--border); }
 
 .info-toggle {
   flex-shrink: 0;
@@ -2689,9 +2696,8 @@ button.info-caret:focus-visible { outline: 2px solid var(--accent); outline-offs
   padding-block: 10px;
   background: var(--bg);
 }
-/* 제목 줄의 수정·PDF 단추. 아이콘과 글자가 나란히 섭니다. */
-.head-edit,
-.head-pdf { display: inline-flex; align-items: center; gap: 5px; align-self: center; flex-shrink: 0; }
+/* 제목 줄의 수정 단추. 아이콘과 글자가 나란히 섭니다. */
+.head-edit { display: inline-flex; align-items: center; gap: 5px; align-self: center; flex-shrink: 0; }
 /*
  * 보기 배율 손잡이. 그림을 볼 때와 고칠 때 같은 것을 씁니다.
  * 보기에서는 그림 위에 떠 있고(문서의 맨 위·맨 아래 단추와 같은 자리),
