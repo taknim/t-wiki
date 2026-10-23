@@ -133,6 +133,16 @@ export async function exportDocumentPdf(job: PdfJob): Promise<Blob> {
   host.className = 'pdf-sheet'
   host.style.width = `${SHEET_WIDTH}px`
   applyLightTheme(host, job.settings)
+  /*
+   * 종이는 **흰 바탕**입니다.
+   *
+   * 테마의 바탕색을 그대로 쓰면 글이 앉은 자리만 누렇고(세피아 같은 테마) 네 변의 여백은
+   * 희어, 쪽 한가운데에 색종이를 붙여 놓은 꼴이 됩니다. 쪽 전체를 그 색으로 칠하는 길은
+   * 버렸습니다 — 종이 한 장을 꽉 채워 칠하는 일이라 잉크를 들이켭니다.
+   * 글자·강조·표 머리·코드 칸의 색은 고른 테마 그대로 둡니다. 그쪽은 흰 바탕 위에서
+   * 옅은 음영으로 읽혀, 화면에서 보던 결이 남습니다.
+   */
+  host.style.setProperty('--bg', '#ffffff')
   document.body.append(host)
 
   const root = createRoot(host)

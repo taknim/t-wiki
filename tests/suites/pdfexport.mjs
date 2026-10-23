@@ -18,11 +18,12 @@ const errors = []
 page.on('pageerror', (e) => errors.push('pageerror: ' + e.message))
 await page.addInitScript(readFileSync(join(HERE, '..', 'mock-fs.js'), 'utf8'))
 /*
- * **어두운 테마로 돌립니다.** PDF 는 늘 밝은 벌로 나와야 하는데, 앱이 밝은 채로
- * 시험하면 그것이 지켜지는지 알 수 없습니다.
+ * **어두운 세피아로 돌립니다.** PDF 는 늘 흰 바탕에 밝은 벌로 나와야 하는데, 앱이 밝은
+ * 채로 시험하면 그것이 지켜지는지 알 수 없습니다. 세피아는 밝은 벌도 바탕이 누레서
+ * (#faf4e8) "밝다" 와 "희다" 를 가려 줍니다.
  */
 await page.addInitScript(({ xlsx, docx }) => {
-  localStorage.setItem('mdwiki:theme', JSON.stringify({ mode: 'dark' }))
+  localStorage.setItem('mdwiki:theme', JSON.stringify({ theme: 'sepia', mode: 'dark' }))
   window.__installMockFs()
   const root = window.__mockRoot
   const sample = root._children.get('개발 환경.md')
@@ -60,6 +61,16 @@ await page.addInitScript(({ xlsx, docx }) => {
   put('긴 글.md', '# 긴 글\n\n'
     + Array.from({ length: 90 }, (_, at) => `## ${at + 1}째 마디\n\n이 마디는 ${at + 1}번입니다. `
       + '쪽이 넘어가는지 보려고 길게 적어 둔 글입니다.\n').join('\n'))
+  /*
+   * 창 너비를 바꿔 가며 견줄 글. **내용이 똑같은 두 벌**을 둡니다 — 같은 파일을 두 번
+   * 내보내면 둘째가 첫째를 덮어써, 무엇이 달라졌는지 가릴 수 없습니다.
+   */
+  const paged = '# 쪽 나눔\n\n| 구분 | 대상 | 이유 |\n| --- | --- | --- |\n'
+    + Array.from({ length: 40 }, (_, at) =>
+      `| 계정 | \`taknim${at + 1}\` | 줄이 여럿으로 접히도록 길게 적어 둔 까닭입니다 |`).join('\n')
+    + '\n\n## 표 뒤\n\n마지막 문단입니다.\n'
+  put('쪽 나눔.md', paged)
+  put('쪽 나눔 사본.md', paged)
 }, { xlsx: XLSX_B64, docx: DOCX_B64 })
 
 const open = async (name) => {
@@ -105,10 +116,12 @@ try {
   expect('A4 세로', JSON.stringify(doc.boxes) === A4_PORTRAIT, JSON.stringify(doc.boxes))
   expect('빈 파일이 아님', doc.size > 5000, String(doc.size))
 
-  step('2. 뜨는 자리는 어두운 테마로 보던 중에도 밝은 벌이다')
+  step('2. 뜨는 자리는 어두운 테마로 보던 중에도 흰 바탕이다')
   /*
    * PDF 는 화면 밖에 한 벌 더 그려서 뜹니다. 그 자리가 **살아 있는 동안** 색을 잽니다.
    * 어두운 바탕을 그대로 내보내면 쪽마다 검은 자리가 깔려 잉크를 들이켭니다.
+   * 테마의 밝은 바탕(세피아는 누런빛)도 쓰지 않습니다 — 글이 앉은 자리만 누렇고 네 변의
+   * 여백은 희어, 쪽 한가운데에 색종이를 붙여 놓은 꼴이 됩니다.
    */
   await open('판매표.xlsx')
   await page.waitForSelector('.data-table', { timeout: 20000 })
@@ -116,17 +129,25 @@ try {
   await page.waitForSelector('.pdf-sheet .sheet-page', { timeout: 20000 })
   const sheet = await page.evaluate(() => {
     const host = document.querySelector('.pdf-sheet')
+    const head = host.querySelector('.data-table td, .data-table th')
     return {
       bg: getComputedStyle(host).backgroundColor,
+      // 표 머리의 음영. 테마 색이 그대로 남아야 합니다.
+      음영: head ? getComputedStyle(head.closest('.table-wrap')).borderTopColor : null,
       width: host.getBoundingClientRect().width,
       names: [...host.querySelectorAll('.sheet-name')].map((one) => one.textContent),
       tabs: host.querySelectorAll('.sheet-tabs').length,
       offscreen: host.getBoundingClientRect().right < 0,
+      화면: getComputedStyle(document.documentElement).getPropertyValue('--bg').trim(),
     }
   })
   console.log('  ' + JSON.stringify(sheet))
-  const light = (sheet.bg.match(/\d+/g) ?? []).map(Number).slice(0, 3)
-  expect('밝은 바탕', light.length === 3 && light.every((one) => one > 200), sheet.bg)
+  expect('흰 바탕', sheet.bg === 'rgb(255, 255, 255)', sheet.bg)
+  // 화면은 어두운 채로 있어야 합니다. PDF 를 뜨느라 보던 색이 바뀌면 안 됩니다.
+  expect('보던 화면은 그대로 어두움', /^#[0-3]/.test(sheet.화면), sheet.화면)
+  // 바탕만 희게 합니다. 테두리·음영까지 지우면 표와 코드 칸의 결이 사라집니다.
+  expect('테마 색은 남아 있음', sheet.음영 !== null && sheet.음영 !== 'rgb(255, 255, 255)',
+    String(sheet.음영))
   expect('화면 밖에 섬', sheet.offscreen, JSON.stringify(sheet))
   expect('쪽 너비(698px)로 앉힘', Math.round(sheet.width) === 698, String(sheet.width))
 
@@ -265,6 +286,53 @@ try {
   expect('네모가 겹치지 않음', corner.겹침 === false, JSON.stringify(corner))
   expect('배율 단추가 그대로 눌림', corner.잡힌것 === '배율', JSON.stringify(corner))
   expect('단추 사이만큼 띄움', corner.틈 >= 6 && corner.틈 <= 16, JSON.stringify(corner))
+
+  step('13. 창을 좁혀도 같은 PDF 가 나온다')
+  /*
+   * 좁은 화면 규칙(@media max-width: 720px)이 글 칸의 좌우 여백을 20px 에서 12px 로
+   * 줄입니다. 쪽 너비(698px)는 그 자보다 좁아, 그냥 두면 **뜨는 틀 안에서도** 그 규칙이
+   * 걸렸습니다. 그러면 쪽 가를 자리를 재어 둔 이쪽과 그려진 그림이 어긋나, 쪽 끝에서
+   * 글줄과 표의 한 줄이 반 토막 납니다. 창 너비에 흔들리지 않아야 합니다.
+   */
+  const paper = async () => {
+    await page.click('.doc-tools .doc-tool-pdf')
+    await page.waitForSelector('.pdf-sheet .preview', { timeout: 20000 })
+    return page.evaluate(() =>
+      getComputedStyle(document.querySelector('.pdf-sheet .preview')).paddingLeft)
+  }
+
+  await open('쪽 나눔.md')
+  const wideGap = await paper()
+  const wide = await saved('쪽 나눔.pdf')
+
+  await open('쪽 나눔 사본.md')
+  await page.setViewportSize({ width: 600, height: 920 })
+  await page.waitForTimeout(600)
+  /*
+   * 좁아지면 옆줄이 서랍처럼 덮개와 함께 뜹니다. 덮개를 눌러 닫아야 본문에 손이 닿습니다.
+   * 덮개는 화면을 다 덮지만 그 가운데는 서랍이 가리고 있으므로, 서랍 밖(오른쪽)을 짚습니다.
+   */
+  if (await page.locator('.sidebar-backdrop').count()) {
+    await page.click('.sidebar-backdrop', { position: { x: 520, y: 500 } })
+    await page.waitForTimeout(400)
+  }
+  // 보기 모드는 앞 걸음에서 고른 것을 따라옵니다. 셋 가운데 서 있는 칸을 잽니다.
+  const onScreen = await page.evaluate(() =>
+    getComputedStyle(document.querySelector('.main .preview, .main .editor, .main .asset-view'))
+      .paddingLeft)
+  const narrowGap = await paper()
+  const narrow = await saved('쪽 나눔 사본.pdf')
+  await page.setViewportSize({ width: 1400, height: 920 })
+  await page.waitForTimeout(400)
+
+  console.log('  ' + JSON.stringify({ wideGap, narrowGap, onScreen,
+    넓은창: wide.pages, 좁은창: narrow.pages }))
+  // 좁힌 화면에서는 보고 있는 글의 여백이 실제로 줄어야 합니다. 안 줄면 시험이 헛돈 것입니다.
+  expect('좁힌 화면의 본문은 여백이 줄어듦', onScreen === '12px', onScreen)
+  expect('뜨는 자리는 넓은 창에서 20px', wideGap === '20px', wideGap)
+  expect('좁은 창에서도 그대로 20px', narrowGap === '20px', narrowGap)
+  expect('쪽 수가 같음', wide.pages === narrow.pages && wide.pages > 1,
+    `${wide.pages} ≠ ${narrow.pages}`)
 } catch (cause) {
   fail('묶음이 도중에 멈춤', cause instanceof Error ? (cause.stack ?? cause.message) : String(cause))
 } finally {

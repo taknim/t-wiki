@@ -182,11 +182,20 @@ export async function sheetToPdf(sheet: HTMLElement): Promise<Blob> {
   // 넓은 표는 글자 폭보다 바깥으로 비어져 나옵니다. 그만큼까지 떠서 쪽에 맞춰 줄입니다.
   const width = Math.max(sheet.scrollWidth, SHEET_WIDTH)
   const height = sheet.scrollHeight
+  /*
+   * 뜨는 쪽은 제 틀을 세워 화면을 한 벌 베낀 뒤 거기서 그립니다. 그 틀의 너비를 쪽 너비로
+   * 일러 주었더니(`windowWidth`), **베낀 쪽에서는 좁은 화면 규칙이 걸렸습니다**(@media
+   * max-width: 720px). 글 칸의 좌우 여백이 20px 에서 12px 로 줄어 글이 다르게 접히고,
+   * 그러면 쪽을 가를 자리를 재어 둔 이쪽(진짜 화면)과 그려진 그림이 어긋납니다. 어긋난
+   * 만큼 쪽 끝에서 글줄과 표의 한 줄이 반 토막 났습니다. 틀의 너비는 건드리지 않습니다 —
+   * 그래야 재는 쪽과 그리는 쪽이 같은 규칙으로 섭니다. 그와 짝으로, 글 칸의 여백은
+   * `.pdf-sheet .preview` 에서 못 박아 두었습니다. 사람이 창을 좁혀 두었을 때도 쪽은
+   * 같은 모양이어야 하기 때문입니다.
+   */
   const canvas = await html2canvas(sheet, {
     scale: rasterScale(width, height),
     width,
     height,
-    windowWidth: width,
     backgroundColor: '#ffffff',
     logging: false,
   })
