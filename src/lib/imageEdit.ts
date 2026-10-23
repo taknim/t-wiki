@@ -5,22 +5,94 @@
  * 내놓습니다 — 고치는 일은 되돌릴 수 없고, 덮어쓰면 원본이 사라집니다.
  */
 
-/** 내놓을 수 있는 형식. */
-export type ImageFormat = 'png' | 'jpeg'
+/** canvas 가 그려서 내놓을 수 있는 그림 형식. */
+export type ImageFormat = 'png' | 'jpeg' | 'webp'
 
-export const FORMATS: { id: ImageFormat; name: string; extension: string }[] = [
-  { id: 'png', name: 'PNG', extension: 'png' },
-  { id: 'jpeg', name: 'JPG', extension: 'jpg' },
-]
+/** 수정 화면에서 내놓을 수 있는 것. 그림 형식에 종이(PDF)를 더합니다. */
+export type OutputFormat = ImageFormat | 'pdf'
+
+export interface OutputSpec {
+  id: OutputFormat
+  name: string
+  extension: string
+  /** 버려 가며 줄이는 형식인지. 이쪽만 품질을 고를 수 있습니다. */
+  lossy?: boolean
+}
+
+const SPECS: Record<OutputFormat, OutputSpec> = {
+  png: { id: 'png', name: 'PNG', extension: 'png' },
+  jpeg: { id: 'jpeg', name: 'JPG', extension: 'jpg', lossy: true },
+  webp: { id: 'webp', name: 'WEBP', extension: 'webp', lossy: true },
+  pdf: { id: 'pdf', name: 'PDF', extension: 'pdf' },
+}
+
+/**
+ * 어느 그림에서나 낼 수 있는 것.
+ *
+ * **PDF 가 여기 있는 것은 그림을 종이로 내는 길을 이 화면 하나로 모았기 때문입니다.**
+ * 예전에는 보는 화면에 Export PDF 단추가 따로 떠 있었습니다. 그런데 그림을 종이에 담기
+ * 전에 하고 싶은 일(돌리기·자르기·크기 줄이기)은 모두 이 화면에 있어, 손질한 뒤 PDF 로
+ * 내려면 파일을 한 번 만들어 폴더에 남기고 그것을 다시 열어 단추를 눌러야 했습니다.
+ * 같은 일을 하는 자리를 둘로 두지 않습니다.
+ */
+const ALWAYS: OutputFormat[] = ['png', 'jpeg', 'pdf']
+
+/**
+ * 원본 형식 그대로 다시 쓸 수 있는 것.
+ *
+ * **canvas 가 되돌려 주는 형식만** 둡니다. gif·svg·bmp·ico 는 받아서 그릴 수는 있어도
+ * 내놓지는 못합니다. avif 도 빠집니다 — 크롬은 `toBlob('image/avif')` 를 거절하는 대신
+ * **말없이 PNG 를 돌려줍니다.** 그러면 avif 로 저장한 줄 알고 받은 파일이 PNG 입니다.
+ */
+const KEEPABLE: Record<string, ImageFormat> = {
+  png: 'png', jpg: 'jpeg', jpeg: 'jpeg', jpe: 'jpeg', webp: 'webp',
+}
+
+/** 그림 파일의 확장자. 대소문자를 가리지 않습니다. */
+function suffixOf(path: string): string {
+  const name = path.split('/').pop() ?? path
+  const at = name.lastIndexOf('.')
+  return at === -1 ? '' : name.slice(at + 1).toLowerCase()
+}
+
+/** 원래 형식 그대로 다시 쓸 수 있으면 그 형식. 없으면 null. */
+export function keepFormatOf(path: string): ImageFormat | null {
+  return KEEPABLE[suffixOf(path)] ?? null
+}
+
+/**
+ * 고를 수 있는 형식. **원래 형식이 맨 앞**이고, 열었을 때 그것이 골라져 있습니다.
+ *
+ * 예전에는 늘 PNG 가 맨 앞이고 PNG 로 골라져 있었습니다. 그래서 사진(JPG)을 조금 자르려고
+ * 열면 형식이 PNG 로 갈려, 자르기만 하려던 사람이 몇 배로 불어난 파일을 받았습니다.
+ * 되돌릴 수 없는 형식(gif·svg·bmp·ico·avif)만 PNG 로 엽니다 — 그 그림은 어차피 갈아야 합니다.
+ */
+export function formatsFor(path: string): OutputSpec[] {
+  const keep = keepFormatOf(path)
+  const rest = ALWAYS.filter((one) => one !== keep).map((one) => SPECS[one])
+  return keep ? [SPECS[keep], ...rest] : rest
+}
+
+/*
+ * 투명한 자리를 지닐 수 있는 형식.
+ *
+ * PDF 에 PNG 로 실을지 JPG 로 실을지 가립니다. 사진을 PNG 로 담으면 PDF 가 몇 배로
+ * 불어나는데, 사진에는 애초에 투명이 없습니다. 반대로 투명을 지닌 그림을 JPG 로 담으면
+ * 투명하던 자리가 흰 바탕으로 굳습니다.
+ */
+const ALPHA = ['png', 'gif', 'webp', 'avif', 'svg', 'ico']
+
+export function keepsAlpha(path: string): boolean {
+  return ALPHA.includes(suffixOf(path))
+}
 
 /**
  * 그림 파일의 형식 이름. 확장자를 사람이 부르는 이름으로 옮깁니다.
  * jpe·jpeg 처럼 같은 것을 다르게 적은 확장자도 한 이름으로 모읍니다.
  */
 export function imageFormatName(path: string): string {
-  const extension = (path.split('.').pop() ?? '').toLowerCase()
+  const extension = suffixOf(path)
   if (extension === 'jpg' || extension === 'jpeg' || extension === 'jpe') return 'JPG'
-  if (extension === 'svg') return 'SVG'
   return extension.toUpperCase()
 }
 
@@ -102,8 +174,13 @@ export interface RenderOptions {
   width?: number
   height?: number
   format: ImageFormat
-  /** JPG 의 품질(0.1 ~ 1). PNG 에는 뜻이 없습니다. */
+  /** JPG·WEBP 의 품질(0.1 ~ 1). PNG 에는 뜻이 없습니다. */
   quality?: number
+  /**
+   * 화면에서 재어 둔 본디 크기. 크기를 밝히지 않은 SVG 처럼 그림 스스로 크기를 말해 주지
+   * 못할 때만 씁니다.
+   */
+  natural?: { width: number; height: number }
 }
 
 /** 그림 크기의 위아래 끝. 1픽셀 아래로는 그릴 것이 없고, 너무 크면 브라우저가 canvas 를 내주지 않습니다. */
@@ -252,12 +329,18 @@ export function keepRatio(side: number, from: number, to: number): number {
  * 빈칸과 괄호는 따옴표로 감싸야 하고, 주소에서는 `%20` 으로 바뀌어 읽기 어렵습니다.
  * (같은 이름이 이미 있으면 덮을지 묻습니다.)
  */
-export function outputName(path: string, format: ImageFormat, suffix = '_modified'): string {
+export function outputName(path: string, format: OutputFormat, suffix = '_modified'): string {
   const name = path.split('/').pop() ?? path
   const at = name.lastIndexOf('.')
   const stem = at === -1 ? name : name.slice(0, at)
-  const extension = FORMATS.find((one) => one.id === format)?.extension ?? 'png'
-  return `${stem}${suffix}.${extension}`
+  /*
+   * PDF 는 원래 확장자를 **지우지 않고 뒤에 덧붙입니다** — 문서를 내보낼 때 저장 창에 미리
+   * 적는 이름과 같은 규칙입니다(pdfExport 의 pdfNameFor). 지우면 `사진.png` 에서 낸 것과
+   * `사진.jpg` 에서 낸 것이 한 이름이 되어, 같은 폴더에 둘 때 뒤에 낸 것이 앞의 것을 덮을지
+   * 묻는 물음을 받습니다. 덧붙이면 무엇에서 낸 종이인지가 이름에 남습니다.
+   */
+  if (format === 'pdf') return `${stem}${suffix}${at === -1 ? '' : name.slice(at)}.pdf`
+  return `${stem}${suffix}.${SPECS[format].extension}`
 }
 
 /**
@@ -267,8 +350,26 @@ export function outputName(path: string, format: ImageFormat, suffix = '_modifie
  * 검정보다 흰 쪽이 원래 모습에 가깝습니다 — 화면도 문서도 대개 흰 바탕입니다.
  */
 export async function renderImage(source: Blob, options: RenderOptions): Promise<Blob> {
-  const bitmap = await createImageBitmap(source)
+  /*
+   * 그릴 바탕은 **<img> 로** 읽습니다.
+   *
+   * `createImageBitmap` 은 한 줄로 끝나지만 **크롬이 SVG 를 받지 않습니다**
+   * (InvalidStateError: The source image could not be decoded). 그래서 SVG 그림은 수정
+   * 화면을 열어 손질해 놓고 저장을 누르는 순간에야 그 오류를 만났습니다. <img> 는 화면에
+   * 그려 보여 줄 때 이미 쓰고 있는 길이고, SVG 도 그대로 읽습니다.
+   *
+   * 크기를 밝히지 않은 SVG 는 naturalWidth 가 0 으로 옵니다. 그때는 **부르는 쪽이 재어
+   * 둔 크기**(화면에 그려진 크기)를 씌워 그립니다.
+   */
+  const url = URL.createObjectURL(source)
   try {
+    const image = new Image()
+    image.src = url
+    await image.decode()
+    const bitmap = image.naturalWidth > 0 && image.naturalHeight > 0
+      ? { width: image.naturalWidth, height: image.naturalHeight }
+      : options.natural ?? { width: 0, height: 0 }
+    if (bitmap.width <= 0 || bitmap.height <= 0) throw new Error('그림의 크기를 알 수 없습니다.')
     const orient = options.orient ?? UPRIGHT
     /*
      * 돌리기·뒤집기를 **먼저 마친 그림**을 하나 만들어 두고, 잘라내기와 크기는 그 위에서 셉니다.
@@ -287,7 +388,7 @@ export async function renderImage(source: Blob, options: RenderOptions): Promise
     // 차례는 orientCss 와 같습니다. 나중에 적은 것이 먼저 먹으므로 그림은 돌아간 뒤 뒤집힙니다.
     board.scale(orient.flipX ? -1 : 1, orient.flipY ? -1 : 1)
     board.rotate((orient.turn * Math.PI) / 180)
-    board.drawImage(bitmap, -bitmap.width / 2, -bitmap.height / 2)
+    board.drawImage(image, -bitmap.width / 2, -bitmap.height / 2, bitmap.width, bitmap.height)
 
     const crop = options.crop ? clampCrop(options.crop, shown) : { x: 0, y: 0, ...shown }
     const width = clampSide(options.width ?? crop.width)
@@ -309,10 +410,10 @@ export async function renderImage(source: Blob, options: RenderOptions): Promise
       canvas.toBlob(
         (blob) => (blob ? resolve(blob) : reject(new Error('그림을 내놓지 못했습니다.'))),
         `image/${options.format}`,
-        options.format === 'jpeg' ? (options.quality ?? 0.9) : undefined,
+        SPECS[options.format].lossy ? (options.quality ?? 0.9) : undefined,
       )
     })
   } finally {
-    bitmap.close()
+    URL.revokeObjectURL(url)
   }
 }

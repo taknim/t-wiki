@@ -23,8 +23,14 @@ expect('마크다운', canExportPdf('회의록.md'))
 expect('표', canExportPdf('매출.csv') && canExportPdf('매출.tsv'))
 expect('엑셀', canExportPdf('판매표.xlsx') && canExportPdf('옛판매표.xls'))
 expect('워드', canExportPdf('안내문.docx'))
-expect('그림은 모두', ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'avif', 'bmp', 'ico']
-  .every((one) => canExportPdf(`그림.${one}`)))
+/*
+ * 그림은 빠집니다. 종이로 내는 일을 **수정 화면의 형식 고르기**(PNG·JPG·PDF)로 옮겼습니다.
+ * 보는 화면에도 단추를 두면 손질하려던 사람은 파일을 한 번 만들어 남기고 그것을 다시 열어
+ * 눌러야 했습니다.
+ */
+expect('그림은 보는 화면에서 내지 않음',
+  ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'avif', 'bmp', 'ico']
+    .every((one) => !canExportPdf(`그림.${one}`)))
 // 글자를 글자 그대로(또는 강조만 입혀) 보여 주는 것은 PDF 로 감싸도 더해지는 것이 없습니다.
 same('그냥 글은 아님', [canExportPdf('메모.txt'), canExportPdf('어제.log')], [false, false])
 same('코드도 아님', [canExportPdf('도구.py'), canExportPdf('설정.json'), canExportPdf('쪽.html')],
@@ -35,11 +41,18 @@ same('못 그리는 문서는 아님',
   [false, false, false, false, false])
 same('압축·PDF 는 아님', [canExportPdf('자료.zip'), canExportPdf('안내.pdf')], [false, false])
 
-console.log('\n>>> 2. 이름은 확장자만 갈아 준다')
-same('마크다운', pdfNameFor('회의/주간 회의.md'), '주간 회의.pdf')
-same('두 번 찍힌 확장자', pdfNameFor('자료.2026.xlsx'), '자료.2026.pdf')
-same('확장자가 없으면 뒤에 붙임', pdfNameFor('README'), 'README.pdf')
-// 숨은 파일은 앞의 점이 확장자 구분이 아닙니다. `.pdf` 하나만 남으면 이름이 사라집니다.
+console.log('\n>>> 2. 이름은 원래 것 뒤에 .pdf 를 덧붙인다')
+/*
+ * 확장자를 갈아 치우지 않습니다. 갈아 치우면 `판매표.xlsx` 와 `판매표.csv` 가 둘 다
+ * `판매표.pdf` 가 되어, 한 자리에 모아 둘 때 뒤에 낸 것이 앞의 것을 말없이 덮습니다.
+ */
+same('마크다운', pdfNameFor('회의/주간 회의.md'), '주간 회의.md.pdf')
+same('엑셀', pdfNameFor('판매표.xlsx'), '판매표.xlsx.pdf')
+// 같은 이름의 다른 형식은 다른 PDF 가 됩니다.
+expect('형식이 다르면 이름도 다름', pdfNameFor('판매표.xlsx') !== pdfNameFor('판매표.csv'),
+  pdfNameFor('판매표.csv'))
+same('두 번 찍힌 확장자', pdfNameFor('자료.2026.xlsx'), '자료.2026.xlsx.pdf')
+same('확장자가 없어도 그대로 붙임', pdfNameFor('README'), 'README.pdf')
 same('숨은 파일', pdfNameFor('.gitignore'), '.gitignore.pdf')
 
 console.log('\n>>> 3. 쪽은 A4 세로, 네 변에 여백을 둔다')

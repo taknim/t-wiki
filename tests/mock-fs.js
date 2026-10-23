@@ -224,8 +224,7 @@ window.__installMockFs = function installMockFs() {
    * 메가바이트짜리 글이 되어 느려지니, 여기서 보고 셈만 넘깁니다.
    * 쪽 꾸러미(`/Type /Page`)와 쪽 크기(`/MediaBox`)는 압축하지 않고 그대로 적힙니다.
    */
-  window.__savedPdf = async (name) => {
-    const handle = savedDir._children.get(name)
+  const readPdf = async (handle) => {
     if (!handle) return null
     const bytes = new Uint8Array(await (await handle.getFile()).arrayBuffer())
     let text = ''
@@ -240,4 +239,10 @@ window.__installMockFs = function installMockFs() {
         .map((one) => JSON.parse(one)),
     }
   }
+  window.__savedPdf = (name) => readPdf(savedDir._children.get(name))
+  /*
+   * 폴더 안에 만들어진 PDF. 그림 수정 화면은 저장 창을 거치지 않고 **원본 옆에** 만들므로
+   * 저장 창이 받아 둔 것(savedDir)에는 없습니다.
+   */
+  window.__vaultPdf = (name) => readPdf(window.__mockRoot._children.get(name))
 }

@@ -1,4 +1,4 @@
-import { extensionOf, IMAGE_EXTENSIONS, isMarkdown, withMime } from './attachments'
+import { extensionOf, isMarkdown } from './attachments'
 
 /**
  * 보던 것을 PDF 한 벌로 내보냅니다.
@@ -9,20 +9,29 @@ import { extensionOf, IMAGE_EXTENSIONS, isMarkdown, withMime } from './attachmen
  *
  * ppt·pptx·hwp·hwpx·doc 도 빠집니다. 앱이 아직 그려 보여 주지 못하는 형식이라,
  * 내보낼 그림이 없습니다. 그릴 수 있게 되면 여기 한 줄을 더하면 따라옵니다.
+ *
+ * **그림도 빠집니다.** 그림을 종이에 담는 일은 수정 화면의 형식 고르기(PNG·JPG·PDF)로
+ * 옮겼습니다. 거기서는 돌리고 자르고 크기를 줄인 뒤 그대로 PDF 로 낼 수 있습니다.
+ * 보는 화면에도 단추를 두면, 손질하려던 사람은 파일을 한 번 만들고 그것을 다시 열어
+ * 눌러야 했습니다 — 같은 일을 하는 자리를 둘로 두지 않습니다.
  */
 const DOCUMENT_EXPORTS = ['csv', 'tsv', 'docx', 'xlsx', 'xlsm', 'xls']
 
 export function canExportPdf(path: string): boolean {
-  const extension = extensionOf(path)
   if (isMarkdown(path)) return true
-  return IMAGE_EXTENSIONS.includes(extension) || DOCUMENT_EXPORTS.includes(extension)
+  return DOCUMENT_EXPORTS.includes(extensionOf(path))
 }
 
-/** 내보낼 파일에 미리 적어 둘 이름. `회의록.md` → `회의록.pdf`. */
+/**
+ * 내보낼 파일에 미리 적어 둘 이름. `판매표.xlsx` → `판매표.xlsx.pdf`.
+ *
+ * 원래 확장자를 갈아 치우지 않고 **뒤에 덧붙입니다.** 갈아 치우면 같은 이름의 다른
+ * 형식들(`판매표.xlsx`·`판매표.csv`·`판매표.md`)이 모두 `판매표.pdf` 하나가 되어, 한
+ * 자리에 모아 둘 때 뒤에 낸 것이 앞의 것을 말없이 덮습니다. 덧붙이면 이름만 보고도
+ * 무엇에서 뜬 것인지 알 수 있고, 원본과 나란히 두어도 짝이 보입니다.
+ */
 export function pdfNameFor(path: string): string {
-  const name = path.split('/').pop() ?? path
-  const at = name.lastIndexOf('.')
-  return `${at <= 0 ? name : name.slice(0, at)}.pdf`
+  return `${path.split('/').pop() ?? path}.pdf`
 }
 
 /*
@@ -235,72 +244,37 @@ export async function sheetToPdf(sheet: HTMLElement): Promise<Blob> {
   return doc.output('blob')
 }
 
-/** 크기를 밝히지 않은 SVG. 그려 둔 자리를 읽어 가로세로 비를 셉니다. */
-async function svgSize(blob: Blob): Promise<{ width: number; height: number }> {
-  const text = await blob.text()
-  const box = /viewBox\s*=\s*["']\s*[\d.+-]+[\s,]+[\d.+-]+[\s,]+([\d.]+)[\s,]+([\d.]+)/.exec(text)
-  if (box) return { width: Number(box[1]), height: Number(box[2]) }
-  // 그것도 없으면 브라우저가 쓰는 기본 크기입니다. 벡터라 키워 떠도 번지지 않습니다.
-  return { width: 300, height: 150 }
-}
-
-/** 벡터 그림을 이만큼 키워 뜹니다. 본디 크기로 뜨면 종이에서 획이 뭉개집니다. */
-const VECTOR_WIDTH = 1600
-
-async function imageCanvas(blob: Blob, path: string): Promise<HTMLCanvasElement> {
-  const url = URL.createObjectURL(withMime(blob, path))
+/**
+ * 그려 낸 그림 한 장을 쪽 하나에 앉혀 PDF 로 냅니다.
+ *
+ * 받는 것은 **수정 화면이 손질을 마치고 canvas 로 그려 낸 그림**입니다. 원본 파일을 받아
+ * 확장자로 이것저것 가리던 길은 걷어냈습니다 — 벡터를 키워 뜰지, 투명을 지녔는지는 모두
+ * 부르는 쪽이 이미 아는 값이라, 두 군데서 같은 것을 다시 가리고 있었습니다.
+ *
+ * 움직이는 GIF 는 첫 장만 담깁니다. PDF 에는 움직임을 담을 자리가 없습니다.
+ */
+export async function rasterToPdf(blob: Blob, alpha: boolean): Promise<Blob> {
+  const url = URL.createObjectURL(blob)
+  let canvas: HTMLCanvasElement
   try {
     const image = new Image()
     image.src = url
     await image.decode()
 
-    /*
-     * SVG 는 크기를 밝히지 않은 것이 많아 naturalWidth 가 0 으로 옵니다. 그대로
-     * canvas 를 만들면 넓이가 0 이라 아무것도 그려지지 않습니다.
-     */
-    const natural = image.naturalWidth > 0 && image.naturalHeight > 0
-      ? { width: image.naturalWidth, height: image.naturalHeight }
-      : await svgSize(blob)
-    const scale = extensionOf(path) === 'svg' ? Math.max(1, VECTOR_WIDTH / natural.width) : 1
-
-    const canvas = document.createElement('canvas')
-    canvas.width = Math.round(natural.width * scale)
-    canvas.height = Math.round(natural.height * scale)
-
+    canvas = document.createElement('canvas')
+    canvas.width = image.naturalWidth
+    canvas.height = image.naturalHeight
     const paint = canvas.getContext('2d')
     if (!paint) throw new Error('이 브라우저에서는 그림을 뜰 수 없습니다.')
-    paint.drawImage(image, 0, 0, canvas.width, canvas.height)
-    return canvas
-  } finally {
-    URL.revokeObjectURL(url)
-  }
-}
-
-/*
- * 투명한 자리를 지닐 수 있는 형식. 이쪽은 PNG 로 싣습니다.
- *
- * 나머지(사진)는 JPEG 로 싣습니다. 사진을 PNG 로 담으면 파일이 열 배로 불어나는데,
- * 사진은 애초에 JPEG 로 들어온 것이라 다시 JPEG 로 담아도 눈에 띄게 나빠지지 않습니다.
- */
-const ALPHA_FORMATS = ['png', 'gif', 'webp', 'avif', 'svg', 'ico']
-
-/**
- * 그림 한 장을 PDF 한 쪽으로 냅니다.
- *
- * 움직이는 GIF 는 첫 장만 담깁니다. PDF 에는 움직임을 담을 자리가 없습니다.
- */
-export async function imageToPdf(blob: Blob, path: string): Promise<Blob> {
-  const canvas = await imageCanvas(blob, path)
-  const alpha = ALPHA_FORMATS.includes(extensionOf(path))
-
-  if (!alpha) {
-    // 투명한 자리가 없는 형식이라도 JPEG 로 바꾸는 길에 검게 깔리지 않도록 흰 바탕을 먼저 둡니다.
-    const paint = canvas.getContext('2d')
-    if (paint) {
+    paint.drawImage(image, 0, 0)
+    if (!alpha) {
+      // 투명한 자리가 남으면 JPEG 로 바꾸는 길에 검게 깔립니다. 흰 바탕을 밑에 둡니다.
       paint.globalCompositeOperation = 'destination-over'
       paint.fillStyle = '#ffffff'
       paint.fillRect(0, 0, canvas.width, canvas.height)
     }
+  } finally {
+    URL.revokeObjectURL(url)
   }
 
   const place = fitOnPage(canvas.width, canvas.height)
@@ -311,6 +285,11 @@ export async function imageToPdf(blob: Blob, path: string): Promise<Blob> {
     orientation: place.orientation,
     compress: true,
   })
+  /*
+   * 투명을 지닌 그림은 PNG 로, 그렇지 않은 것(사진)은 JPEG 로 싣습니다. 사진을 PNG 로
+   * 담으면 PDF 가 몇 배로 불어나는데, 사진은 애초에 JPEG 로 들어온 것이라 다시 JPEG 로
+   * 담아도 눈에 띄게 나빠지지 않습니다.
+   */
   doc.addImage(
     alpha ? canvas.toDataURL('image/png') : canvas.toDataURL('image/jpeg', 0.92),
     alpha ? 'PNG' : 'JPEG',

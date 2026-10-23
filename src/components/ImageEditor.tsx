@@ -3,10 +3,12 @@ import { formatBytes, withMime } from '../lib/attachments'
 import { readBinaryFile } from '../lib/fsAccess'
 import { fileNameOf } from '../lib/paths'
 import {
-  clampSide, CROP_RATIOS, FORMATS, isUpright, keepRatio, MAX_SIDE, MIN_SIDE, orientCss, orientedSize,
-  orientName, outputName, ratioOf, renderImage, reshapeCrop, sizeCrop, turnBy, UPRIGHT,
-  type Crop, type ImageFormat, type Lay, type Orient,
+  clampSide, CROP_RATIOS, formatsFor, isUpright, keepFormatOf, keepRatio, keepsAlpha, MAX_SIDE,
+  MIN_SIDE, orientCss, orientedSize, orientName, outputName, ratioOf, renderImage, reshapeCrop,
+  sizeCrop, turnBy, UPRIGHT,
+  type Crop, type ImageFormat, type Lay, type Orient, type OutputFormat,
 } from '../lib/imageEdit'
+import { rasterToPdf } from '../lib/pdfExport'
 import { askZoomPercent, clampPercent, stepZoom } from '../lib/zoom'
 import { FlipXIcon, FlipYIcon, RotateLeftIcon, RotateRightIcon } from './icons'
 import { ZoomControl } from './ZoomControl'
@@ -71,9 +73,14 @@ export function ImageEditor({ root, path, onSave, onCancel }: ImageEditorProps) 
   const [width, setWidth] = useState(0)
   const [height, setHeight] = useState(0)
   const [ratio, setRatio] = useState(true)
-  const [format, setFormat] = useState<ImageFormat>('png')
+  /*
+   * 처음 골라져 있는 형식은 **원래 그 파일의 형식**입니다. 되돌릴 수 없는 형식(gif·svg·
+   * bmp·ico·avif)이면 PNG 로 엽니다. 까닭은 imageEdit 의 formatsFor 에 적어 두었습니다.
+   */
+  const formats = formatsFor(path)
+  const [format, setFormat] = useState<OutputFormat>(() => keepFormatOf(path) ?? 'png')
   const [quality, setQuality] = useState(90)
-  const [name, setName] = useState(() => outputName(path, 'png'))
+  const [name, setName] = useState(() => outputName(path, keepFormatOf(path) ?? 'png'))
   const [zoom, setZoom] = useState(1)
   /** 지금 칸에 꽉 차는 배율. 맞춤 단추를 켜 둘지 가리는 데 씁니다. */
   const [fitZoom, setFitZoom] = useState<number | null>(null)
@@ -182,7 +189,7 @@ export function ImageEditor({ root, path, onSave, onCancel }: ImageEditorProps) 
     setZoom(fit)
   }
 
-  const changeFormat = (next: ImageFormat) => {
+  const changeFormat = (next: OutputFormat) => {
     setFormat(next)
     setName(outputName(path, next))
   }
@@ -543,7 +550,17 @@ export function ImageEditor({ root, path, onSave, onCancel }: ImageEditorProps) 
     setBusy(true)
     setError(null)
     try {
-      const blob = await renderImage(source, { orient, crop, width, height, format, quality: quality / 100 })
+      /*
+       * PDF 는 두 걸음입니다. 손질한 그림을 **PNG 로 한 장 그려 내고**, 그것을 쪽 하나에
+       * 앉힙니다. 중간을 PNG(버리는 것이 없는 형식)로 두는 것은 두 번 버리지 않기
+       * 위해서입니다 — 중간을 JPG 로 두면 여기서 한 번, 종이에 실을 때 또 한 번 버립니다.
+       * 쪽에 실을 때 PNG 로 실을지 JPG 로 실을지는 원본이 투명을 지닐 수 있는지로 가립니다.
+       */
+      const raster: ImageFormat = format === 'pdf' ? 'png' : format
+      const drawn = await renderImage(source, {
+        orient, crop, width, height, format: raster, quality: quality / 100, natural,
+      })
+      const blob = format === 'pdf' ? await rasterToPdf(drawn, keepsAlpha(path)) : drawn
       await onSave(name.trim() || outputName(path, format), blob)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause))
@@ -861,7 +878,7 @@ export function ImageEditor({ root, path, onSave, onCancel }: ImageEditorProps) 
         <section className="field">
           <h4 className="field-group-title">형식</h4>
           <div className="segmented" role="group" aria-label="내놓을 형식">
-            {FORMATS.map((one) => (
+            {formats.map((one) => (
               <button
                 key={one.id}
                 type="button"
@@ -873,26 +890,32 @@ export function ImageEditor({ root, path, onSave, onCancel }: ImageEditorProps) 
               </button>
             ))}
           </div>
-          {/* JPG 는 그림을 버려 가며 줄입니다. PNG 는 버리는 것이 없어 이 값이 뜻이 없습니다. */}
+          {/* JPG·WEBP 는 그림을 버려 가며 줄입니다. PNG 는 버리는 것이 없어 이 값이 뜻이 없습니다. */}
+          {formats.find((one) => one.id === format)?.lossy && (
+            <div className="row" style={{ alignItems: 'center', gap: 8 }}>
+              <label htmlFor="image-quality">품질</label>
+              <input
+                id="image-quality"
+                type="range"
+                min={10}
+                max={100}
+                step={5}
+                value={quality}
+                onChange={(event) => setQuality(Number(event.target.value))}
+              />
+              <span className="hint" style={{ margin: 0 }}>{quality}%</span>
+            </div>
+          )}
           {format === 'jpeg' && (
-            <>
-              <div className="row" style={{ alignItems: 'center', gap: 8 }}>
-                <label htmlFor="image-quality">품질</label>
-                <input
-                  id="image-quality"
-                  type="range"
-                  min={10}
-                  max={100}
-                  step={5}
-                  value={quality}
-                  onChange={(event) => setQuality(Number(event.target.value))}
-                />
-                <span className="hint" style={{ margin: 0 }}>{quality}%</span>
-              </div>
-              <p className="hint" style={{ margin: 0 }}>
-                JPG 에는 투명이 없습니다. 투명한 자리는 흰 바탕으로 깔립니다.
-              </p>
-            </>
+            <p className="hint" style={{ margin: 0 }}>
+              JPG 에는 투명이 없습니다. 투명한 자리는 흰 바탕으로 깔립니다.
+            </p>
+          )}
+          {/* 종이에 담는 길. 보는 화면에는 단추를 두지 않고 이 자리 하나로 모았습니다. */}
+          {format === 'pdf' && (
+            <p className="hint" style={{ margin: 0 }}>
+              A4 한 쪽 가운데에 앉힙니다. 쪽보다 크면 여백에 맞춰 줄이고, 가로로 길면 쪽을 누입니다.
+            </p>
           )}
         </section>
 

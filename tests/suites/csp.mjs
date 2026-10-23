@@ -214,8 +214,8 @@ try {
   await page.click('.tree-row:has-text("모둠")')
   await page.waitForSelector('.preview .mermaid-figure svg', { timeout: 15000 })
   await page.click('.doc-tools .doc-tool-pdf')
-  await page.waitForFunction(() => window.__savedSize('모둠.pdf') > 0, undefined, { timeout: 60000 })
-  const paper = await page.evaluate(() => window.__savedPdf('모둠.pdf'))
+  await page.waitForFunction(() => window.__savedSize('모둠.md.pdf') > 0, undefined, { timeout: 60000 })
+  const paper = await page.evaluate(() => window.__savedPdf('모둠.md.pdf'))
   console.log('  ' + JSON.stringify(paper))
   expect('PDF 가 만들어짐', paper.head.startsWith('%PDF-') && paper.size > 5000,
     JSON.stringify(paper))

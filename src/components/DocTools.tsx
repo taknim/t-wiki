@@ -49,8 +49,6 @@ function findPane(): HTMLElement | null {
  */
 /** 글에서 띄울 만큼. 굴림대와 아래 표시줄은 이 값에 더해 따로 셉니다. */
 const GAP = 24
-/** 떠 있는 것끼리의 틈. 단추 사이(.doc-tools 의 gap)와 같습니다. */
-const STACK_GAP = 8
 
 export function DocTools({ toc, backlinks, pdf, path }: DocToolsProps) {
   const [rolls, setRolls] = useState(false)
@@ -95,16 +93,15 @@ export function DocTools({ toc, backlinks, pdf, path }: DocToolsProps) {
        * 굴림대에 달라붙습니다. 눈에 보이는 틈을 같게 하려면 굴림대 너비를 재서
        * 더해야 합니다. 아래도 표시줄 높이만큼 더합니다.
        *
-       * 그림을 볼 때는 **배율 손잡이가 같은 구석에** 떠 있습니다. 그 높이만큼 더 올라서지
-       * 않으면 두 벌이 그대로 겹쳐, 아래 것이 눌리지 않습니다. PDF 단추가 생기기 전에는
-       * 그림 화면에 뜰 단추가 없어 부딪힐 일이 없었습니다.
+       * 그림 위에 떠 있는 배율 손잡이는 셈에 넣지 않습니다. 여기 서는 단추(목차·백링크·
+       * PDF)는 모두 문서에만 있고, 맨 위·맨 아래는 **굴러가는 칸이 따로 있는** 그림
+       * 보기(.asset-canvas)에서는 뜨지 않아, 그 구석에서 부딪힐 일이 없습니다.
+       * 그림에도 서는 단추를 두게 되면 손잡이 높이만큼 더 올라서야 합니다.
        */
       const dock = box.querySelector(':scope > .info-dock')?.getBoundingClientRect().height ?? 0
-      const zoom = box.querySelector(':scope > .asset-view > .zoom-control')
-        ?.getBoundingClientRect().height ?? 0
       const next = {
         right: GAP + (pane ? pane.offsetWidth - pane.clientWidth : 0),
-        bottom: GAP + dock + (zoom > 0 ? zoom + STACK_GAP : 0),
+        bottom: GAP + dock,
       }
       // 같은 값을 새 꾸러미로 담아 돌려주면 다시 그려지고, 그것이 또 알림을 부릅니다.
       setGap((now) => (now.right === next.right && now.bottom === next.bottom ? now : next))

@@ -60,11 +60,22 @@ await page.addInitScript(() => {
   const mark = facing.getContext('2d')
   mark.fillStyle = 'rgb(220, 40, 40)'
   mark.fillRect(0, 0, 100, 50)
+  /*
+   * **크롬이 canvas 로 내놓지 못하는 형식.** SVG 는 받아서 그릴 수는 있어도 내놓지 못하므로
+   * 수정 화면에서 형식을 갈아야 합니다. 게다가 크롬의 createImageBitmap 은 SVG 를 아예
+   * 받지 않습니다(InvalidStateError) — 그 길로 그리던 때는 SVG 를 열어 손질해 놓고 저장을
+   * 누르는 순간에야 "그림을 그릴 수 없습니다" 를 만났습니다.
+   */
+  put('그림.svg', '<svg xmlns="http://www.w3.org/2000/svg" width="240" height="120">'
+    + '<rect width="240" height="120" fill="#2f6feb"/></svg>')
   window.__seedImage = () => Promise.all([
     new Promise((done) => canvas.toBlob((blob) => { put('사진.png', blob); done() }, 'image/png')),
     new Promise((done) => big.toBlob((blob) => { put('큰 그림.png', blob); done() }, 'image/png')),
     new Promise((done) => edge.toBlob((blob) => { put('가장자리.png', blob); done() }, 'image/png')),
     new Promise((done) => facing.toBlob((blob) => { put('방향.png', blob); done() }, 'image/png')),
+    // 같은 그림을 형식만 달리 둡니다. 열었을 때 그 형식이 골라져 있어야 합니다.
+    new Promise((done) => canvas.toBlob((blob) => { put('사진.jpg', blob); done() }, 'image/jpeg', 0.9)),
+    new Promise((done) => canvas.toBlob((blob) => { put('사진.webp', blob); done() }, 'image/webp', 0.9)),
   ])
 })
 
@@ -72,15 +83,18 @@ await page.addInitScript(() => {
 const madeFile = (name) => page.evaluate(async (which) => {
   const blob = window.__mockRoot._children.get(which)?._data
   if (!blob) return null
-  const head = new Uint8Array(await blob.slice(0, 4).arrayBuffer())
+  const head = new Uint8Array(await blob.slice(0, 12).arrayBuffer())
+  const letters = (from, to) => String.fromCharCode(...head.slice(from, to))
   const bitmap = await createImageBitmap(blob)
   const size = { width: bitmap.width, height: bitmap.height }
   bitmap.close()
   return {
     size,
     bytes: blob.size,
-    // PNG 는 89 50 4E 47, JPG 는 FF D8 로 시작합니다.
-    kind: head[0] === 0x89 && head[1] === 0x50 ? 'png' : head[0] === 0xff && head[1] === 0xd8 ? 'jpg' : '?',
+    // PNG 는 89 50 4E 47, JPG 는 FF D8, WEBP 는 RIFF….WEBP 로 시작합니다.
+    kind: head[0] === 0x89 && head[1] === 0x50 ? 'png'
+      : head[0] === 0xff && head[1] === 0xd8 ? 'jpg'
+        : letters(0, 4) === 'RIFF' && letters(8, 12) === 'WEBP' ? 'webp' : '?',
   }
 }, name)
 
@@ -100,6 +114,8 @@ const pixelAt = (name, x, y) => page.evaluate(async (where) => {
 const painted = (dot) => dot.a > 200 && dot.r > 180 && dot.g < 90
 const blank = (dot) => dot.a < 20
 
+const A4_PORTRAIT = '[[0,0,595.28,841.89]]'
+const A4_LANDSCAPE = '[[0,0,841.89,595.28]]'
 const names = () => page.evaluate(() => [...window.__mockRoot._children.keys()].filter((one) => /사진|자른/.test(one)))
 const openEditor = async () => {
   await page.click('.doc-head button:has-text("수정")')
@@ -139,6 +155,13 @@ try {
   console.log('  ' + info)
   expect('형식이 적힘', info.startsWith('PNG'), info)
   expect('크기도 함께', info.includes('300 × 200px'), info)
+  /*
+   * 보는 화면에는 Export PDF 단추를 두지 않습니다. 그림을 종이에 담기 전에 하고 싶은
+   * 일(돌리기·자르기·크기 줄이기)은 모두 수정 화면에 있어, 같은 일을 하는 자리를 둘로
+   * 두면 손질하려던 사람은 파일을 한 번 만들어 폴더에 남기고 그것을 다시 열어야 했습니다.
+   */
+  expect('Export PDF 는 보는 화면에 없음',
+    (await page.locator('.doc-tools .doc-tool-pdf').count()) === 0)
   await page.click('.tree-row:has-text("개발 환경") .tree-name')
   await page.waitForTimeout(500)
   expect('문서에는 없음', (await page.locator('.doc-head button:has-text("수정")').count()) === 0)
@@ -1230,6 +1253,144 @@ try {
   console.log('  투명하던 자리: ' + JSON.stringify(corner))
   expect('투명한 자리가 희게 깔림', corner.every((one) => one > 240), JSON.stringify(corner))
 
+  step('6-1. 형식은 원래 형식부터 늘어놓고, 그것이 골라져 있다')
+  /*
+   * 늘 PNG 가 맨 앞이고 PNG 로 골라져 있던 때는, 사진(JPG)을 조금 자르려고 열면 형식이
+   * PNG 로 갈려 자르기만 하려던 사람이 몇 배로 불어난 파일을 받았습니다. 되돌릴 수 없는
+   * 형식(svg·gif·bmp)만 PNG 로 엽니다 — 그 그림은 어차피 갈아야 합니다.
+   */
+  const offer = async (file) => {
+    await page.click(`.tree-row:has-text("${file}") >> nth=0`)
+    await page.waitForTimeout(400)
+    await openEditor()
+    return page.evaluate(() => {
+      const group = document.querySelector('.image-edit .segmented[aria-label="내놓을 형식"]')
+      return {
+        차례: [...group.querySelectorAll('button')].map((one) => one.textContent.trim()),
+        골라진것: group.querySelector('button.is-active')?.textContent.trim() ?? null,
+        이름: document.querySelector('.image-edit input[aria-label="파일 이름"]').value,
+        품질: document.querySelectorAll('#image-quality').length,
+      }
+    })
+  }
+
+  const asPng = await offer('사진.png')
+  console.log('  png: ' + JSON.stringify(asPng))
+  expect('png 는 PNG 부터', asPng.차례.join() === 'PNG,JPG,PDF', JSON.stringify(asPng.차례))
+  expect('png 가 골라져 있음', asPng.골라진것 === 'PNG', String(asPng.골라진것))
+  expect('이름도 그 형식', asPng.이름 === '사진_modified.png', asPng.이름)
+  // PNG 는 버리는 것이 없어 품질이 뜻이 없습니다.
+  expect('품질 자리는 없음', asPng.품질 === 0, String(asPng.품질))
+
+  const asJpg = await offer('사진.jpg')
+  console.log('  jpg: ' + JSON.stringify(asJpg))
+  expect('jpg 는 JPG 부터', asJpg.차례.join() === 'JPG,PNG,PDF', JSON.stringify(asJpg.차례))
+  expect('jpg 가 골라져 있음', asJpg.골라진것 === 'JPG', String(asJpg.골라진것))
+  expect('이름도 그대로 jpg', asJpg.이름 === '사진_modified.jpg', asJpg.이름)
+  expect('버려 가며 줄이는 형식이라 품질이 있음', asJpg.품질 === 1, String(asJpg.품질))
+
+  /*
+   * WEBP 는 늘 내놓는 형식에는 없습니다(PNG·JPG·PDF). 그래도 원래 그 형식이면 그대로 둘
+   * 수 있어야 합니다 — 형식을 지키려고 열었는데 고를 수가 없으면 고치기를 그만두게 됩니다.
+   */
+  const asWebp = await offer('사진.webp')
+  console.log('  webp: ' + JSON.stringify(asWebp))
+  expect('webp 는 WEBP 부터', asWebp.차례.join() === 'WEBP,PNG,JPG,PDF', JSON.stringify(asWebp.차례))
+  expect('webp 가 골라져 있음', asWebp.골라진것 === 'WEBP', String(asWebp.골라진것))
+  expect('이름도 그대로 webp', asWebp.이름 === '사진_modified.webp', asWebp.이름)
+
+  const asSvg = await offer('그림.svg')
+  console.log('  svg: ' + JSON.stringify(asSvg))
+  // canvas 가 SVG 로는 내놓지 못합니다. 지킬 수 없는 형식은 목록에 두지 않습니다.
+  expect('svg 는 지킬 수 없어 PNG 부터', asSvg.차례.join() === 'PNG,JPG,PDF', JSON.stringify(asSvg.차례))
+  expect('png 로 골라져 있음', asSvg.골라진것 === 'PNG', String(asSvg.골라진것))
+  expect('이름도 png', asSvg.이름 === '그림_modified.png', asSvg.이름)
+
+  step('6-2. 형식을 그대로 두고 저장하면 그 형식으로 나온다')
+  await page.click('.tree-row:has-text("사진.webp") >> nth=0')
+  await page.waitForTimeout(400)
+  await openEditor()
+  await page.fill('#image-width', '150')
+  await page.waitForTimeout(200)
+  await saveEdit()
+  const webp = await madeFile('사진_modified.webp')
+  console.log('  ' + JSON.stringify(webp))
+  expect('WEBP 로 나옴', webp?.kind === 'webp', JSON.stringify(webp))
+  expect('줄인 크기로', webp?.size.width === 150 && webp.size.height === 100, JSON.stringify(webp))
+
+  step('6-3. 수정 화면에서 바로 PDF 로 낸다')
+  /*
+   * 손질한 그림을 종이에 담는 길입니다. 형식 고르기의 마지막 자리에 둡니다 — 보는 화면에
+   * 단추를 따로 두면 자르고 돌린 뒤 종이로 내려는 사람이 파일을 한 번 만들어 폴더에
+   * 남기고 그것을 다시 열어 눌러야 했습니다.
+   */
+  await page.click('.tree-row:has-text("사진.png") >> nth=0')
+  await page.waitForTimeout(400)
+  await openEditor()
+  await page.click('.image-edit .segmented[aria-label="내놓을 형식"] button:has-text("PDF")')
+  await page.waitForTimeout(200)
+  const paperName = await page.inputValue('.image-edit input[aria-label="파일 이름"]')
+  /*
+   * 종이 이름은 원래 확장자를 **지우지 않고** 뒤에 덧붙입니다. 지우면 `사진.png` 와
+   * `사진.jpg` 에서 낸 종이가 한 이름이 되어, 같은 폴더에 둘 때 덮어쓸지 묻는 물음을 받습니다.
+   */
+  expect('이름은 원래 이름 뒤에 .pdf', paperName === '사진_modified.png.pdf', paperName)
+  expect('품질 자리는 없음', (await page.locator('#image-quality').count()) === 0)
+  await saveEdit()
+  const paper = await page.evaluate(() => window.__vaultPdf('사진_modified.png.pdf'))
+  console.log('  ' + JSON.stringify(paper))
+  expect('PDF 로 나옴', paper?.head.startsWith('%PDF-'), JSON.stringify(paper))
+  expect('한 쪽', paper?.pages === 1, String(paper?.pages))
+  // 300 × 200 은 가로로 깁니다. 세운 쪽에 억지로 넣으면 그림이 손톱만 해집니다.
+  expect('가로로 긴 그림은 쪽을 누임', JSON.stringify(paper?.boxes) === A4_LANDSCAPE,
+    JSON.stringify(paper?.boxes))
+
+  // 돌린 것도 그대로 따라가야 합니다. 돌리면 세로로 길어지므로 쪽도 세워 섭니다.
+  await page.click('.tree-row:has-text("사진.png") >> nth=0')
+  await page.waitForTimeout(400)
+  await openEditor()
+  await page.click('.image-edit .segmented[aria-label="내놓을 형식"] button:has-text("PDF")')
+  await page.click('.turn-group button[aria-label="오른쪽으로 90도 돌리기"]')
+  await page.waitForTimeout(300)
+  await page.fill('.image-edit input[aria-label="파일 이름"]', '세운 종이.pdf')
+  await saveEdit()
+  const standing = await page.evaluate(() => window.__vaultPdf('세운 종이.pdf'))
+  console.log('  ' + JSON.stringify(standing))
+  expect('돌려서 세로로 길어지면 세운 쪽', JSON.stringify(standing?.boxes) === A4_PORTRAIT,
+    JSON.stringify(standing?.boxes))
+
+  step('6-4. SVG 도 고쳐서 낸다')
+  /*
+   * 크롬의 createImageBitmap 은 SVG 를 받지 않습니다(InvalidStateError: The source image
+   * could not be decoded). 그 길로 그리던 때는 SVG 를 열어 손질해 놓고 저장을 누르는
+   * 순간에야 "그림을 그릴 수 없습니다" 를 만났습니다. <img> 로 읽으면 SVG 도 읽힙니다.
+   */
+  await page.click('.tree-row:has-text("그림.svg") >> nth=0')
+  await page.waitForTimeout(400)
+  await openEditor()
+  await saveEdit()
+  const fromSvg = await madeFile('그림_modified.png')
+  console.log('  ' + JSON.stringify(fromSvg))
+  expect('PNG 로 나옴', fromSvg?.kind === 'png', JSON.stringify(fromSvg))
+  expect('본디 크기 그대로', fromSvg?.size.width === 240 && fromSvg.size.height === 120,
+    JSON.stringify(fromSvg))
+  expect('오류가 뜨지 않음', (await page.locator('.image-edit-error').count()) === 0)
+
+  // 벡터도 종이로 냅니다. 투명을 지닐 수 있는 형식이라 쪽에는 PNG 로 실립니다.
+  await page.click('.tree-row:has-text("그림.svg") >> nth=0')
+  await page.waitForTimeout(400)
+  await openEditor()
+  await page.click('.image-edit .segmented[aria-label="내놓을 형식"] button:has-text("PDF")')
+  await page.waitForTimeout(200)
+  expect('종이 이름도 원래 확장자를 지님',
+    (await page.inputValue('.image-edit input[aria-label="파일 이름"]')) === '그림_modified.svg.pdf',
+    await page.inputValue('.image-edit input[aria-label="파일 이름"]'))
+  await saveEdit()
+  const vector = await page.evaluate(() => window.__vaultPdf('그림_modified.svg.pdf'))
+  console.log('  ' + JSON.stringify(vector))
+  expect('벡터도 PDF 로 나옴', vector?.head.startsWith('%PDF-') && vector.pages === 1,
+    JSON.stringify(vector))
+
   /*
    * 같은 이름으로 저장하면 덮어쓸지 먼저 묻습니다. 덮으면 되돌릴 수 없고, 문서에 끼워 넣은
    * 자리도 함께 바뀝니다. 물러서면 아무것도 쓰지 않고 수정 화면에 머뭅니다.
@@ -1279,6 +1440,41 @@ try {
   await page.waitForTimeout(400)
   expect('다시 누르면 보기로 돌아감', (await page.locator('.image-edit').count()) === 0
     && (await page.locator('.asset-image').count()) === 1)
+
+  step('8-1. 그림 위에는 떠 있는 단추를 두지 않는다')
+  /*
+   * 배율 손잡이도 글 오른쪽 아래 같은 구석에 떠 있습니다. 그 자리에 다른 단추가 서면
+   * 두 벌이 그대로 겹쳐 아래 것이 눌리지 않습니다(Export PDF 가 그림에도 서던 때 그랬고,
+   * 손잡이 높이만큼 비켜서게 해 두었습니다). 지금은 그 구석에 설 단추가 아예 없습니다 —
+   * 목차·백링크·PDF 는 문서에만 서고, 맨 위·맨 아래는 굴러가는 칸이 따로 있는 그림
+   * 보기에서는 뜨지 않습니다. 그래서 비켜서는 셈도 걷어냈습니다.
+   *
+   * 그림에 서는 단추를 다시 두게 되면 이 걸음이 먼저 걸립니다. 그때는 손잡이 높이만큼
+   * 비켜서게 하고 눌리는지까지 봐야 합니다.
+   */
+  await page.click('.tree-row:has-text("큰 그림") .tree-name')
+  await page.waitForSelector('.asset-view > .zoom-control', { timeout: 15000 })
+  await page.waitForTimeout(600)
+  // 열 때는 칸에 맞춰 줄여 보여 주므로 넘치는 것이 없습니다. 본디 크기로 두어 칸을 넘깁니다.
+  await page.click('.asset-view > .zoom-control button[aria-label="원본 크기"]')
+  await page.waitForTimeout(600)
+  const stacked = await page.evaluate(() => {
+    const spot = document.querySelector('.asset-view > .zoom-control button').getBoundingClientRect()
+    const hit = document.elementFromPoint(spot.left + spot.width / 2, spot.top + spot.height / 2)
+    return {
+      떠있는것: [...document.querySelectorAll('.doc-tools .doc-tool')].map((one) => one.textContent.trim()),
+      // 칸을 넘겨 두었는지. 넘치지도 않는 채로 재면 아무것도 지키지 않는 걸음이 됩니다.
+      넘침: (() => {
+        const roll = document.querySelector('.asset-canvas')
+        return roll.scrollHeight > roll.clientHeight + 8
+      })(),
+      잡힌것: hit?.closest('.zoom-control') !== null ? '배율' : (hit?.className ?? '모름'),
+    }
+  })
+  console.log('  ' + JSON.stringify(stacked))
+  expect('본디 크기로 두면 칸을 넘침', stacked.넘침, JSON.stringify(stacked))
+  expect('그 구석에 설 단추가 없음', stacked.떠있는것.length === 0, JSON.stringify(stacked))
+  expect('배율 단추가 그대로 눌림', stacked.잡힌것 === '배율', JSON.stringify(stacked))
 
   step('9. 취소하면 아무것도 만들지 않는다')
   const before = (await names()).length

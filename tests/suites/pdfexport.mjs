@@ -126,7 +126,6 @@ const exportPdf = async (name) => {
   return saved(name)
 }
 const A4_PORTRAIT = '[[0,0,595.28,841.89]]'
-const A4_LANDSCAPE = '[[0,0,841.89,595.28]]'
 
 try {
   await page.goto(process.env.APP_URL ?? 'http://localhost:5173', { waitUntil: 'domcontentloaded' })
@@ -140,12 +139,24 @@ try {
   step('1. 마크다운을 A4 세로 한 벌로 낸다')
   await open('개발 환경.md')
   expect('글 옆에 PDF 단추가 섬', (await hasButton()) === 1)
-  const doc = await exportPdf('개발 환경.pdf')
+  const doc = await exportPdf('개발 환경.md.pdf')
   console.log('  ' + JSON.stringify({ ...doc, boxes: doc.boxes }))
   expect('PDF 파일임', doc.head.startsWith('%PDF-'), doc.head)
   expect('한 쪽', doc.pages === 1, String(doc.pages))
   expect('A4 세로', JSON.stringify(doc.boxes) === A4_PORTRAIT, JSON.stringify(doc.boxes))
   expect('빈 파일이 아님', doc.size > 5000, String(doc.size))
+
+  /*
+   * 저장 창에 미리 적히는 이름. 가짜 저장 창은 적힌 이름 그대로 파일을 지으므로,
+   * 저장된 이름이 곧 창에 뜬 이름입니다.
+   *
+   * 원래 확장자를 갈아 치우면 `개발 환경.pdf` 가 되어, 한 자리에 모아 둘 때 같은 이름의
+   * 다른 형식에서 낸 것과 부딪힙니다. 무엇에서 뜬 것인지도 이름에서 사라집니다.
+   */
+  const names = await page.evaluate(() => window.__savedNames())
+  console.log('  ' + JSON.stringify(names))
+  expect('저장 이름은 원래 이름 뒤에 .pdf',
+    names.includes('개발 환경.md.pdf') && !names.includes('개발 환경.pdf'), JSON.stringify(names))
 
   step('2. 뜨는 자리는 어두운 테마로 보던 중에도 흰 바탕이다')
   /*
@@ -186,7 +197,7 @@ try {
   // 종이에는 탭이 없습니다. 탭으로 가려 두면 보고 있던 한 장만 나가고 나머지는 사라집니다.
   expect('시트 이름이 둘', sheet.names.join() === '판매,메모', JSON.stringify(sheet.names))
   expect('탭은 두지 않음', sheet.tabs === 0, String(sheet.tabs))
-  const book = await saved('판매표.pdf')
+  const book = await saved('판매표.xlsx.pdf')
   expect('엑셀도 PDF 로 나옴', book.head.startsWith('%PDF-') && book.pages >= 1, JSON.stringify(book))
 
   step('4. 다 끝나면 화면 밖 자리를 치운다')
@@ -196,21 +207,27 @@ try {
 
   step('5. 긴 글은 여러 쪽으로 나뉜다')
   await open('긴 글.md')
-  const long = await exportPdf('긴 글.pdf')
+  const long = await exportPdf('긴 글.md.pdf')
   console.log('  ' + JSON.stringify({ pages: long.pages, size: long.size }))
   expect('여러 쪽', long.pages > 1, String(long.pages))
   expect('쪽마다 A4 세로', JSON.stringify(long.boxes) === A4_PORTRAIT, JSON.stringify(long.boxes))
 
-  step('6. 그림은 쪽 하나에, 가로로 길면 누운 쪽에 앉는다')
-  await open('세로 그림.png')
-  const portrait = await exportPdf('세로 그림.pdf')
-  expect('세운 쪽', JSON.stringify(portrait.boxes) === A4_PORTRAIT, JSON.stringify(portrait.boxes))
-  expect('한 쪽', portrait.pages === 1, String(portrait.pages))
-
-  await open('누운 그림.svg')
-  const landscape = await exportPdf('누운 그림.pdf')
-  console.log('  ' + JSON.stringify(landscape.boxes))
-  expect('누운 쪽', JSON.stringify(landscape.boxes) === A4_LANDSCAPE, JSON.stringify(landscape.boxes))
+  step('6. 그림에는 단추를 두지 않는다 — 종이로 내는 길은 수정 화면에 있다')
+  /*
+   * 그림을 종이에 담기 전에 하고 싶은 일(돌리기·자르기·크기 줄이기)은 모두 수정 화면에
+   * 있습니다. 보는 화면에도 단추를 두면, 손질하려던 사람은 파일을 한 번 만들어 폴더에
+   * 남기고 그것을 다시 열어 눌러야 했습니다. 수정 화면이 내는 것은 imageedit 묶음에서 봅니다.
+   */
+  const pictures = {}
+  for (const name of ['세로 그림.png', '누운 그림.svg']) {
+    await open(name)
+    pictures[name] = { 단추: await hasButton(), 수정: await page.locator('.doc-head button:has-text("수정")').count() }
+  }
+  console.log('  ' + JSON.stringify(pictures))
+  expect('그림에는 Export PDF 가 없음',
+    Object.values(pictures).every((one) => one.단추 === 0), JSON.stringify(pictures))
+  expect('그 대신 수정 단추가 있음',
+    Object.values(pictures).every((one) => one.수정 === 1), JSON.stringify(pictures))
 
   step('7. 표는 고치는 중에도 보던 그대로 낸다')
   /*
@@ -229,13 +246,13 @@ try {
   console.log('  ' + JSON.stringify(rows))
   expect('방금 쓴 줄까지 표로 그려짐', rows.length === 3 && rows[2].includes('셋'),
     JSON.stringify(rows))
-  const table = await saved('작은 표.pdf')
+  const table = await saved('작은 표.csv.pdf')
   expect('표도 PDF 로 나옴', table.head.startsWith('%PDF-'), JSON.stringify(table))
 
   step('8. 워드도 낸다')
   await open('안내문.docx')
   await page.waitForSelector('.text-preview.markdown-body', { timeout: 20000 })
-  const word = await exportPdf('안내문.pdf')
+  const word = await exportPdf('안내문.docx.pdf')
   expect('PDF 로 나옴', word.head.startsWith('%PDF-') && word.size > 5000, JSON.stringify(word))
 
   step('9. 글자 그대로 보여 주는 것에는 단추가 없다')
@@ -292,33 +309,11 @@ try {
   await page.screenshot({ path: join(HERE, '..', 'shots', 'pdfexport', '01-button.png'),
     clip: { x: 900, y: 480, width: 500, height: 420 } })
 
-  step('12. 그림에서는 배율 손잡이와 겹치지 않는다')
   /*
-   * 배율 손잡이도 같은 구석에 떠 있습니다. 네모가 겹치는지만 보지 않고, 그 자리를
-   * 눌렀을 때 무엇이 잡히는지까지 물어봅니다 — 눌리지 않으면 없는 것과 같습니다.
+   * 떠 있는 단추가 그림의 배율 손잡이와 겹치지 않는지는 imageedit 묶음에서 봅니다.
+   * 그림에는 Export PDF 가 서지 않으므로, 이제 그 구석에서 부딪히는 것은 맨 위·맨 아래입니다.
    */
-  await open('세로 그림.png')
-  await page.waitForSelector('.asset-view > .zoom-control', { timeout: 15000 })
-  await page.waitForTimeout(500)
-  const corner = await page.evaluate(() => {
-    const tools = document.querySelector('.doc-tools').getBoundingClientRect()
-    const zoom = document.querySelector('.asset-view > .zoom-control').getBoundingClientRect()
-    const button = document.querySelector('.asset-view > .zoom-control button')
-    const spot = button.getBoundingClientRect()
-    const hit = document.elementFromPoint(spot.left + spot.width / 2, spot.top + spot.height / 2)
-    return {
-      겹침: tools.bottom > zoom.top && tools.top < zoom.bottom
-        && tools.right > zoom.left && tools.left < zoom.right,
-      틈: Math.round(zoom.top - tools.bottom),
-      잡힌것: hit?.closest('.zoom-control') !== null ? '배율' : (hit?.className ?? '모름'),
-    }
-  })
-  console.log('  ' + JSON.stringify(corner))
-  expect('네모가 겹치지 않음', corner.겹침 === false, JSON.stringify(corner))
-  expect('배율 단추가 그대로 눌림', corner.잡힌것 === '배율', JSON.stringify(corner))
-  expect('단추 사이만큼 띄움', corner.틈 >= 6 && corner.틈 <= 16, JSON.stringify(corner))
-
-  step('13. 창을 좁혀도 같은 PDF 가 나온다')
+  step('12. 창을 좁혀도 같은 PDF 가 나온다')
   /*
    * 좁은 화면 규칙(@media max-width: 720px)이 글 칸의 좌우 여백을 20px 에서 12px 로
    * 줄입니다. 쪽 너비(698px)는 그 자보다 좁아, 그냥 두면 **뜨는 틀 안에서도** 그 규칙이
@@ -334,7 +329,7 @@ try {
 
   await open('쪽 나눔.md')
   const wideGap = await paper()
-  const wide = await saved('쪽 나눔.pdf')
+  const wide = await saved('쪽 나눔.md.pdf')
 
   await open('쪽 나눔 사본.md')
   await page.setViewportSize({ width: 600, height: 920 })
@@ -352,7 +347,7 @@ try {
     getComputedStyle(document.querySelector('.main .preview, .main .editor, .main .asset-view'))
       .paddingLeft)
   const narrowGap = await paper()
-  const narrow = await saved('쪽 나눔 사본.pdf')
+  const narrow = await saved('쪽 나눔 사본.md.pdf')
   await page.setViewportSize({ width: 1400, height: 920 })
   await page.waitForTimeout(400)
   // 덮개를 눌러 닫은 옆줄은 넓혀도 닫힌 채입니다. 트리를 다시 펴야 다음 글을 고릅니다.
@@ -371,7 +366,7 @@ try {
   expect('쪽 수가 같음', wide.pages === narrow.pages && wide.pages > 1,
     `${wide.pages} ≠ ${narrow.pages}`)
 
-  step('14. 넓은 표와 긴 코드는 잘리지 않고 쪽 너비에 맞춰 접힌다')
+  step('13. 넓은 표와 긴 코드는 잘리지 않고 쪽 너비에 맞춰 접힌다')
   /*
    * 화면에서는 넘치는 표와 코드를 제 칸 안에서 옆으로 굴려 봅니다. 종이에는 굴릴 손이
    * 없어, 칸 밖으로 나간 자리가 그대로 잘려 나갔습니다 — 열이 많은 표의 마지막 열과
@@ -429,10 +424,10 @@ try {
    */
   expect('제목도 같은 비로 줄어듦',
     wrapped.화면제목 === '24px' && wrapped.제목 === '19px', JSON.stringify(wrapped))
-  const fitted = await saved('넓은 표.pdf')
+  const fitted = await saved('넓은 표.md.pdf')
   expect('PDF 로 나옴', fitted.head.startsWith('%PDF-'), JSON.stringify(fitted))
 
-  step('15. 줄을 넘어간 코드 조각이 뒤의 글을 덮지 않는다')
+  step('14. 줄을 넘어간 코드 조각이 뒤의 글을 덮지 않는다')
   /*
    * 뜨는 쪽은 줄을 넘어가며 접힌 인라인 요소의 바탕을 **조각마다가 아니라 통째로 한 번**
    * 칠합니다. 그래서 두 줄에 걸친 코드 조각이 그 줄의 나머지 글을 네모나게 덮어, 무슨
@@ -469,7 +464,7 @@ try {
   expect('바탕을 지닌 인라인이 두 줄에 걸치지 않음', spread.걸친것.length === 0,
     JSON.stringify(spread.걸친것))
   expect('조각 뒤의 글도 그대로', spread.칸글.includes('약한 암호 3DES 허용'), spread.칸글)
-  const safe = await saved('덮임.pdf')
+  const safe = await saved('덮임.md.pdf')
   expect('PDF 로 나옴', safe.head.startsWith('%PDF-'), JSON.stringify(safe))
 } catch (cause) {
   fail('묶음이 도중에 멈춤', cause instanceof Error ? (cause.stack ?? cause.message) : String(cause))

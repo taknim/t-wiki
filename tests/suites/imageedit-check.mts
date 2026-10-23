@@ -1,6 +1,7 @@
 import {
-  clampCrop, clampSide, isUpright, keepRatio, MAX_SIDE, orientCss, orientedSize, orientName,
-  outputName, ratioOf, reshapeCrop, sizeCrop, turnBy, UPRIGHT,
+  clampCrop, clampSide, formatsFor, imageFormatName, isUpright, keepFormatOf, keepRatio, keepsAlpha,
+  MAX_SIDE, orientCss, orientedSize, orientName, outputName, ratioOf, reshapeCrop, sizeCrop,
+  turnBy, UPRIGHT,
 } from '../../src/lib/imageEdit'
 import { clampPercent, MAX_PERCENT, MIN_PERCENT, stepZoom, ZOOMS } from '../../src/lib/zoom'
 
@@ -51,9 +52,58 @@ same('아주 작게 줄여도 1 아래로는 안 감', keepRatio(1, 300, 200), 1
 console.log('\n>>> 4. 새 이름은 확장자를 갈고 원본을 덮지 않는다')
 same('png 를 jpg 로', outputName('사진.png', 'jpeg'), '사진_modified.jpg')
 same('jpg 를 png 로', outputName('자료/사진.jpg', 'png'), '사진_modified.png')
+same('webp 는 webp 로', outputName('사진.webp', 'webp'), '사진_modified.webp')
 same('확장자가 없어도', outputName('사진', 'png'), '사진_modified.png')
 same('점이 여럿이어도 마지막만', outputName('a.b.c.png', 'png'), 'a.b.c_modified.png')
 expect('원본 이름과 같지 않음', outputName('사진.png', 'png') !== '사진.png')
+/*
+ * PDF 만 원래 확장자를 지우지 않고 뒤에 덧붙입니다. 지우면 `사진.png` 와 `사진.jpg` 에서
+ * 낸 종이가 한 이름이 되어, 같은 폴더에 둘 때 덮어쓸지 묻는 물음을 받습니다.
+ */
+same('png 에서 낸 종이', outputName('사진.png', 'pdf'), '사진_modified.png.pdf')
+same('jpg 에서 낸 종이', outputName('자료/사진.jpg', 'pdf'), '사진_modified.jpg.pdf')
+expect('형식이 다르면 종이 이름도 다름',
+  outputName('사진.png', 'pdf') !== outputName('사진.jpg', 'pdf'))
+same('확장자가 없으면 덧붙일 것도 없음', outputName('사진', 'pdf'), '사진_modified.pdf')
+
+console.log('\n>>> 4-1. 고를 수 있는 형식은 원래 형식부터 늘어놓는다')
+/*
+ * 늘 PNG 가 맨 앞이던 때는, 사진(JPG)을 조금 자르려고 열면 형식이 PNG 로 갈려 자르기만
+ * 하려던 사람이 몇 배로 불어난 파일을 받았습니다.
+ */
+same('png 는 png 부터', formatsFor('사진.png').map((one) => one.id), ['png', 'jpeg', 'pdf'])
+same('jpg 는 jpg 부터', formatsFor('사진.jpg').map((one) => one.id), ['jpeg', 'png', 'pdf'])
+same('jpeg 도 같은 것', formatsFor('사진.jpeg').map((one) => one.id), ['jpeg', 'png', 'pdf'])
+// webp 는 늘 내놓는 형식에는 없지만, 원래 그 형식이면 그대로 둘 수 있어야 합니다.
+same('webp 는 webp 부터', formatsFor('사진.webp').map((one) => one.id), ['webp', 'png', 'jpeg', 'pdf'])
+/*
+ * 되돌릴 수 없는 형식. canvas 가 이 형식으로는 내놓지 못합니다. avif 가 여기 있는 것은
+ * 크롬이 거절하는 대신 **말없이 PNG 를 돌려주기** 때문입니다 — 그러면 avif 로 저장한 줄
+ * 알고 받은 파일이 PNG 입니다.
+ */
+for (const one of ['svg', 'gif', 'bmp', 'ico', 'avif']) {
+  same(`${one} 는 갈아야 함`, formatsFor(`그림.${one}`).map((each) => each.id), ['png', 'jpeg', 'pdf'])
+  same(`${one} 는 지킬 형식이 없음`, keepFormatOf(`그림.${one}`), null)
+}
+same('어느 쪽이든 PDF 는 있음',
+  ['png', 'jpg', 'webp', 'svg', 'gif', 'bmp', 'ico', 'avif']
+    .every((one) => formatsFor(`그림.${one}`).some((each) => each.id === 'pdf')), true)
+// 확장자를 크게 적어도 같은 것입니다.
+same('대문자 확장자도 같게', formatsFor('사진.JPG').map((one) => one.id), ['jpeg', 'png', 'pdf'])
+same('품질을 고르는 것만 lossy',
+  formatsFor('사진.webp').filter((one) => one.lossy).map((one) => one.id), ['webp', 'jpeg'])
+
+console.log('\n>>> 4-2. 투명을 지닐 수 있는 형식만 종이에 PNG 로 싣는다')
+// 사진을 PNG 로 담으면 PDF 가 몇 배로 불어나는데, 사진에는 애초에 투명이 없습니다.
+same('투명을 지닐 수 있는 것', ['png', 'gif', 'webp', 'avif', 'svg', 'ico'].map(
+  (one) => keepsAlpha(`그림.${one}`)), [true, true, true, true, true, true])
+same('사진은 아님', [keepsAlpha('사진.jpg'), keepsAlpha('사진.jpeg'), keepsAlpha('사진.bmp')],
+  [false, false, false])
+
+console.log('\n>>> 4-3. 형식 이름은 같은 것을 한 이름으로 모은다')
+same('jpe·jpg·jpeg 는 JPG', ['jpg', 'jpeg', 'jpe'].map((one) => imageFormatName(`사진.${one}`)),
+  ['JPG', 'JPG', 'JPG'])
+same('그 밖은 대문자로', [imageFormatName('그림.svg'), imageFormatName('그림.webp')], ['SVG', 'WEBP'])
 
 console.log('\n>>> 5. 보기 배율은 지금 값에서 한 걸음씩, 큰 쪽일수록 성글게 옮긴다')
 // 작을 때는 20% 씩, 100% 를 넘으면 25% 씩, 200% 를 넘으면 50% 씩.

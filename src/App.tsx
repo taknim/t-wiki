@@ -35,7 +35,7 @@ import {
 import { extractHeadings, parseFrontmatter, toggleTask } from './lib/markdown'
 import { ExternalChangeError } from './lib/fsAccess'
 import { exportDocumentPdf } from './components/PdfSheet'
-import { canExportPdf, imageToPdf, pdfNameFor } from './lib/pdfExport'
+import { canExportPdf, pdfNameFor } from './lib/pdfExport'
 import { TrashView } from './components/TrashView'
 import { KeyboardIcon, TrashIcon } from './components/icons'
 import { ShortcutsPopover } from './components/ShortcutsPopover'
@@ -46,7 +46,7 @@ import { matches, SHORTCUTS } from './lib/shortcuts'
 import { askZoomPercent, stepZoom } from './lib/zoom'
 import { readTrashPolicy } from './lib/saveOptions'
 import type { TrashItem } from './lib/trash'
-import { entryKind, readBinaryFile, readFile } from './lib/fsAccess'
+import { entryKind, readFile } from './lib/fsAccess'
 import { DEFAULT_VIEW_MODE, loadSession, saveSession } from './lib/session'
 import { formatTidyFor, highlightLanguage, textPreviewKind, trimWhitespace } from './lib/textPreview'
 import { isBigText } from './lib/bigText'
@@ -952,16 +952,17 @@ export default function App() {
   /*
    * PDF 로 낼 수 있는지.
    *
-   * **그려서 보여 주고 있는 것만** 냅니다. 미리보기를 꺼 두었거나(그림·오피스), 너무 커서
-   * 보는 자리로 열렸거나, 그림을 고치는 중이면 화면에 그려진 것이 없으니 낼 것도 없습니다.
+   * **그려서 보여 주고 있는 것만** 냅니다. 미리보기를 꺼 두었거나(오피스), 너무 커서 보는
+   * 자리로 열렸으면 화면에 그려진 것이 없으니 낼 것도 없습니다.
+   *
+   * 그림은 여기에 들지 않습니다. 그림을 종이로 내는 일은 수정 화면의 형식 고르기로
+   * 옮겼습니다(까닭은 pdfExport 의 canExportPdf 에 적어 두었습니다).
    */
   const exportKind = selection !== null && selection.kind !== 'dir'
     ? attachmentKind(selection.path)
     : null
   const exportable = selection !== null && selection.kind !== 'dir'
     && canExportPdf(selection.path) && !bigText
-    && editingImage !== selection.path
-    && (exportKind !== 'image' || imagePreview)
     && ((exportKind !== 'sheet' && exportKind !== 'word') || officePreview)
 
   const splitable = textPreview === 'table'
@@ -1028,20 +1029,18 @@ export default function App() {
     setExporting(true)
     try {
       const kind = attachmentKind(path)
-      const paper = kind === 'image'
-        ? await imageToPdf(await readBinaryFile(root, path), path)
-        : await exportDocumentPdf({
-          kind: isMarkdown(path)
-            ? 'markdown'
-            : kind === 'sheet' ? 'sheet' : kind === 'word' ? 'word' : 'table',
-          path,
-          text: isMarkdown(path) ? body : draft,
-          fields: isMarkdown(path) ? fields : undefined,
-          root,
-          index: vault.index,
-          assets: vault.assets,
-          settings: look,
-        })
+      const paper = await exportDocumentPdf({
+        kind: isMarkdown(path)
+          ? 'markdown'
+          : kind === 'sheet' ? 'sheet' : kind === 'word' ? 'word' : 'table',
+        path,
+        text: isMarkdown(path) ? body : draft,
+        fields: isMarkdown(path) ? fields : undefined,
+        root,
+        index: vault.index,
+        assets: vault.assets,
+        settings: look,
+      })
 
       const writable = await handle.createWritable()
       await writable.write(paper)
