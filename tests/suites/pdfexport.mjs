@@ -23,9 +23,12 @@ await page.addInitScript(readFileSync(join(HERE, '..', 'mock-fs.js'), 'utf8'))
  * (#faf4e8) "밝다" 와 "희다" 를 가려 줍니다.
  */
 await page.addInitScript(({ xlsx, docx }) => {
-  // 본문 너비는 '좁게'(680px)로 둡니다. 종이에서는 이 설정을 쓰지 않아야 합니다.
+  /*
+   * 본문 너비는 '좁게'(680px), 글자는 '아주 크게'(19px)로 둡니다.
+   * 종이에서는 둘 다 쓰지 않고 쪽에 맞춘 제 값으로 서야 합니다.
+   */
   localStorage.setItem('mdwiki:theme',
-    JSON.stringify({ theme: 'sepia', mode: 'dark', width: 'narrow' }))
+    JSON.stringify({ theme: 'sepia', mode: 'dark', width: 'narrow', size: 'largest' }))
   window.__installMockFs()
   const root = window.__mockRoot
   const sample = root._children.get('개발 환경.md')
@@ -364,6 +367,9 @@ try {
    * 긴 코드 한 줄의 뒷부분이 통째로 사라졌습니다.
    */
   await open('넓은 표.md')
+  // 화면 쪽 글자와 견주려면 그린 글이 서 있어야 합니다. 보기 모드는 앞 걸음을 따라옵니다.
+  await page.click('.doc-head .mode-switch button[aria-label="미리보기"]')
+  await page.waitForSelector('.main .preview', { timeout: 10000 })
   await page.click('.doc-tools .doc-tool-pdf')
   await page.waitForSelector('.pdf-sheet .markdown-body table', { timeout: 20000 })
   const wrapped = await page.evaluate(() => {
@@ -380,6 +386,11 @@ try {
       좁은표: Math.round(tables[tables.length - 1].getBoundingClientRect().width),
       코드넘침: code ? cut(code) : null,
       본문너비: getComputedStyle(host).getPropertyValue('--doc-width').trim(),
+      글자: getComputedStyle(host.querySelector('.markdown-body')).fontSize,
+      화면글자: getComputedStyle(document.querySelector('.main .preview')).fontSize,
+      제목: getComputedStyle(host.querySelector('.markdown-body h1')).fontSize,
+      화면제목: getComputedStyle(document.querySelector('.main .preview h1')).fontSize,
+      줄간격: getComputedStyle(host).getPropertyValue('--doc-leading').trim(),
     }
   })
   console.log('  ' + JSON.stringify(wrapped))
@@ -392,6 +403,21 @@ try {
   expect('작은 표는 늘어나지 않음', wrapped.좁은표 < 400, JSON.stringify(wrapped))
   // 본문 너비 설정('좁게' = 680px)은 쓰지 않습니다. 종이에서는 쪽 너비가 자입니다.
   expect('본문 너비 설정을 쓰지 않음', wrapped.본문너비 === 'none', String(wrapped.본문너비))
+  /*
+   * 글자 크기도 마찬가지입니다. 화면은 한 번에 한 화면만 보여 주므로 넉넉한 편이 읽기
+   * 좋지만, 종이는 쪽 수가 곧 무게입니다. '아주 크게'(19px)로 보고 있어도 종이에는 9pt
+   * 로 앉혀 한 쪽에 더 담습니다.
+   */
+  expect('화면은 고른 대로 큼', wrapped.화면글자 === '19px', String(wrapped.화면글자))
+  expect('종이는 9pt(12px)', wrapped.글자 === '12px', String(wrapped.글자))
+  expect('줄 간격도 촘촘함', wrapped.줄간격 === '1.5', String(wrapped.줄간격))
+  /*
+   * 제목 크기는 본문 크기에 매여 있지 않고 못 박혀 있습니다. 본문만 줄이면 제목만 유난히
+   * 커 보이고, 제목이 잦은 글에서는 쪽 수도 줄지 않습니다 — 쪽을 차지하던 것이 제목이기
+   * 때문입니다.
+   */
+  expect('제목도 같은 비로 줄어듦',
+    wrapped.화면제목 === '24px' && wrapped.제목 === '19px', JSON.stringify(wrapped))
   const fitted = await saved('넓은 표.pdf')
   expect('PDF 로 나옴', fitted.head.startsWith('%PDF-'), JSON.stringify(fitted))
 } catch (cause) {

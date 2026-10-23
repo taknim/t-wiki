@@ -1,7 +1,7 @@
 import { createRoot } from 'react-dom/client'
 import type { AssetIndex, DocIndex } from '../types'
 import { applyLightTheme, paletteFor, type ThemeSettings } from '../lib/theme'
-import { SHEET_WIDTH, sheetToPdf } from '../lib/pdfExport'
+import { PDF_LEADING, PDF_TEXT_SIZE, SHEET_WIDTH, sheetToPdf } from '../lib/pdfExport'
 import { ThemeContext } from './themeContext'
 import { Preview } from './Preview'
 import { TextPreview } from './TextPreview'
@@ -149,6 +149,12 @@ export async function exportDocumentPdf(job: PdfJob): Promise<Blob> {
    * 직접 적어 두므로, 스타일시트에 적은 것은 덮여 아무 일도 하지 않습니다.
    */
   host.style.setProperty('--doc-width', 'none')
+  /*
+   * 글자는 화면에서 보던 것보다 작게, 줄도 촘촘히. 종이는 쪽 수가 곧 무게입니다.
+   * 까닭은 pdfExport 의 PDF_TEXT_SIZE 에 적어 두었습니다.
+   */
+  host.style.setProperty('--doc-size', PDF_TEXT_SIZE)
+  host.style.setProperty('--doc-leading', PDF_LEADING)
   document.body.append(host)
 
   const root = createRoot(host)

@@ -1,7 +1,8 @@
 import {
   canExportPdf, CONTENT_HEIGHT, CONTENT_WIDTH, fitOnPage, pageBreaks, PAGE_HEIGHT, PAGE_MARGIN,
-  PAGE_WIDTH, pdfNameFor, rasterScale, SHEET_WIDTH,
+  PAGE_WIDTH, PDF_LEADING, PDF_TEXT_SIZE, pdfNameFor, rasterScale, SHEET_WIDTH,
 } from '../../src/lib/pdfExport'
+import { LEADINGS, SIZES } from '../../src/lib/theme'
 
 /*
  * PDF 로 낼 때의 셈만 따로 잽니다. 쪽을 어디서 가르는지, 그림을 어느 자리에 앉히는지.
@@ -47,6 +48,23 @@ same('여백 12.7mm', PAGE_MARGIN, 36)
 same('글 자리', [CONTENT_WIDTH, CONTENT_HEIGHT], [523.28, 769.89])
 // 1pt = 1/72인치, CSS 1px = 1/96인치. 포인트 자리를 4/3 배 하면 픽셀 자리입니다.
 same('글을 앉히는 너비', SHEET_WIDTH, 698)
+
+console.log('\n>>> 3-2. 종이의 글자는 화면에서 고를 수 있는 어느 크기보다 작다')
+/*
+ * 화면은 한 번에 한 화면만 보여 주므로 넉넉한 편이 읽기 좋지만, 종이는 쪽 수가 곧
+ * 무게입니다. 고를 수 있는 가장 작은 값(13px)보다도 작아야 "작게 뽑았다" 가 됩니다.
+ */
+const smallest = Math.min(...SIZES.map((one) => Number.parseFloat(one.value)))
+expect('가장 작은 화면 글자보다 작음', Number.parseFloat(PDF_TEXT_SIZE) < smallest,
+  `${PDF_TEXT_SIZE} ≥ ${smallest}px`)
+// 글자만 줄이면 줄 사이만 허옇게 벌어집니다. 줄 간격도 함께 줄입니다.
+const normal = LEADINGS.find((one) => one.id === 'normal')
+expect('줄 간격도 보통보다 촘촘함', Number(PDF_LEADING) < Number(normal?.value),
+  `${PDF_LEADING} ≥ ${normal?.value}`)
+// 그렇다고 읽을 수 없을 만큼 줄이지는 않습니다. 9pt 가 바닥입니다.
+expect('9pt(12px) 밑으로는 내려가지 않음', Number.parseFloat(PDF_TEXT_SIZE) >= 12, PDF_TEXT_SIZE)
+expect('줄 간격도 가장 좁은 값보다는 넓음',
+  Number(PDF_LEADING) > Math.min(...LEADINGS.map((one) => Number(one.value))), PDF_LEADING)
 
 console.log('\n>>> 4. 끊어도 되는 자리에서 쪽을 가른다')
 // 한 쪽에 100 씩. 110 과 190 에서 끊을 수 있으면 190 까지 채워 넣습니다.

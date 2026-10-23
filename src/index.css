@@ -3018,6 +3018,17 @@ button.info-caret:focus-visible { outline: 2px solid var(--accent); outline-offs
 .pdf-sheet .markdown-body td,
 .pdf-sheet .data-table th,
 .pdf-sheet .data-table td { overflow-wrap: anywhere; }
+/*
+ * 제목도 본문과 같은 비(0.8)로 줄입니다.
+ *
+ * 제목 크기는 본문 크기에 매여 있지 않고 못 박혀 있어(24·19·16px), 본문만 줄이면 제목만
+ * 유난히 커 보입니다. 제목이 잦은 글에서는 쪽 수도 줄지 않았습니다 — 쪽을 차지하던 것이
+ * 본문이 아니라 제목이었기 때문입니다.
+ */
+.pdf-sheet .markdown-body h1 { font-size: 19px; margin-block-end: 10px; }
+.pdf-sheet .markdown-body h2 { font-size: 15px; margin-block: 19px 8px; }
+.pdf-sheet .markdown-body h3 { font-size: 13px; margin-block: 16px 6px; }
+
 /* 긴 코드 한 줄도 잘라 버리지 않고 접어 내립니다. 뒷부분이 사라지는 것보다는 낫습니다. */
 .pdf-sheet .markdown-body pre {
   overflow: visible;
