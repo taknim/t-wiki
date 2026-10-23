@@ -91,6 +91,17 @@ await page.addInitScript(({ xlsx, docx }) => {
     + 'ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:'
     + 'ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384\n```\n\n'
     + '| 구분 | 값 |\n| --- | --- |\n| 하나 | 1 |\n')
+  /*
+   * 줄을 넘어가며 접히는 코드 조각. 조각 **뒤에 글이 더 있어야** 덮이는 것이 드러납니다.
+   * 조각만 든 칸은 제 바탕이 제 글만 덮으므로 아무 일도 없어 보입니다.
+   */
+  put('덮임.md', '# 덮임\n\n'
+    + '앞에 글을 길게 적어 코드 조각이 줄 끝에 걸리도록 합니다. 보안 업데이트가 계속 나오므로 '
+    + '설치 때 `dnf upgrade -y --refresh --setopt=install_weak_deps=False --exclude=kernel* '
+    + '--enablerepo=crb --disablerepo=epel-testing` 후 `rpm -q` 로 다시 확인해 이 표를 고칩니다. '
+    + '뒤에 오는 이 글이 가려지면 안 됩니다.\n\n'
+    + '| 구분 | 값 | 비고 |\n| --- | --- | --- |\n'
+    + '| 웹 | TLS 1.0·1.1·1.2 (`SSLProtocol all -SSLv2 -SSLv3`), 약한 암호 3DES 허용 | 2장 |\n')
 }, { xlsx: XLSX_B64, docx: DOCX_B64 })
 
 const open = async (name) => {
@@ -420,6 +431,46 @@ try {
     wrapped.화면제목 === '24px' && wrapped.제목 === '19px', JSON.stringify(wrapped))
   const fitted = await saved('넓은 표.pdf')
   expect('PDF 로 나옴', fitted.head.startsWith('%PDF-'), JSON.stringify(fitted))
+
+  step('15. 줄을 넘어간 코드 조각이 뒤의 글을 덮지 않는다')
+  /*
+   * 뜨는 쪽은 줄을 넘어가며 접힌 인라인 요소의 바탕을 **조각마다가 아니라 통째로 한 번**
+   * 칠합니다. 그래서 두 줄에 걸친 코드 조각이 그 줄의 나머지 글을 네모나게 덮어, 무슨
+   * 글이었는지 알 수 없게 되었습니다 — 표의 칸과 문단에서 글이 통째로 사라졌습니다.
+   *
+   * 화면이 아니라 뜬 그림에서 일어나는 일이라 색을 재서는 잡을 수 없습니다. 대신 그 일이
+   * 일어날 수 있는 꼴 자체를 막습니다: **바탕을 지닌 인라인은 두 줄에 걸치지 않는다.**
+   */
+  await open('덮임.md')
+  await page.click('.doc-tools .doc-tool-pdf')
+  await page.waitForSelector('.pdf-sheet .markdown-body table', { timeout: 20000 })
+  const spread = await page.evaluate(() => {
+    const host = document.querySelector('.pdf-sheet')
+    const 걸친것 = []
+    for (const one of host.querySelectorAll('.markdown-body *')) {
+      // 울타리 안의 코드는 블록이 제 바탕을 칠하므로 그런 일이 없습니다.
+      if (one.closest('pre')) continue
+      const look = getComputedStyle(one)
+      if (look.display !== 'inline') continue
+      if (look.backgroundColor === 'rgba(0, 0, 0, 0)') continue
+      if (one.getClientRects().length > 1) 걸친것.push(`${one.tagName}:${one.textContent.slice(0, 16)}`)
+    }
+    const chips = [...host.querySelectorAll('.markdown-body code')].filter((one) => !one.closest('pre'))
+    return {
+      걸친것,
+      키: chips.map((one) => Math.round(one.getBoundingClientRect().height)),
+      // 조각 뒤의 글이 그대로 남아 있는지. 덮이는 것은 그림에서지만 글은 여기 있어야 합니다.
+      칸글: host.querySelector('.markdown-body td')?.parentElement.textContent ?? '',
+    }
+  })
+  console.log('  ' + JSON.stringify(spread))
+  // 시험이 헛돌지 않으려면 접힐 만큼 긴 조각이 실제로 있어야 합니다(한 줄은 17px 남짓).
+  expect('두 줄이 되는 조각이 있음', spread.키.some((one) => one > 25), JSON.stringify(spread.키))
+  expect('바탕을 지닌 인라인이 두 줄에 걸치지 않음', spread.걸친것.length === 0,
+    JSON.stringify(spread.걸친것))
+  expect('조각 뒤의 글도 그대로', spread.칸글.includes('약한 암호 3DES 허용'), spread.칸글)
+  const safe = await saved('덮임.pdf')
+  expect('PDF 로 나옴', safe.head.startsWith('%PDF-'), JSON.stringify(safe))
 } catch (cause) {
   fail('묶음이 도중에 멈춤', cause instanceof Error ? (cause.stack ?? cause.message) : String(cause))
 } finally {
