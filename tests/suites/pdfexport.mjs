@@ -23,7 +23,9 @@ await page.addInitScript(readFileSync(join(HERE, '..', 'mock-fs.js'), 'utf8'))
  * (#faf4e8) "밝다" 와 "희다" 를 가려 줍니다.
  */
 await page.addInitScript(({ xlsx, docx }) => {
-  localStorage.setItem('mdwiki:theme', JSON.stringify({ theme: 'sepia', mode: 'dark' }))
+  // 본문 너비는 '좁게'(680px)로 둡니다. 종이에서는 이 설정을 쓰지 않아야 합니다.
+  localStorage.setItem('mdwiki:theme',
+    JSON.stringify({ theme: 'sepia', mode: 'dark', width: 'narrow' }))
   window.__installMockFs()
   const root = window.__mockRoot
   const sample = root._children.get('개발 환경.md')
@@ -71,6 +73,21 @@ await page.addInitScript(({ xlsx, docx }) => {
     + '\n\n## 표 뒤\n\n마지막 문단입니다.\n'
   put('쪽 나눔.md', paged)
   put('쪽 나눔 사본.md', paged)
+  /*
+   * 쪽보다 넓어지려 드는 글. 칸마다 띄어쓰기 없는 긴 토막을 넣어 **접을 자리가 없게**
+   * 만듭니다. 그냥 긴 글은 저절로 접혀 쪽 안에 들어오므로 아무것도 드러내지 못합니다.
+   */
+  put('넓은 표.md', '# 넓은 표\n\n'
+    + '| # | 위치 | 문제 | 고치는 법 | 품 | 비고 |\n| --- | --- | --- | --- | --- | --- |\n'
+    + Array.from({ length: 5 }, (_, at) => `| ${at + 1} `
+      + '| `application/controllers/Manage_excel_download.php` '
+      + '| `PHP7.2이상에서경고가납니다확인바랍니다` '
+      + '| `vendor/phpoffice/phpspreadsheet/src/Writer.php` | 2일 '
+      + '| `https://example.com/aaaaaaaa/bbbbbbbb/cccccccc` |').join('\n')
+    + '\n\n```sh\nSSLProtocol all -SSLv3 -TLSv1 -TLSv1.1 SSLCipherSuite '
+    + 'ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:'
+    + 'ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384\n```\n\n'
+    + '| 구분 | 값 |\n| --- | --- |\n| 하나 | 1 |\n')
 }, { xlsx: XLSX_B64, docx: DOCX_B64 })
 
 const open = async (name) => {
@@ -324,6 +341,12 @@ try {
   const narrow = await saved('쪽 나눔 사본.pdf')
   await page.setViewportSize({ width: 1400, height: 920 })
   await page.waitForTimeout(400)
+  // 덮개를 눌러 닫은 옆줄은 넓혀도 닫힌 채입니다. 트리를 다시 펴야 다음 글을 고릅니다.
+  if (!(await page.locator('.tree').count())) {
+    await page.keyboard.press('Meta+Shift+B')
+    await page.waitForSelector('.tree', { timeout: 8000 })
+    await page.waitForTimeout(300)
+  }
 
   console.log('  ' + JSON.stringify({ wideGap, narrowGap, onScreen,
     넓은창: wide.pages, 좁은창: narrow.pages }))
@@ -333,6 +356,44 @@ try {
   expect('좁은 창에서도 그대로 20px', narrowGap === '20px', narrowGap)
   expect('쪽 수가 같음', wide.pages === narrow.pages && wide.pages > 1,
     `${wide.pages} ≠ ${narrow.pages}`)
+
+  step('14. 넓은 표와 긴 코드는 잘리지 않고 쪽 너비에 맞춰 접힌다')
+  /*
+   * 화면에서는 넘치는 표와 코드를 제 칸 안에서 옆으로 굴려 봅니다. 종이에는 굴릴 손이
+   * 없어, 칸 밖으로 나간 자리가 그대로 잘려 나갔습니다 — 열이 많은 표의 마지막 열과
+   * 긴 코드 한 줄의 뒷부분이 통째로 사라졌습니다.
+   */
+  await open('넓은 표.md')
+  await page.click('.doc-tools .doc-tool-pdf')
+  await page.waitForSelector('.pdf-sheet .markdown-body table', { timeout: 20000 })
+  const wrapped = await page.evaluate(() => {
+    const host = document.querySelector('.pdf-sheet')
+    const edge = host.getBoundingClientRect().right
+    const tables = [...host.querySelectorAll('.markdown-body table')]
+    const code = host.querySelector('.markdown-body pre')
+    const cut = (one) => one.scrollWidth - one.clientWidth
+    return {
+      쪽넘침: host.scrollWidth - host.clientWidth,
+      표넘침: tables.map(cut),
+      표오른끝: tables.map((one) => Math.round(one.getBoundingClientRect().right - edge)),
+      // 몇 칸 안 되는 표는 쪽 끝까지 늘이지 않습니다.
+      좁은표: Math.round(tables[tables.length - 1].getBoundingClientRect().width),
+      코드넘침: code ? cut(code) : null,
+      본문너비: getComputedStyle(host).getPropertyValue('--doc-width').trim(),
+    }
+  })
+  console.log('  ' + JSON.stringify(wrapped))
+  expect('쪽이 넘치지 않음', wrapped.쪽넘침 === 0, JSON.stringify(wrapped))
+  expect('표가 제 칸 안에 다 들어옴', wrapped.표넘침.every((one) => one <= 0),
+    JSON.stringify(wrapped))
+  expect('표가 쪽 밖으로 나가지 않음', wrapped.표오른끝.every((one) => one <= 0),
+    JSON.stringify(wrapped))
+  expect('긴 코드도 접힘', wrapped.코드넘침 === 0, JSON.stringify(wrapped))
+  expect('작은 표는 늘어나지 않음', wrapped.좁은표 < 400, JSON.stringify(wrapped))
+  // 본문 너비 설정('좁게' = 680px)은 쓰지 않습니다. 종이에서는 쪽 너비가 자입니다.
+  expect('본문 너비 설정을 쓰지 않음', wrapped.본문너비 === 'none', String(wrapped.본문너비))
+  const fitted = await saved('넓은 표.pdf')
+  expect('PDF 로 나옴', fitted.head.startsWith('%PDF-'), JSON.stringify(fitted))
 } catch (cause) {
   fail('묶음이 도중에 멈춤', cause instanceof Error ? (cause.stack ?? cause.message) : String(cause))
 } finally {

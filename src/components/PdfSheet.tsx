@@ -143,6 +143,12 @@ export async function exportDocumentPdf(job: PdfJob): Promise<Blob> {
    * 옅은 음영으로 읽혀, 화면에서 보던 결이 남습니다.
    */
   host.style.setProperty('--bg', '#ffffff')
+  /*
+   * 본문 너비 설정은 쓰지 않습니다. 종이에서는 **쪽 너비가 자**입니다.
+   * 스타일시트가 아니라 여기서 적습니다 — 바로 위 applyLightTheme 가 같은 값을 칸에
+   * 직접 적어 두므로, 스타일시트에 적은 것은 덮여 아무 일도 하지 않습니다.
+   */
+  host.style.setProperty('--doc-width', 'none')
   document.body.append(host)
 
   const root = createRoot(host)

@@ -2982,8 +2982,6 @@ button.info-caret:focus-visible { outline: 2px solid var(--accent); outline-offs
   pointer-events: none;
   background: var(--bg);
   color: var(--text);
-  /* 쪽 너비가 자입니다. 사람이 고른 본문 너비는 화면에서만 씁니다. */
-  --doc-width: none;
 }
 /*
  * 글 칸의 여백을 못 박습니다.
@@ -2995,12 +2993,37 @@ button.info-caret:focus-visible { outline: 2px solid var(--accent); outline-offs
  */
 .pdf-sheet .preview { padding: 16px 20px; }
 /*
- * 굴려서 볼 수 없는 종이이므로 넘치는 것을 가두지 않습니다. 넓은 표는 글줄 바깥으로
- * 비어져 나온 채로 뜨고(그만큼까지 떠서) 쪽 너비에 맞춰 함께 줄어듭니다. 가둬 두면
- * 표의 오른쪽이 잘린 PDF 가 나옵니다.
+ * **종이는 옆으로 굴릴 수 없습니다.**
+ *
+ * 화면에서는 넘치는 표와 코드를 제 칸 안에서 옆으로 굴려 봅니다. 종이에서는 굴릴 손이
+ * 없어, 칸 밖으로 나간 자리가 그대로 잘려 나갑니다. 실제로 열이 많은 표의 마지막 열과
+ * 긴 코드 한 줄의 뒷부분이 통째로 사라졌습니다. 그러니 가두지 말고 **쪽 너비에 맞춰
+ * 접습니다.**
  */
 .pdf-sheet .preview,
 .pdf-sheet .table-wrap { overflow: visible; }
+/*
+ * 표는 쪽 너비 안으로 들어옵니다.
+ *
+ * `display: block` 이면 표가 제 안에서 굴러가는 칸이 되어 오른쪽이 잘립니다. 표로 세우고
+ * 너비만 묶으면 열을 좁혀 접어 줍니다. `width: 100%` 가 아니라 `max-width` 인 것은, 몇
+ * 칸 안 되는 작은 표까지 쪽 끝까지 늘어나면 허전해 보이기 때문입니다.
+ */
+.pdf-sheet .markdown-body table { display: table; max-width: 100%; overflow: visible; }
+/*
+ * 칸 안의 글은 어디서든 접습니다. 경로나 함수 이름(`models/Encrypt_m.php`)처럼 띄어쓰기가
+ * 없는 토막은 접을 자리가 없어, 그런 칸이 몇 개만 있어도 표가 쪽을 넘어섭니다.
+ */
+.pdf-sheet .markdown-body th,
+.pdf-sheet .markdown-body td,
+.pdf-sheet .data-table th,
+.pdf-sheet .data-table td { overflow-wrap: anywhere; }
+/* 긴 코드 한 줄도 잘라 버리지 않고 접어 내립니다. 뒷부분이 사라지는 것보다는 낫습니다. */
+.pdf-sheet .markdown-body pre {
+  overflow: visible;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
 /* 시트를 늘어놓을 때. 어느 시트인지 적고 사이를 띄웁니다. */
 .pdf-sheet .sheet-page + .sheet-page { margin-block-start: 28px; }
 .pdf-sheet .sheet-name { font-size: 17px; margin: 0 0 8px; }
