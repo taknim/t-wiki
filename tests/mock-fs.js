@@ -205,4 +205,39 @@ window.__installMockFs = function installMockFs() {
     const handle = savedDir._children.get(name)
     return handle ? (await handle.getFile()).text() : null
   }
+  /*
+   * 저장한 파일의 크기. **셈이 아니라 기다림에 씁니다.**
+   *
+   * `waitForFunction` 에 비동기 함수를 주면 돌려받은 약속 자체를 참으로 쳐서 첫 번째
+   * 재는 자리에서 곧바로 통과합니다. 그래서 다 쓰이기를 기다리는 자리에는 **동시에 재는**
+   * 손이 있어야 합니다. 없는 파일은 -1, 이름만 잡아 둔 빈 껍데기는 0 입니다.
+   */
+  window.__savedSize = (name) => {
+    const handle = savedDir._children.get(name)
+    if (!handle) return -1
+    return handle._data?.size ?? handle._data?.length ?? 0
+  }
+  /*
+   * 저장한 PDF 를 들여다봅니다.
+   *
+   * 글로 읽으면 안엣것이 깨지므로 바이트로 받아 한 글자씩 옮깁니다. 통째로 넘기면
+   * 메가바이트짜리 글이 되어 느려지니, 여기서 보고 셈만 넘깁니다.
+   * 쪽 꾸러미(`/Type /Page`)와 쪽 크기(`/MediaBox`)는 압축하지 않고 그대로 적힙니다.
+   */
+  window.__savedPdf = async (name) => {
+    const handle = savedDir._children.get(name)
+    if (!handle) return null
+    const bytes = new Uint8Array(await (await handle.getFile()).arrayBuffer())
+    let text = ''
+    for (const byte of bytes) text += String.fromCharCode(byte)
+    return {
+      size: bytes.length,
+      head: text.slice(0, 8),
+      pages: (text.match(/\/Type\s*\/Page[^s]/g) ?? []).length,
+      /* 쪽 크기는 소수 자리를 길게 적어 둡니다(595.2799999…). 둘째 자리로 끊어 봅니다. */
+      boxes: [...new Set((text.match(/\/MediaBox\s*\[[^\]]*\]/g) ?? []).map((one) =>
+        JSON.stringify((one.match(/[\d.]+/g) ?? []).map((size) => Math.round(Number(size) * 100) / 100))))]
+        .map((one) => JSON.parse(one)),
+    }
+  }
 }

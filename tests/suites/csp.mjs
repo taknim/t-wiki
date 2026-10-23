@@ -206,7 +206,21 @@ try {
     document.querySelector('.text-preview.markdown-body h1')?.textContent ?? null)
   expect('워드가 글로 그려짐', word === '워드 제목', String(word))
 
-  step('7. 저장소와 주고받기도 막히지 않는다')
+  /*
+   * PDF 로 낼 때도 벌을 두 개 더 내려받고, 글을 뜨는 쪽은 제 틀(iframe)을 세워 그 안에
+   * 화면을 한 벌 베낍니다. frame-src 나 img-src 를 잘못 좁히면 여기서만 막힙니다.
+   */
+  step('7. PDF 로 내보내기도 울타리 안에서 돈다')
+  await page.click('.tree-row:has-text("모둠")')
+  await page.waitForSelector('.preview .mermaid-figure svg', { timeout: 15000 })
+  await page.click('.doc-head .head-pdf')
+  await page.waitForFunction(() => window.__savedSize('모둠.pdf') > 0, undefined, { timeout: 60000 })
+  const paper = await page.evaluate(() => window.__savedPdf('모둠.pdf'))
+  console.log('  ' + JSON.stringify(paper))
+  expect('PDF 가 만들어짐', paper.head.startsWith('%PDF-') && paper.size > 5000,
+    JSON.stringify(paper))
+
+  step('8. 저장소와 주고받기도 막히지 않는다')
   await page.click('button[aria-label="설정"]')
   await page.waitForSelector('.settings-nav')
   await page.click('.settings-nav button:has-text("GitHub 동기화")')
@@ -232,7 +246,7 @@ try {
   console.log('  저장소: ' + JSON.stringify(landed))
   expect('저장소에 올라감', landed.length > 0, JSON.stringify(landed))
 
-  step('8. 막힌 것이 하나도 없다')
+  step('9. 막힌 것이 하나도 없다')
   const blocked = await page.evaluate(() => window.__csp)
   console.log('  ' + JSON.stringify(blocked))
   expect('CSP 에 걸린 것이 없음', blocked.length === 0, JSON.stringify(blocked))

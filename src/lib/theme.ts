@@ -547,12 +547,13 @@ const VARIABLES: [keyof Palette, string][] = [
 ]
 
 /**
- * 값을 <html> 에 인라인으로 얹습니다.
- * 스타일시트의 :root 나 prefers-color-scheme 규칙보다 우선하므로
- * 시스템 설정과 무관하게 고른 테마가 그대로 적용됩니다.
+ * 색과 글자 설정을 그 칸에 인라인으로 얹습니다.
+ *
+ * <html> 에 얹으면 스타일시트의 :root 나 prefers-color-scheme 규칙보다 우선하므로
+ * 시스템 설정과 무관하게 고른 테마가 그대로 적용됩니다. 칸 하나에만 얹을 수도 있게
+ * 갈라 두었습니다 — PDF 로 낼 글은 화면과 따로 **밝은 벌**로 그려야 합니다.
  */
-export function applyTheme(settings: ThemeSettings, isDark: boolean): void {
-  const root = document.documentElement
+function applyVariables(root: HTMLElement, settings: ThemeSettings, isDark: boolean): void {
   const palette = paletteFor(settings, isDark)
 
   for (const [key, variable] of VARIABLES) {
@@ -577,6 +578,22 @@ export function applyTheme(settings: ThemeSettings, isDark: boolean): void {
   root.style.colorScheme = isDark ? 'dark' : 'light'
   root.dataset.theme = settings.theme
   root.dataset.mode = isDark ? 'dark' : 'light'
+}
+
+/** 고른 테마를 화면 전체에 얹습니다. */
+export function applyTheme(settings: ThemeSettings, isDark: boolean): void {
+  applyVariables(document.documentElement, settings, isDark)
+}
+
+/**
+ * 고른 테마의 **밝은 벌**을 그 칸에만 얹습니다.
+ *
+ * PDF 로 낼 글에 씁니다. 어두운 테마로 보던 글을 그대로 내보내면 쪽마다 검은 바탕이
+ * 깔려 잉크를 들이켜고, 화면에서는 멀쩡했던 글자가 종이에서는 읽히지 않습니다.
+ * 테마 자체는 그대로 두고(사람이 고른 글꼴·글자 크기·줄 간격은 지킵니다) 색만 밝은 벌로 바꿉니다.
+ */
+export function applyLightTheme(element: HTMLElement, settings: ThemeSettings): void {
+  applyVariables(element, settings, false)
 }
 
 const STORAGE_KEY = 'mdwiki:theme'

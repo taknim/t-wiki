@@ -7,6 +7,14 @@ interface OfficePreviewProps {
   path: string
 }
 
+interface SheetPreviewProps extends OfficePreviewProps {
+  /**
+   * 시트를 탭으로 오가지 않고 모두 한 줄로 늘어놓을지. PDF 로 낼 때 켭니다.
+   * 종이에는 탭이 없으니, 탭으로 가려 두면 보고 있던 한 장만 나가고 나머지는 사라집니다.
+   */
+  flat?: boolean
+}
+
 /** 아주 큰 시트는 앞부분만 그립니다. 글 첨부 미리보기와 같은 잣대입니다. */
 const MAX_ROWS = 500
 
@@ -22,7 +30,7 @@ interface Sheet {
  * 읽는 벌(SheetJS)은 이 파일을 열 때만 내려받습니다. 첫 화면에 지고 다닐 무게가 아닙니다.
  * 셀은 서식이 입혀진 글자 그대로 가져옵니다. 날짜와 소수점이 사람이 보던 모양대로 나옵니다.
  */
-export function SheetPreview({ root, path }: OfficePreviewProps) {
+export function SheetPreview({ root, path, flat = false }: SheetPreviewProps) {
   const [sheets, setSheets] = useState<Sheet[] | null>(null)
   const [at, setAt] = useState(0)
   const [error, setError] = useState<string | null>(null)
@@ -70,13 +78,12 @@ export function SheetPreview({ root, path }: OfficePreviewProps) {
   if (!sheets) return <p className="asset-note">시트를 읽는 중…</p>
   if (sheets.length === 0) return <p className="panel-empty">시트가 없습니다.</p>
 
-  const sheet = sheets[Math.min(at, sheets.length - 1)]
-  const columns = sheet.rows.reduce((most, row) => Math.max(most, row.length), 0)
+  const pages = flat ? sheets : [sheets[Math.min(at, sheets.length - 1)]]
 
   return (
     <div className="preview text-preview">
       {/* 시트가 여럿이면 아래쪽 탭으로 오갑니다. 엑셀에서 보던 자리와 같습니다. */}
-      {sheets.length > 1 && (
+      {!flat && sheets.length > 1 && (
         <div className="sheet-tabs" role="group" aria-label="시트">
           {sheets.map((one, index) => (
             <button
@@ -92,6 +99,22 @@ export function SheetPreview({ root, path }: OfficePreviewProps) {
         </div>
       )}
 
+      {pages.map((sheet) => (
+        <section key={sheet.name} className="sheet-page">
+          {/* 늘어놓을 때는 어느 시트인지 적어 줍니다. 탭이 없으면 구분이 가지 않습니다. */}
+          {flat && sheets.length > 1 && <h2 className="sheet-name">{sheet.name}</h2>}
+          <SheetBody sheet={sheet} />
+        </section>
+      ))}
+    </div>
+  )
+}
+
+function SheetBody({ sheet }: { sheet: Sheet }) {
+  const columns = sheet.rows.reduce((most, row) => Math.max(most, row.length), 0)
+
+  return (
+    <>
       {sheet.rows.length === 0 ? (
         <p className="panel-empty">빈 시트입니다.</p>
       ) : (
@@ -115,7 +138,7 @@ export function SheetPreview({ root, path }: OfficePreviewProps) {
         {sheet.total}행 · {columns}열
         {sheet.total > MAX_ROWS && ` (앞 ${MAX_ROWS}행만 표시)`}
       </p>
-    </div>
+    </>
   )
 }
 

@@ -34,6 +34,9 @@ import {
 } from './lib/attachments'
 import { extractHeadings, parseFrontmatter, toggleTask } from './lib/markdown'
 import { ExternalChangeError } from './lib/fsAccess'
+import { exportDocumentPdf } from './components/PdfSheet'
+import { PdfExportButton } from './components/PdfExportButton'
+import { canExportPdf, imageToPdf, pdfNameFor } from './lib/pdfExport'
 import { TrashView } from './components/TrashView'
 import { KeyboardIcon, TrashIcon } from './components/icons'
 import { ShortcutsPopover } from './components/ShortcutsPopover'
@@ -44,7 +47,7 @@ import { matches, SHORTCUTS } from './lib/shortcuts'
 import { askZoomPercent, stepZoom } from './lib/zoom'
 import { readTrashPolicy } from './lib/saveOptions'
 import type { TrashItem } from './lib/trash'
-import { entryKind, readFile } from './lib/fsAccess'
+import { entryKind, readBinaryFile, readFile } from './lib/fsAccess'
 import { DEFAULT_VIEW_MODE, loadSession, saveSession } from './lib/session'
 import { formatTidyFor, highlightLanguage, textPreviewKind, trimWhitespace } from './lib/textPreview'
 import { isBigText } from './lib/bigText'
@@ -119,6 +122,8 @@ export default function App() {
   const [editingImage, setEditingImage] = useState<string | null>(null)
   /** 그림을 볼 때의 배율. null 이면 화면에 맞춰 봅니다. */
   const [imageZoom, setImageZoom] = useState<number | null>(null)
+  /** PDF 를 뜨는 중인지. 몇 초 걸리는 일이라 단추로 알립니다. */
+  const [exporting, setExporting] = useState(false)
   const [reportOpen, setReportOpen] = useState(false)
   const [historyOpen, setHistoryOpen] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
@@ -945,6 +950,21 @@ export default function App() {
    */
   if (fresh !== null && selectedPath !== fresh) setFresh(null)
 
+  /*
+   * PDF 로 낼 수 있는지.
+   *
+   * **그려서 보여 주고 있는 것만** 냅니다. 미리보기를 꺼 두었거나(그림·오피스), 너무 커서
+   * 보는 자리로 열렸거나, 그림을 고치는 중이면 화면에 그려진 것이 없으니 낼 것도 없습니다.
+   */
+  const exportKind = selection !== null && selection.kind !== 'dir'
+    ? attachmentKind(selection.path)
+    : null
+  const exportable = selection !== null && selection.kind !== 'dir'
+    && canExportPdf(selection.path) && !bigText
+    && editingImage !== selection.path
+    && (exportKind !== 'image' || imagePreview)
+    && ((exportKind !== 'sheet' && exportKind !== 'word') || officePreview)
+
   const splitable = textPreview === 'table'
   const textMode: ViewMode = selection !== null && fresh === selection.path
     ? 'edit'
@@ -978,6 +998,62 @@ export default function App() {
     setDraft(draft.slice(0, draft.length - body.length) + next)
     markEdited()
   }
+
+  /**
+   * 보던 것을 PDF 로 냅니다.
+   *
+   * 저장할 자리를 **먼저** 묻습니다. 떠서 담는 데 몇 초가 걸리는데, 그 뒤에 저장 창을
+   * 열려 하면 브라우저가 "사람이 누른 김에" 로 보지 않아 창이 열리지 않습니다.
+   * 물러서면 그린 것도, 쓴 것도 없습니다.
+   *
+   * 고치던 글은 **지금 글상자에 든 그대로** 냅니다. 파일에 아직 안 쓴 글을 두고
+   * 파일에 적힌 옛 글을 내보내면, 보고 있는 것과 다른 PDF 가 나옵니다.
+   */
+  const handleExportPdf = useCallback(async () => {
+    if (!vault.root || !selection || selection.kind === 'dir') return
+    const { path } = selection
+    const root = vault.root
+
+    let handle: FileSystemFileHandle
+    try {
+      handle = await window.showSaveFilePicker({
+        id: 'mdwiki-pdf',
+        suggestedName: pdfNameFor(path),
+        types: [{ description: 'PDF 문서', accept: { 'application/pdf': ['.pdf'] } }],
+      })
+    } catch {
+      // 저장 창을 그냥 닫으면 여기로 옵니다. 알릴 것이 없습니다.
+      return
+    }
+
+    setExporting(true)
+    try {
+      const kind = attachmentKind(path)
+      const paper = kind === 'image'
+        ? await imageToPdf(await readBinaryFile(root, path), path)
+        : await exportDocumentPdf({
+          kind: isMarkdown(path)
+            ? 'markdown'
+            : kind === 'sheet' ? 'sheet' : kind === 'word' ? 'word' : 'table',
+          path,
+          text: isMarkdown(path) ? body : draft,
+          fields: isMarkdown(path) ? fields : undefined,
+          root,
+          index: vault.index,
+          assets: vault.assets,
+          settings: look,
+        })
+
+      const writable = await handle.createWritable()
+      await writable.write(paper)
+      await writable.close()
+      flash(`PDF 로 냈습니다 · ${handle.name}`)
+    } catch (cause) {
+      report(cause)
+    } finally {
+      setExporting(false)
+    }
+  }, [body, draft, fields, flash, look, report, selection, vault.assets, vault.index, vault.root])
 
   /*
    * 행·열 표시를 누르면 갈 자리를 칸마다 따로 묻습니다. 열을 비우면 그 줄 첫 칸.
@@ -1997,6 +2073,7 @@ export default function App() {
                     수정
                   </button>
                 )}
+                {exportable && <PdfExportButton busy={exporting} onExport={() => void handleExportPdf()} />}
               </div>
 
               {editableText && bigText ? (
@@ -2063,6 +2140,7 @@ export default function App() {
                 <h1>{fileNameOf(selectedPath)}</h1>
                 <SaveState dirty={dirty} saving={saving} dueAt={saveDueAt} seconds={autoSave.seconds} onSave={() => void commit()} />
                 <ViewModeSwitch mode={viewMode} onChange={setViewMode} />
+                {exportable && <PdfExportButton busy={exporting} onExport={() => void handleExportPdf()} />}
               </div>
 
               {fields.length > 0 && (

@@ -479,3 +479,19 @@ export function MoveIcon(props: IconProps) {
     </Svg>
   )
 }
+
+/**
+ * PDF 로 내보내기. 쪽 한 장에서 아래로 내려가는 화살입니다.
+ *
+ * 글자로 `PDF` 를 그리지 않습니다. 16px 안에서는 세 글자가 뭉개져 무슨 글자인지
+ * 알 수 없고, 단추 옆에 이미 `PDF` 라고 적혀 있습니다.
+ */
+export function PdfIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M9.4 2.4H4.2a.8.8 0 0 0-.8.8v9.6a.8.8 0 0 0 .8.8h7.6a.8.8 0 0 0 .8-.8V5.4z" />
+      <path d="M9.2 2.4v3.2h3.2" />
+      <path d="M8 7.6v3.6M6.4 9.8L8 11.4l1.6-1.6" />
+    </Svg>
+  )
+}
