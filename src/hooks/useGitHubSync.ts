@@ -183,6 +183,14 @@ export function useGitHubSync({ root, ready, docs, assets, onBeforeSync, onLocal
   useEffect(() => {
     readyRef.current = ready
   }, [ready])
+  /*
+   * 마지막으로 우리가 올린 커밋. **가지 끝이 뒤처져 보이는지 가리는 데** 씁니다.
+   * 회차 안에서 읽으므로 상태가 아니라 ref 로 들고 있어야 한 박자 묵은 값을 보지 않습니다.
+   */
+  const lastCommitRef = useRef<LastCommit | null>(null)
+  useEffect(() => {
+    lastCommitRef.current = lastCommit
+  }, [lastCommit])
   const callbacksRef = useRef({ onBeforeSync, onLocalChanged })
 
   // ref 쓰기는 렌더가 아니라 커밋 뒤에 해야 합니다.
@@ -308,7 +316,23 @@ export function useGitHubSync({ root, ready, docs, assets, onBeforeSync, onLocal
         // 편집 중이던 내용이 아직 파일에 없으면 그대로 덮어써질 수 있습니다.
         await callbacksRef.current.onBeforeSync(trigger)
 
-        const remote = await scanRemote(current)
+        /*
+         * **우리가 이미 지나온 자리가 돌아오면 기다렸다 다시 읽습니다.**
+         *
+         * GitHub 은 쓴 직후의 읽기가 뒤처질 수 있습니다. 방금 우리가 옮겨 놓은 가지를
+         * 읽었는데 그 앞 커밋이 오고, 그 위에 쌓으면 `Update is not a fast forward` 로
+         * 거절당합니다. 곧바로 되물어도 같은 답이 와서 재시도까지 통째로 깨집니다.
+         * 지난 커밋의 부모가 그대로 보인다면 남이 되감은 것이 아니라 아직 안 보이는 것입니다.
+         */
+        const onStale = () => setStatus({
+          phase: 'running',
+          message: '저장소가 아직 방금 올린 커밋을 보여 주지 않습니다. 잠시 기다리는 중…',
+          progress: null,
+        })
+        const remote = await scanRemote(current, {
+          passed: lastCommitRef.current?.parent ?? null,
+          onWait: onStale,
+        })
         if (remote.truncated) {
           throw new Error('저장소가 너무 커서 파일 목록을 다 받지 못했습니다. 하위 폴더를 지정해 범위를 좁혀 주세요.')
         }
@@ -371,6 +395,7 @@ export function useGitHubSync({ root, ready, docs, assets, onBeforeSync, onLocal
           plan,
           remote,
           synced,
+          onStale,
           onProgress: (done, total, path) => setStatus((previous) => {
             const before = previous.progress?.steps ?? []
             const step: SyncStep | null = path === ''
@@ -395,7 +420,7 @@ export function useGitHubSync({ root, ready, docs, assets, onBeforeSync, onLocal
 
         // 올릴 것이 없었으면 커밋도 없습니다. 그때는 지난 커밋을 그대로 둡니다.
         if (result.commitSha) {
-          const commit = { sha: result.commitSha, at }
+          const commit = { sha: result.commitSha, at, parent: result.parentSha }
           await saveLastCommit(key, commit)
           setLastCommit(commit)
         }
@@ -480,8 +505,12 @@ export function useGitHubSync({ root, ready, docs, assets, onBeforeSync, onLocal
             message: '저장소가 그 사이에 바뀌었습니다. 다시 맞추는 중…',
             progress: null,
           })
-          // 정말로 다른 쪽이 쓰는 중이라면 조금 쉬었다 가는 편이 낫습니다.
-          await new Promise((done) => setTimeout(done, 400 * attempt))
+          /*
+           * 정말로 다른 쪽이 쓰는 중이라면 조금 쉬었다 가는 편이 낫습니다.
+           * 400ms·800ms 로 두었더니 셋을 합쳐 1.2초뿐이라, 저장소가 따라오기 전에
+           * 세 번을 다 써 버렸습니다. 갑절씩 늘려 뒤로 갈수록 넉넉히 기다립니다.
+           */
+          await new Promise((done) => setTimeout(done, 600 * 2 ** (attempt - 1)))
         }
       })
 

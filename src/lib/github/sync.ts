@@ -51,8 +51,58 @@ function toVaultPath(config: GitHubConfig, repoPath: string): string | null {
   return repoPath.startsWith(prefix) ? repoPath.slice(prefix.length) : null
 }
 
-export async function scanRemote(config: GitHubConfig): Promise<RemoteSnapshot> {
-  const head = await api.getHead(config)
+/**
+ * 가지 끝이 아직 따라오지 못했을 때 다시 읽기까지 기다리는 시간(ms).
+ *
+ * GitHub 의 Git Database API 는 **쓴 직후의 읽기가 뒤처질 수 있습니다.** 방금 우리가
+ * 옮겨 놓은 가지를 읽었는데 옛 커밋이 돌아오고, 그 위에 커밋을 쌓으면 우리 커밋이 빠져
+ * 있으니 `Update is not a fast forward` 로 거절당합니다. 곧바로 다시 읽어도 같은 답이
+ * 오므로 재시도까지 통째로 깨집니다.
+ *
+ * 그래서 **기다렸다 다시 읽습니다.** 점점 길게 기다리는 것은, 대개 첫 번째나 두 번째에
+ * 따라오는데 그때마다 길게 쉬면 멀쩡한 회차까지 느려지기 때문입니다. 다 쓰면 그냥
+ * 읽은 대로 갑니다 — 영영 기다리는 것보다 한 번 거절당하고 다시 세우는 편이 낫습니다.
+ */
+export const STALE_WAITS = [500, 1000, 2000, 4000, 8000]
+
+/** 가지 끝이 "따라왔는지" 를 가리는 조건. 둘 다 없으면 기다리지 않습니다. */
+export interface FreshCheck {
+  /** 이 커밋이 가지 끝에 설 때까지. 방금 우리가 올린 커밋입니다. */
+  wanted?: string | null
+  /** 가지 끝이 이 자리를 벗어날 때까지. 우리가 이미 지나온 자리(지난 커밋의 부모)입니다. */
+  passed?: string | null
+  /** 기다리기 시작할 때. 화면에 "아직 안 보인다" 고 적어 주는 데 씁니다. */
+  onWait?: (ms: number) => void
+}
+
+/**
+ * 읽어 온 가지 끝이 **우리가 아는 것보다 뒤처져 있는지**.
+ *
+ * `wanted` 는 "이것이어야 한다"(방금 올린 커밋), `passed` 는 "이것이면 안 된다"(이미
+ * 지나온 자리)입니다. 둘을 따로 두는 것은 물음이 서로 다르기 때문입니다 — 올린 직후에는
+ * 무엇이 서야 하는지 알지만, 다음 회차에는 그 사이에 남이 무엇을 올렸을지 알 수 없어
+ * "적어도 거기는 아니다" 만 말할 수 있습니다.
+ */
+export function isBehind(head: api.HeadInfo | null, check: FreshCheck): boolean {
+  if (!head) return false
+  if (check.wanted) return head.commitSha !== check.wanted
+  if (check.passed) return head.commitSha === check.passed
+  return false
+}
+
+export async function scanRemote(
+  config: GitHubConfig,
+  check: FreshCheck = {},
+): Promise<RemoteSnapshot> {
+  let head = await api.getHead(config)
+
+  for (const wait of STALE_WAITS) {
+    if (!isBehind(head, check)) break
+    check.onWait?.(wait)
+    await new Promise((done) => setTimeout(done, wait))
+    head = await api.getHead(config)
+  }
+
   if (!head) return { head: null, files: new Map(), truncated: false }
 
   const { entries, truncated } = await api.getTree(config, head.treeSha)
@@ -272,6 +322,8 @@ export interface ApplyOptions {
   remote: RemoteSnapshot
   synced: SyncState
   onProgress?: (done: number, total: number, path: string) => void
+  /** 저장소가 아직 우리 커밋을 보여 주지 않아 기다리는 중일 때. 화면에 적어 줍니다. */
+  onStale?: (ms: number) => void
 }
 
 export interface ApplyResult {
@@ -279,6 +331,8 @@ export interface ApplyResult {
   synced: SyncState
   localChanged: boolean
   commitSha: string | null
+  /** 그 커밋의 부모. 다음 회차가 "이미 지나온 자리" 를 가리는 데 씁니다. */
+  parentSha: string | null
   /**
    * 우리가 저장소를 읽은 뒤 다른 쪽이 먼저 올려서 커밋이 거부됐는지.
    * 잘못된 게 아니라 다시 읽고 다시 하면 되는 상황이라 따로 표시합니다.
@@ -287,7 +341,7 @@ export interface ApplyResult {
 }
 
 export async function applyPlan(options: ApplyOptions): Promise<ApplyResult> {
-  const { root, config, plan, remote, onProgress } = options
+  const { root, config, plan, remote, onProgress, onStale } = options
   const synced: SyncState = { ...options.synced }
   const log: SyncLogLine[] = []
   let localChanged = false
@@ -418,9 +472,14 @@ export async function applyPlan(options: ApplyOptions): Promise<ApplyResult> {
     try {
       commitSha = await commitChanges(config, remote.head, uploads, binaryUploads, deletions, staged)
 
-      // 커밋된 실제 blob SHA 를 다시 읽어 기준점으로 삼습니다.
-      // 직접 계산한 값을 믿는 대신 서버가 저장한 값을 그대로 씁니다.
-      const fresh = await scanRemote(config)
+      /*
+       * 커밋된 실제 blob SHA 를 다시 읽어 기준점으로 삼습니다.
+       * 직접 계산한 값을 믿는 대신 서버가 저장한 값을 그대로 씁니다.
+       *
+       * **방금 올린 커밋이 설 때까지 기다렸다 읽습니다.** 뒤처진 답을 그대로 받으면 옛
+       * 트리에서 SHA 를 찾게 되어 기준점이 비고, 다음 회차가 같은 파일을 다시 올립니다.
+       */
+      const fresh = await scanRemote(config, { wanted: commitSha, onWait: onStale })
       for (const path of [...uploads.keys(), ...binaryUploads.keys()]) {
         const sha = fresh.files.get(path)
         if (sha) synced[path] = sha
@@ -448,7 +507,7 @@ export async function applyPlan(options: ApplyOptions): Promise<ApplyResult> {
   }
 
   onProgress?.(totalSteps, totalSteps, '')
-  return { log, synced, localChanged, commitSha, staleRemote }
+  return { log, synced, localChanged, commitSha, parentSha: remote.head?.commitSha ?? null, staleRemote }
 }
 
 async function commitChanges(
